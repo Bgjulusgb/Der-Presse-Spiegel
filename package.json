@@ -1,7 +1,7 @@
 {
   "name": "pressespiegel-kammerspiele",
-  "version": "1.0.0",
-  "description": "Intelligentes Pressespiegel-Tool fuer die Muenchner Kammerspiele - ohne kostenpflichtige APIs",
+  "version": "1.1.0",
+  "description": "Lokales Pressespiegel-Tool fuer die Muenchner Kammerspiele - alles offline, keine APIs, keine Cloud",
   "main": "bin/cli.js",
   "bin": {
     "pressespiegel": "./bin/cli.js"
@@ -12,8 +12,8 @@
     "report": "node bin/cli.js report",
     "schedule": "node bin/cli.js schedule",
     "stats": "node bin/cli.js stats",
-    "test": "node --test tests/",
-    "test:watch": "node --test --watch tests/"
+    "test": "node --test tests/*.test.js",
+    "test:watch": "node --test --watch tests/*.test.js"
   },
   "keywords": [
     "pressespiegel",
@@ -21,7 +21,8 @@
     "kammerspiele",
     "muenchen",
     "scraping",
-    "rss"
+    "rss",
+    "local"
   ],
   "author": "Muenchner Kammerspiele",
   "license": "MIT",
@@ -38,7 +39,6 @@
     "dotenv": "^16.4.5",
     "natural": "^8.0.1",
     "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.15",
     "p-limit": "^3.1.0",
     "puppeteer": "^23.5.0",
     "rss-parser": "^3.13.0",

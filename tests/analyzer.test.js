@@ -10,7 +10,9 @@ const {
   passesRequiredFilter,
   detectArticleType,
   categorize,
-  generateSummary
+  generateSummary,
+  findContextualMatch,
+  findFuzzyMatch
 } = require('../src/analyzer');
 
 test('passesRequiredFilter akzeptiert Kammerspiele-Artikel', () => {
@@ -118,6 +120,74 @@ test('generateSummary respektiert Maximallaenge', () => {
   };
   const summary = generateSummary(article, 50);
   assert.ok(summary.length <= 51);
+});
+
+test('passesRequiredFilter schliesst Hamburger Kammerspiele aus', () => {
+  const article = {
+    title: 'Hamburger Kammerspiele zeigen neues Stueck',
+    fullText: 'Die Hamburger Kammerspiele zeigen eine neue Inszenierung.'
+  };
+  const result = passesRequiredFilter(article);
+  assert.equal(result.passes, false);
+  assert.ok(result.reason.includes('hamburger'));
+});
+
+test('calculateRelevance erkennt aktuelle Produktion "Wokey Wokey"', () => {
+  const article = {
+    title: 'Wokey Wokey an den Kammerspielen',
+    fullText: 'Nora Abdel-Maksoud inszeniert ihr Stueck Wokey Wokey an den Muenchner Kammerspielen.'
+  };
+  const result = calculateRelevance(article, 100);
+  assert.ok(result.score >= 80, `erwarte sehr_relevant, score=${result.score}`);
+  assert.equal(result.category, 'sehr_relevant');
+});
+
+test('calculateRelevance erkennt Ensemble-Mitglied Wiebke Puls', () => {
+  const article = {
+    title: 'Wiebke Puls in neuer Rolle',
+    fullText: 'Die Schauspielerin Wiebke Puls vom Ensemble der Muenchner Kammerspiele uebernimmt eine Hauptrolle. Die Inszenierung ist beeindruckend.'
+  };
+  const result = calculateRelevance(article, 100);
+  assert.ok(result.score >= 50);
+  assert.ok(result.matches.people.length > 0);
+});
+
+test('calculateRelevance gibt mehr Punkte bei Titel + Produktion', () => {
+  const both = calculateRelevance({
+    title: 'Pinocchio an den Kammerspielen',
+    fullText: 'Eine Inszenierung von Wu Tsang.'
+  }, 100);
+  const textOnly = calculateRelevance({
+    title: 'Theaternachricht',
+    fullText: 'Bei den Muenchner Kammerspielen laeuft Pinocchio.'
+  }, 100);
+  assert.ok(both.score > textOnly.score + 30);
+});
+
+test('findFuzzyMatch erkennt aehnliche Phrasen', () => {
+  const text = 'die muenchner kammerspielen zeigen wachse oder weiche';
+  assert.equal(findFuzzyMatch(text, 'wachse oder weiche'), true);
+});
+
+test('findContextualMatch findet Wort in Naehe', () => {
+  const text = 'an den muenchner kammerspielen feierte pinocchio premiere';
+  const ctx = findContextualMatch(text, 'pinocchio', ['kammerspielen'], 100);
+  assert.equal(ctx, true);
+});
+
+test('findContextualMatch ignoriert wenn zu weit weg', () => {
+  const text = 'pinocchio. ' + ('foo bar baz '.repeat(200)) + 'kammerspielen.';
+  const ctx = findContextualMatch(text, 'pinocchio', ['kammerspielen'], 100);
+  assert.equal(ctx, false);
+});
+
+test('generateSummary bevorzugt Saetze mit Schluesselwoertern', () => {
+  const article = {
+    title: 'Hamlet Premiere',
+    fullText: 'Das Wetter war schoen am Abend. Die Premiere von Hamlet an den Muenchner Kammerspielen war ein Erfolg. Der Verkehr stockte. Die Inszenierung beeindruckte das Publikum.'
+  };
+  const summary = generateSummary(article, 300);
+  assert.ok(summary.toLowerCase().includes('kammerspielen') || summary.toLowerCase().includes('hamlet'));
 });
 
 test('analyze vollstaendiger Durchlauf', () => {
