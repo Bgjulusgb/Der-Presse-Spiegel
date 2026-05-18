@@ -1,0 +1,68 @@
+{
+  "required": [
+    "Muenchner Kammerspiele",
+    "Münchner Kammerspiele",
+    "Kammerspiele München",
+    "Kammerspiele Muenchen",
+    "Kammerspiele"
+  ],
+  "productions": [
+    "Hamlet",
+    "Dantons Tod",
+    "Antigone",
+    "Faust",
+    "Der Sturm",
+    "Endspiel",
+    "Maria Stuart",
+    "Don Karlos",
+    "Tschick",
+    "Werther"
+  ],
+  "people": [
+    "Barbara Mundel",
+    "Intendantin",
+    "Intendant",
+    "Chefdramaturg",
+    "Chefdramaturgin",
+    "Ensemble Kammerspiele"
+  ],
+  "venues": [
+    "Schauspielhaus",
+    "Werkraum",
+    "Therese-Giehse-Halle",
+    "Habibi Kiosk",
+    "Kammer 1",
+    "Kammer 2",
+    "Kammer 3"
+  ],
+  "exclude": [
+    "Stellenanzeige",
+    "Stellenangebot",
+    "Anzeige -",
+    "Werbung",
+    "Leserbrief",
+    "Hamburger Kammerspiele",
+    "Berliner Kammerspiele",
+    "Wiener Kammerspiele"
+  ],
+  "scoring_weights": {
+    "title_match": 50,
+    "title_exact_match": 80,
+    "required_keyword": 10,
+    "production_match": 15,
+    "people_match": 20,
+    "venue_match": 10,
+    "review": 30,
+    "interview": 25,
+    "announcement": 20,
+    "short_article_penalty": -20,
+    "very_short_article_penalty": -50
+  },
+  "thresholds": {
+    "very_relevant": 80,
+    "relevant": 50,
+    "maybe_relevant": 30,
+    "min_word_count": 50,
+    "short_article_word_count": 100
+  }
+}

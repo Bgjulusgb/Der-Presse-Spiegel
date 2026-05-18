@@ -1,0 +1,16 @@
+node_modules/
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+logs/*.log
+reports/*.pdf
+reports/*.html
+.env
+.env.local
+.DS_Store
+*.swp
+*.swo
+coverage/
+.nyc_output/
+puppeteer-cache/

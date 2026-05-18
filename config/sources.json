@@ -1,0 +1,84 @@
+{
+  "feeds": [
+    {
+      "name": "Sueddeutsche Zeitung - Muenchen",
+      "url": "https://rss.sueddeutsche.de/rss/Muenchen",
+      "priority": 100,
+      "type": "rss"
+    },
+    {
+      "name": "Sueddeutsche Zeitung - Kultur",
+      "url": "https://rss.sueddeutsche.de/rss/Kultur",
+      "priority": 100,
+      "type": "rss"
+    },
+    {
+      "name": "Bayerischer Rundfunk - Kultur",
+      "url": "https://www.br.de/nachrichten/kultur/index.xml",
+      "priority": 95,
+      "type": "rss"
+    },
+    {
+      "name": "Bayerischer Rundfunk - Bayern",
+      "url": "https://www.br.de/nachrichten/bayern/index.xml",
+      "priority": 90,
+      "type": "rss"
+    },
+    {
+      "name": "Merkur - Kultur",
+      "url": "https://www.merkur.de/kultur/rssfeed.rdf",
+      "priority": 80,
+      "type": "rss"
+    },
+    {
+      "name": "Merkur - Muenchen",
+      "url": "https://www.merkur.de/lokales/muenchen/rssfeed.rdf",
+      "priority": 80,
+      "type": "rss"
+    },
+    {
+      "name": "tz Muenchen - Kultur",
+      "url": "https://www.tz.de/kultur/rssfeed.rdf",
+      "priority": 70,
+      "type": "rss"
+    },
+    {
+      "name": "Abendzeitung Muenchen - Kultur",
+      "url": "https://www.abendzeitung-muenchen.de/rss/kultur",
+      "priority": 75,
+      "type": "rss"
+    },
+    {
+      "name": "nachtkritik.de",
+      "url": "https://www.nachtkritik.de/index.php?format=feed&type=rss",
+      "priority": 95,
+      "type": "rss"
+    },
+    {
+      "name": "Deutschlandfunk Kultur",
+      "url": "https://www.deutschlandfunkkultur.de/buehne-100.rss",
+      "priority": 85,
+      "type": "rss"
+    }
+  ],
+  "scrape_targets": [
+    {
+      "name": "SZ Kultur Suche",
+      "url": "https://www.sueddeutsche.de/thema/M%C3%BCnchner_Kammerspiele",
+      "type": "scrape",
+      "selector": "article a[href*='/muenchen/'], article a[href*='/kultur/']",
+      "priority": 100,
+      "use_puppeteer": false
+    }
+  ],
+  "source_priorities": {
+    "Sueddeutsche Zeitung": 100,
+    "Bayerischer Rundfunk": 95,
+    "nachtkritik.de": 95,
+    "Deutschlandfunk Kultur": 90,
+    "Merkur": 80,
+    "Abendzeitung Muenchen": 75,
+    "tz Muenchen": 70,
+    "default": 50
+  }
+}

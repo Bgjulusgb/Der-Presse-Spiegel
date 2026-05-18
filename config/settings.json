@@ -1,0 +1,50 @@
+{
+  "database": {
+    "path": "./data/pressespiegel.db",
+    "backup_path": "./data/backups"
+  },
+  "reports": {
+    "path": "./reports",
+    "default_format": "html",
+    "include_pdf": true,
+    "max_articles_per_section": 50,
+    "max_summary_length": 280
+  },
+  "scraping": {
+    "user_agent": "PressespiegelBot/1.0 (+https://www.muenchner-kammerspiele.de)",
+    "request_timeout_ms": 20000,
+    "max_retries": 3,
+    "retry_backoff_ms": 2000,
+    "max_concurrent_requests": 4,
+    "rate_limit_per_domain_ms": 1000,
+    "puppeteer": {
+      "headless": true,
+      "navigation_timeout_ms": 30000,
+      "wait_until": "networkidle2"
+    }
+  },
+  "deduplication": {
+    "title_similarity_threshold": 0.85,
+    "text_similarity_threshold": 0.80,
+    "first_paragraph_chars": 800,
+    "enabled": true
+  },
+  "schedule": {
+    "daily_scan_cron": "0 6 * * *",
+    "daily_scan_lookback_hours": 24,
+    "weekly_report_cron": "0 8 * * 1",
+    "monthly_report_cron": "0 8 1 * *",
+    "timezone": "Europe/Berlin"
+  },
+  "alerts": {
+    "high_relevance_threshold": 80,
+    "negative_review_alert": true,
+    "alert_cron": "0 7,12,17 * * *"
+  },
+  "logging": {
+    "level": "info",
+    "max_file_size_mb": 10,
+    "max_files": 14,
+    "console": true
+  }
+}
