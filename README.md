@@ -1,25 +1,28 @@
-# Pressespiegel-Tool fuer die Muenchner Kammerspiele
+# Pressespiegel Muenchner Kammerspiele
 
-Ein vollstaendiges, produktionsreifes Node.js-Tool zur automatischen
-Beobachtung der Presse rund um die Muenchner Kammerspiele.
+Ein vollstaendig **lokales** Node.js-Tool zur Beobachtung der Presse
+rund um die Muenchner Kammerspiele.
 
-**Komplett ohne kostenpflichtige APIs** – arbeitet ausschliesslich mit RSS-Feeds
-und Web-Scraping.
+**Alles bleibt auf dem eigenen Rechner.**
+Keine Cloud-API, kein E-Mail-Versand, keine externen Dienste. Reports werden lokal als HTML/PDF im Ordner `reports/` abgelegt.
 
-## Features
+## Was das Tool tut
 
-- **Multi-Source RSS-Crawler** mit Retry-Logik und Rate-Limiting pro Domain
-- **Intelligente Datums-Extraktion** aus Meta-Tags, JSON-LD, URL, Text
-- **Mehrstufige Duplikat-Erkennung**: URL, Titel-Levenshtein, Text-Cosine
-- **Relevanz-Scoring** mit konfigurierbaren Keywords und Gewichtungen
-- **Sentiment-Analyse** auf Basis eines Theater-spezifischen Wortbuchs
-  inkl. Negationen und Verstaerkern
-- **Artikeltyp-Erkennung**: Kritik, Interview, Ankuendigung, News
-- **HTML- & PDF-Reports** mit Sentiment-Pie, Zeitverlauf und Quellen-Statistik
-- **SQLite-Persistenz** (WAL-Mode) mit vollstaendigem Schema
-- **Cron-Scheduler** fuer taegliche Scans, Wochen-/Monatsberichte und Alerts
-- **E-Mail-Versand** ueber SMTP (nodemailer)
-- **CLI mit Commander** und Unit-Tests via Node built-in test runner
+- Saugt RSS-Feeds von seriosen Theater- und Kulturredaktionen ab
+  (nachtkritik.de, SZ, FAZ, ZEIT, BR, Deutschlandfunk Kultur, taz, Spiegel,
+  Welt, Merkur, AZ, tz, …)
+- Reichert jeden Artikel an: holt den Volltext, extrahiert Datum, Autor, Paywall-Status
+- Erkennt Duplikate (URL, Titel-Levenshtein, Text-Cosine) – behaelt den
+  hochwertigsten Treffer und merkt alle weiteren Fundstellen
+- Bewertet jeden Artikel nach **aktuellem Spielplan** der Kammerspiele
+  (Wokey Wokey, Pinocchio, Wallenstein, Mephisto, Tristan, Eurydike und
+  Orpheus, …), nach Ensemble-Namen (Wiebke Puls, Walter Hess, Samuel Koch, …),
+  nach Spielstaetten und Theater-Kontext
+- Sentiment-Analyse mit Theater-spezifischem Wortbuch
+  (positiv/negativ/neutral, mit Negationen und Verstaerkern)
+- Erstellt einen modernen, interaktiven HTML-Report mit Live-Filter,
+  Live-Suche (Taste `/`), Sortierung, Dark-Mode und mobile-responsive
+  Layout. Optional PDF via Puppeteer.
 
 ## Schnellstart
 
@@ -28,195 +31,146 @@ git clone <repo>
 cd Der-Presse-Spiegel
 npm install
 
-cp .env.example .env
-
+# Zuletzt 7 Tage scannen
 npm start scan --last 7d
 
-npm start report --last 7d --format both
+# Report erstellen und im Browser oeffnen
+npm start report --last 7d --open
 ```
+
+## CLI-Befehle
+
+```bash
+pressespiegel scan --last 7d                       # Letzte 7 Tage scannen
+pressespiegel scan --from 2026-05-01 --to 2026-05-31
+
+pressespiegel report --last 30d --open             # HTML-Report + im Browser
+pressespiegel report --last 7d --format pdf        # PDF
+pressespiegel report --last 7d --format both       # HTML + PDF
+
+pressespiegel open                                 # Neuesten Report oeffnen
+pressespiegel list-reports                         # Alle Reports auflisten
+
+pressespiegel search "Pinocchio"                   # In lokaler DB suchen
+pressespiegel search "Mundel" --limit 50
+
+pressespiegel stats --last 30d                     # Statistiken
+pressespiegel health                               # Feed-Gesundheit
+
+pressespiegel config list                          # Konfiguration zeigen
+pressespiegel config add-keyword "Neues Stueck" --type productions
+pressespiegel config add-keyword "Neuer Regisseur" --type people
+pressespiegel config remove-keyword "Hamlet" --type productions
+pressespiegel config add-source "https://example.com/rss" --name "Beispiel" --priority 70
+
+pressespiegel dedupe --dry-run                     # Duplikate suchen
+pressespiegel dedupe                               # Duplikate markieren
+
+pressespiegel schedule                             # Cron-Modus (Vordergrund)
+```
+
+## Such-Algorithmus
+
+Stufenweise Bewertung jedes Artikels:
+
+1. **Pflichtfilter**: Ohne mindestens einen `required`-Begriff (`Kammerspiele`,
+   `Muenchner Kammerspiele`) wird verworfen. Treffer auf `exclude` (Hamburger
+   Kammerspiele, Berliner Kammerspiele, Stellenanzeige …) werden auch verworfen.
+
+2. **Relevanz-Scoring**:
+   - Required im Titel: **+80**
+   - Required im Text (bis 5x): **+10 pro Treffer**
+   - Aktuelle Produktion im Titel (Pinocchio, Wallenstein, …): **+50**
+   - Aktuelle Produktion im Text mit Kammerspiele-Kontext: **+25**
+   - Aktuelle Produktion im Text ohne Kontext: **+12**
+   - Fuzzy-Match (Tippfehler) auf Produktion: **+30**
+   - Kammerspiele + Produktion im selben Titel: zusaetzlich **+100**
+   - Ensemble-Mitglied / Regie / Dramaturgie im Titel: **+40**
+   - Im Text mit Kontext: **+20**
+   - Spielstaette (Schauspielhaus, Werkraum, Therese-Giehse-Halle): **+10**
+   - Theater-Kontext (≥2 Begriffe wie Inszenierung, Buehne, Ensemble): **+8**
+   - Typ: Kritik **+30**, Interview **+25**, Ankuendigung **+20**
+   - Premiere erwaehnt: **+20**
+   - Kurzer Artikel (<100 Worte): **-20**, sehr kurz (<50): **-50**
+   - Top-Quelle (nachtkritik, SZ, FAZ, BR, DLF): **+15**
+
+3. **Kategorisierung**:
+   - Score ≥ 80 → **sehr_relevant** (★★★)
+   - Score ≥ 50 → **relevant** (★★)
+   - Score ≥ 30 → **moeglich_relevant** (★)
+   - darunter → verworfen
+
+## Duplikat-Erkennung (dreistufig)
+
+1. **URL-Match** nach Entfernung aller Tracking-Parameter
+2. **Titel-Aehnlichkeit** via Levenshtein > 85 %
+3. **Text-Aehnlichkeit** auf erstem Absatz via Cosine > 80 %
+
+Bei Duplikat-Treffer: Sieger nach Quellen-Prioritaet
+(nachtkritik = SZ = 100, FAZ = BR = DLF = 95, ZEIT = 90 …),
+alle anderen URLs werden als "auch erschienen in" verlinkt.
+
+## Aktueller Spielplan (in `config/keywords.json`)
+
+**Produktionen 2025/26**: Wachse oder weiche · Eurydike und Orpheus ·
+Wokey Wokey · Pinocchio · Love me tender · Enjoy Schatz · Mein kleines
+Prachttier · Meister und Margarita · Fraeulein Else · Fremd · Bevor ich
+es vergesse · Play Auerbach · Mephisto · Very Rich Angels · Tristan (und
+Isolde) · Wallenstein · Was ihr wollt
+
+**Personen**: Barbara Mundel (Intendantin), Daniel Veldhoen (Kuenstlerische
+Leitung), Viola Hasselberg (stv. Intendantin), das gesamte Ensemble
+(Wiebke Puls, Walter Hess, Samuel Koch, Thomas Schmauser, Annette Paulmann,
+Lucy Wilke, Luisa Woellisch, Stefan Merki, Edmund Telgenkaemper, Jelena
+Kuljic, …), aktuelle Gastregien (Nora Abdel-Maksoud, Wu Tsang, Felicitas
+Brucker, Anna Smolar, Leonie Boehm, Maxi Schafroth, Sarah Kohm, …).
+
+Anpassen via:
+```bash
+pressespiegel config add-keyword "Neue Inszenierung" --type productions
+pressespiegel config add-keyword "Neuer Schauspieler" --type people
+```
+
+## UI/UX der HTML-Reports
+
+- Sticky-Toolbar mit Live-Suche, Filter (Kategorie, Sentiment, Quelle),
+  Sortierung (Score / Datum)
+- Tastatur-Shortcut: `/` fokussiert die Suche, `Esc` setzt zurueck
+- Dark-Mode-Toggle (speichert Praeferenz lokal)
+- Responsive: funktioniert auch auf Tablet/Mobil
+- Donut-Chart fuer Sentiment, Balken fuer Zeitverlauf, Quellen-Tabelle
+- Pro Artikel: Kategorie-Badge, Sentiment-Badge, Artikeltyp, Score,
+  Paywall-Hinweis, "auch erschienen in"-Liste, Trefferbegruendungen
+- Print-optimiert (Filter werden ausgeblendet)
 
 ## Projekt-Struktur
 
 ```
 .
-├── bin/
-│   └── cli.js               # CLI-Einstiegspunkt
+├── bin/cli.js               # CLI-Einstiegspunkt (Commander)
 ├── src/
 │   ├── analyzer.js          # Relevanz + Sentiment + Artikeltyp
 │   ├── config.js            # JSON-Konfig + .env laden
-│   ├── database.js          # SQLite-Wrapper, Schema, Statements
+│   ├── database.js          # SQLite (WAL), Schema, Statements
 │   ├── deduplicator.js      # Multi-Level Duplikat-Erkennung
-│   ├── logger.js            # Winston-Logger (Console + File)
-│   ├── mailer.js            # SMTP-Versand (nodemailer)
-│   ├── pipeline.js          # Scan-Pipeline: fetch -> analyze -> dedupe -> save
-│   ├── reporter.js          # HTML- und PDF-Report-Generation
-│   ├── scheduler.js         # Cron-Jobs (taeglich, woechentlich, monatlich)
-│   ├── scraper.js           # RSS-Feeds, HTTP-Fetch, HTML-Extraction
-│   └── utils.js             # URL-Normalize, Levenshtein, Cosine, Date-Parse
+│   ├── logger.js            # Winston (Console + File, rotierend)
+│   ├── pipeline.js          # fetch -> analyze -> dedupe -> save
+│   ├── reporter.js          # HTML + optional PDF
+│   ├── scheduler.js         # Cron-Jobs (lokal, keine E-Mail)
+│   ├── scraper.js           # RSS, HTTP-Fetch, HTML-Extraction
+│   └── utils.js             # URL, Levenshtein, Cosine, Date-Parse
 ├── config/
-│   ├── sources.json         # RSS-Feeds + Prioritaeten
-│   ├── keywords.json        # Required/Productions/People/Exclude
+│   ├── sources.json         # 17 RSS-Quellen mit Prioritaeten
+│   ├── keywords.json        # Pflicht/Produktionen/Personen/Venues
 │   ├── settings.json        # Tool-Einstellungen
-│   └── sentiment.json       # Theater-Wortbuch fuer Sentiment
-├── tests/                   # Unit-Tests (node --test)
-├── data/                    # SQLite-DB (auto-generiert)
-├── logs/                    # Log-Dateien (auto-generiert)
-├── reports/                 # Generierte HTML/PDF-Reports
+│   └── sentiment.json       # Theater-Wortschatz
+├── tests/                   # 56 Unit-Tests (node --test)
+├── data/                    # SQLite-DB (lokal)
+├── logs/                    # Log-Dateien (lokal)
+├── reports/                 # HTML/PDF-Reports (lokal)
 ├── package.json
-└── .env.example
+└── .env.example             # Nur Logging-Settings, kein SMTP
 ```
-
-## CLI-Befehle
-
-### Scan – Artikel suchen und speichern
-
-```bash
-npm start scan --from 2026-01-01 --to 2026-01-31
-npm start scan --last 7d
-npm start scan --last 3m
-```
-
-### Report – HTML/PDF generieren
-
-```bash
-npm start report --last 7d --format html
-npm start report --last 30d --format pdf
-npm start report --period weekly --format both
-npm start report --from 2026-01-01 --to 2026-01-31 --title "Januar 2026"
-```
-
-### Suche in lokaler Datenbank
-
-```bash
-npm start search "Hamlet Premiere"
-npm start search "Barbara Mundel" --limit 50
-```
-
-### Konfiguration
-
-```bash
-npm start config list
-npm start config add-keyword "Neue Produktion" --type productions
-npm start config add-keyword "Neuer Regisseur" --type people
-npm start config add-source "https://example.com/rss" --name "Beispiel" --priority 70
-```
-
-### Statistiken
-
-```bash
-npm start stats --last 30d
-npm start stats --from 2026-01-01 --to 2026-12-31
-```
-
-### Duplikate pruefen
-
-```bash
-npm start dedupe --dry-run
-npm start dedupe --since 2026-01-01
-```
-
-### Feed-Gesundheit
-
-```bash
-npm start health
-```
-
-### Scheduler (Cron-Modus)
-
-```bash
-npm start schedule
-```
-
-Dieser Befehl startet den Scheduler im Vordergrund.
-Lass den Prozess via `pm2`, `systemd` oder Docker laufen.
-
-## Konfiguration
-
-### `config/sources.json`
-
-Liste der RSS-Feeds mit Prioritaet (hoehere Prio = bei Duplikaten bevorzugt):
-
-```json
-{
-  "feeds": [
-    { "name": "SZ Muenchen", "url": "https://...", "priority": 100, "type": "rss" }
-  ]
-}
-```
-
-### `config/keywords.json`
-
-```json
-{
-  "required": ["Muenchner Kammerspiele", "Kammerspiele"],
-  "productions": ["Hamlet", "Dantons Tod"],
-  "people": ["Barbara Mundel"],
-  "exclude": ["Stellenanzeige", "Hamburger Kammerspiele"],
-  "scoring_weights": { "title_exact_match": 80 },
-  "thresholds": { "very_relevant": 80, "relevant": 50, "maybe_relevant": 30 }
-}
-```
-
-- Mindestens 1 `required`-Begriff muss vorkommen
-- `exclude` filtert sofort
-- Umlaute werden automatisch normalisiert (`ae`/`oe`/`ue`/`ss`)
-
-### `config/settings.json`
-
-Steuert Datenbank-Pfad, Scraping-Verhalten, Schwellwerte fuer Dedup,
-Cron-Zeiten und Logging.
-
-### `config/sentiment.json`
-
-Theater-spezifisches Wortbuch mit Positiv- und Negativ-Begriffen,
-Negationen und Verstaerkern.
-
-### `.env`
-
-```
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=user@example.com
-SMTP_PASS=changeme
-SMTP_FROM=pressespiegel@kammerspiele.de
-REPORT_RECIPIENTS=intendanz@kammerspiele.de
-ALERT_RECIPIENTS=presse@kammerspiele.de
-```
-
-## Wie funktioniert die Duplikat-Erkennung?
-
-Pro Artikel werden drei Pruefungen durchgefuehrt:
-
-1. **URL-Match** (nach Tracking-Param-Entfernung): exakte Gleichheit
-2. **Titel-Aehnlichkeit** (Levenshtein > 85 %): erkennt minimale Tippfehler
-3. **Text-Cosine-Similarity** (erster Absatz > 80 %): erkennt dpa-Meldungen,
-   die auf mehreren Portalen gleich starten
-
-Wenn Duplikat: behalte Version mit hoechster Quellen-Prioritaet, merke alle
-zusaetzlichen URLs als `also_on`.
-
-## Relevanz-Scoring
-
-| Faktor | Punkte |
-|---|---|
-| Required-Keyword im Titel | +80 |
-| Required-Keyword im Text (max. 5x) | +10 pro Match |
-| Produktion erwaehnt | +15 |
-| Person erwaehnt | +20 |
-| Venue erwaehnt | +10 |
-| Typ: Kritik | +30 |
-| Typ: Interview | +25 |
-| Typ: Ankuendigung | +20 |
-| Kurzer Artikel (< 100 Worte) | -20 |
-| Sehr kurz (< 50 Worte) | -50 |
-| Hochprioritaere Quelle | +15 |
-
-Schwellwerte:
-
-- `sehr_relevant`: Score >= 80
-- `relevant`: Score >= 50
-- `moeglich_relevant`: Score >= 30
-- darunter: wird verworfen
 
 ## Tests
 
@@ -224,42 +178,58 @@ Schwellwerte:
 npm test
 ```
 
-Tests laufen mit Node built-in `--test` (keine extra Dependency).
-Abgedeckt: Utils, Analyzer, Deduplicator, Scraper-Datums-Extraktion.
+56 Unit-Tests mit Node built-in `--test` (keine Test-Framework-Dependency).
+
+Bereiche:
+- Utils (URL-Normalize, Levenshtein, Cosine, Datums-Parsing, Escaping)
+- Analyzer (Relevanz, Sentiment mit Negationen, Stem-Match, Artikeltyp,
+  Kontext-Suche, Fuzzy-Match, Hamburger-Kammerspiele-Ausschluss)
+- Deduplicator (alle 3 Stufen, Winner-Selection)
+- Scraper (Datums-Extraktion aus Meta/JSON-LD/URL/Text, Paywall)
 
 ## Edge Cases
 
-- **Artikel hinter Paywall**: wird als `paywall=1` markiert, Snippet bleibt erhalten
-- **Kein Datum gefunden**: Warnung im Log, aktuelles Datum + `date_warning` Flag
-- **RSS-Feed down**: Fehler wird in `source_health` festgehalten,
-  andere Feeds laufen weiter
-- **Tracking-Parameter in URL**: werden vor URL-Vergleich entfernt
-- **Sehr aehnliche Schwester-Theater** (Hamburger Kammerspiele): per `exclude` raus
+- **Paywall**: erkannt und markiert; RSS-Snippet bleibt verwertbar
+- **Kein Datum**: Warnung im Log, aktuelles Datum + `date_warning` Flag
+- **RSS-Feed down**: Eintrag in `source_health`, andere Feeds laufen weiter
+- **Tracking-Parameter** (utm_*, gclid, fbclid, …): vor URL-Vergleich entfernt
+- **Schwester-Theater**: Hamburger/Berliner/Wiener Kammerspiele per Exclude
 - **Artikel ohne Volltext**: Fallback auf RSS-`contentSnippet`
+- **Tippfehler in Produktion**: Fuzzy-Match via Levenshtein
+- **Stueck im Text, aber nicht im Kammerspiele-Kontext**: halber Score
 
 ## Logging
 
-- Console: farbig, ab Level `info`
-- Datei: JSON-Format in `logs/pressespiegel.log` (rotierend, max 10 MB)
+- Console: farbig, Level `info`
+- Datei: JSON in `logs/pressespiegel.log` (rotierend, max 10 MB, 14 Tage)
 - Errors zusaetzlich in `logs/error.log`
-- Level via `LOG_LEVEL` in `.env` steuerbar (`debug`, `info`, `warn`, `error`)
+- Level via `LOG_LEVEL` in `.env` steuerbar
 
-## Automatisierung (Production)
+## Automatisierung
 
-Empfohlene Cron-Setup via systemd-Service oder pm2:
+Cron-Modus (Reports werden lokal abgelegt, kein E-Mail-Versand):
 
 ```bash
-pm2 start bin/cli.js --name pressespiegel -- schedule
-pm2 save
-pm2 startup
+# In tmux, screen, pm2 oder systemd:
+pressespiegel schedule
 ```
 
-Vorkonfigurierte Cron-Zeiten (in `settings.json`):
-
+Vorkonfiguriert (in `config/settings.json` aenderbar):
 - **Daily Scan**: 06:00 Uhr (letzte 24 h)
-- **Alerts**: 07:00, 12:00, 17:00 (hochrelevante Artikel)
-- **Wochenbericht**: Montag 08:00 Uhr (per Mail)
-- **Monatsbericht**: 1. des Monats 08:00 Uhr
+- **Wochenbericht**: Montag 08:00 Uhr (in `reports/` abgelegt)
+- **Monatsbericht**: 1. des Monats 08:00 Uhr (in `reports/` abgelegt)
+
+## Datenschutz
+
+Alles, was dieses Tool tut, passiert lokal:
+- SQLite-DB in `data/`
+- HTML/PDF-Reports in `reports/`
+- Logs in `logs/`
+- Konfiguration in `config/`
+
+Es werden **keine** Daten an Server, Cloud-Dienste oder per E-Mail versandt.
+Lediglich die RSS-Feeds der eingestellten Nachrichtenquellen werden abgerufen –
+exakt das, was jeder Browser bei einem Besuch dieser Webseiten auch tut.
 
 ## Lizenz
 
