@@ -9,17 +9,27 @@ kein E-Mail-Versand. Reports landen lokal in `reports/`, die Datenbank in `data/
 
 ## Was das Tool tut
 
+- **Google News + Bing News als universelle Pflicht-Backbone** – keyword-basiert,
+  immer erreichbar, liefert 100+ Artikel pro Scan über alle deutschen Quellen
 - Saugt RSS-/Atom-/RDF-/JSON-Feeds seriöser Theater- und Kulturredaktionen ab
-- Robuster Fetcher mit browser-ähnlichen Headern, Auto-Encoding-Erkennung
-  (UTF-8, ISO-8859-1, Windows-1252, …) und Conditional GET (ETag/Last-Modified)
-- Puppeteer-Fallback für Cloudflare-geschützte Seiten (SZ, FAZ, ZEIT, …)
-- Holt jeden Artikel: Volltext, Datum, Autor, Paywall-Status
+  (35 Quellen vorkonfiguriert)
+- **HTTP-Client `undici`** mit HTTP/2, rotierenden User-Agents, Auto-Encoding-Detection
+  (UTF-8, ISO-8859-1, Windows-1252), Conditional GET (ETag/Last-Modified),
+  Proxy-Support
+- **Puppeteer-Fallback** für Cloudflare-geschützte Seiten (SZ, FAZ, ZEIT, …) –
+  automatisch bei 403/429
+- **`@mozilla/readability`** für saubere Artikel-Extraktion (gleiche Engine wie
+  Firefox-Lesemodus)
+- **Google-News-URL-Resolver** – löst die `news.google.com/rss/articles/CBMi…`
+  Redirects zu den echten Quell-URLs auf
+- HTML-Strip in Feed-Items (saubere Summaries ohne `<a href>`-Reste)
 - Multi-Stufen Duplikat-Erkennung (URL → Titel-Levenshtein → Text-Cosine)
-- Hybride Suche aus **BM25** (für Relevanz) + **Fuse.js** (für Tippfehler)
+- **Hybride Suche** mit BM25 + Fuse.js + Synonyme + Time-Decay + did-you-mean
+- Such-Syntax: `"exakte Phrase"`, `-NOT`, `OR`, `title:`, `source:`, `sentiment:`
 - Relevanz-Scoring nach aktuellem Spielplan, Ensemble, Spielstätten
-- Sentiment-Analyse mit Theater-spezifischem Wortbuch + Negationen + Verstärker
-- Moderne **Web-UI** mit Dashboard, Live-Scan, Filter, Suche, Editor
-- **Desktop-App** (Electron) bauen als `.exe`, `.dmg`, `.AppImage`, `.deb`
+- Sentiment-Analyse mit Theater-spezifischem Wortbuch
+- **Lesezeichen**, **Tags**, **Trends**, **Mentions-Wolke**, **CSV/JSON-Export**
+- Moderne **Web-UI** mit 11 Tabs, **Desktop-App** (Electron) als `.exe`/`.dmg`/`.AppImage`
 - Live-Updates per WebSocket während Scans
 
 ## Schnellstart

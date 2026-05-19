@@ -1,6 +1,35 @@
 {
   "feeds": [
     {
+      "name": "Google News - Münchner Kammerspiele",
+      "url": "google-news:Münchner Kammerspiele",
+      "kind": "google-news",
+      "queries": [
+        "\"Münchner Kammerspiele\"",
+        "\"Kammerspiele München\"",
+        "Kammerspiele Barbara Mundel",
+        "Kammerspiele Wallenstein",
+        "Kammerspiele Pinocchio",
+        "Kammerspiele Mephisto",
+        "Kammerspiele Wokey Wokey",
+        "Kammerspiele Eurydike Orpheus",
+        "Kammerspiele Premiere München"
+      ],
+      "priority": 100,
+      "type": "rss",
+      "category": "aggregator",
+      "notes": "Universelle Pflicht-Quelle - funktioniert immer, keine Auth nötig"
+    },
+    {
+      "name": "Bing News - Münchner Kammerspiele",
+      "url": "bing-news:Münchner Kammerspiele",
+      "kind": "bing-news",
+      "queries": ["Münchner Kammerspiele", "Kammerspiele München"],
+      "priority": 85,
+      "type": "rss",
+      "category": "aggregator"
+    },
+    {
       "name": "nachtkritik.de",
       "url": "https://www.nachtkritik.de/index.php?format=feed&type=rss",
       "priority": 100,
@@ -20,33 +49,47 @@
       "priority": 100,
       "type": "rss",
       "category": "ueberregional",
-      "use_browser": true,
-      "notes": "Cloudflare-geschuetzt - benoetigt Browser-Fetch"
+      "use_browser": true
     },
     {
-      "name": "Sueddeutsche Zeitung - Muenchen",
-      "url": "https://rss.sueddeutsche.de/rss/Muenchen",
+      "name": "Sueddeutsche Zeitung - München",
+      "url": "https://rss.sueddeutsche.de/rss/muenchen",
       "priority": 100,
       "type": "rss",
       "category": "lokal",
       "use_browser": true
     },
     {
-      "name": "Bayerischer Rundfunk - Kultur",
+      "name": "Sueddeutsche Zeitung - Topthemen",
+      "url": "https://rss.sueddeutsche.de/rss/Topthemen",
+      "priority": 95,
+      "type": "rss",
+      "category": "ueberregional",
+      "use_browser": true
+    },
+    {
+      "name": "BR24 - Kultur",
       "url": "https://www.br.de/nachrichten/kultur/index.xml",
       "priority": 95,
       "type": "rss",
       "category": "oeffentlich-rechtlich"
     },
     {
-      "name": "Bayerischer Rundfunk - Bayern",
+      "name": "BR24 - Bayern",
       "url": "https://www.br.de/nachrichten/bayern/index.xml",
       "priority": 90,
       "type": "rss",
       "category": "lokal"
     },
     {
-      "name": "Deutschlandfunk Kultur - Buehne",
+      "name": "BR24 - Top-Themen",
+      "url": "https://www.br.de/nachrichten/meldungen/index.xml",
+      "priority": 85,
+      "type": "rss",
+      "category": "oeffentlich-rechtlich"
+    },
+    {
+      "name": "Deutschlandfunk Kultur - Bühne",
       "url": "https://www.deutschlandfunkkultur.de/buehne-100.rss",
       "priority": 95,
       "type": "rss",
@@ -60,7 +103,15 @@
       "category": "oeffentlich-rechtlich"
     },
     {
-      "name": "FAZ - Buehne und Konzert",
+      "name": "FAZ - Feuilleton",
+      "url": "https://www.faz.net/rss/aktuell/feuilleton/",
+      "priority": 95,
+      "type": "rss",
+      "category": "ueberregional",
+      "use_browser": true
+    },
+    {
+      "name": "FAZ - Bühne und Konzert",
       "url": "https://www.faz.net/rss/aktuell/feuilleton/buehne-und-konzert/",
       "priority": 95,
       "type": "rss",
@@ -76,9 +127,25 @@
       "use_browser": true
     },
     {
+      "name": "ZEIT - alle Artikel",
+      "url": "https://newsfeed.zeit.de/index",
+      "priority": 85,
+      "type": "rss",
+      "category": "ueberregional",
+      "use_browser": true
+    },
+    {
       "name": "Spiegel - Kultur",
       "url": "https://www.spiegel.de/kultur/index.rss",
       "priority": 85,
+      "type": "rss",
+      "category": "ueberregional",
+      "use_browser": true
+    },
+    {
+      "name": "Spiegel - alle Artikel",
+      "url": "https://www.spiegel.de/index.rss",
+      "priority": 80,
       "type": "rss",
       "category": "ueberregional",
       "use_browser": true
@@ -92,6 +159,34 @@
       "use_browser": true
     },
     {
+      "name": "Stern - Kultur",
+      "url": "https://www.stern.de/feed/standard/kultur/",
+      "priority": 75,
+      "type": "rss",
+      "category": "ueberregional"
+    },
+    {
+      "name": "ntv - Politik & Kultur",
+      "url": "https://www.n-tv.de/politik/rss",
+      "priority": 70,
+      "type": "rss",
+      "category": "ueberregional"
+    },
+    {
+      "name": "Tagesschau",
+      "url": "https://www.tagesschau.de/index~rss2.xml",
+      "priority": 80,
+      "type": "rss",
+      "category": "oeffentlich-rechtlich"
+    },
+    {
+      "name": "Tagesspiegel - Kultur",
+      "url": "https://www.tagesspiegel.de/contentexport/feed/kultur",
+      "priority": 85,
+      "type": "rss",
+      "category": "ueberregional"
+    },
+    {
       "name": "Merkur - Kultur",
       "url": "https://www.merkur.de/kultur/rssfeed.rdf",
       "priority": 75,
@@ -100,7 +195,7 @@
       "use_browser": true
     },
     {
-      "name": "Merkur - Muenchen",
+      "name": "Merkur - München",
       "url": "https://www.merkur.de/lokales/muenchen/rssfeed.rdf",
       "priority": 75,
       "type": "rss",
@@ -108,15 +203,22 @@
       "use_browser": true
     },
     {
-      "name": "Abendzeitung Muenchen",
-      "url": "https://www.abendzeitung-muenchen.de/feed",
+      "name": "Abendzeitung München",
+      "url": "https://www.abendzeitung-muenchen.de/storage/rss/rss/alle-artikel-abendzeitung.xml",
       "priority": 75,
+      "type": "rss",
+      "category": "lokal"
+    },
+    {
+      "name": "tz München - Kultur",
+      "url": "https://www.tz.de/kultur/rssfeed.rdf",
+      "priority": 65,
       "type": "rss",
       "category": "lokal",
       "use_browser": true
     },
     {
-      "name": "tz Muenchen",
+      "name": "tz München",
       "url": "https://www.tz.de/muenchen/rssfeed.rdf",
       "priority": 65,
       "type": "rss",
@@ -124,44 +226,104 @@
       "use_browser": true
     },
     {
-      "name": "Deutsche Buehne",
-      "url": "https://www.die-deutsche-buehne.de/rss.xml",
-      "priority": 90,
+      "name": "MUH - Bayerische Aspekte",
+      "url": "https://muh.bayern/feed/",
+      "priority": 70,
       "type": "rss",
-      "category": "theater-fachpresse"
+      "category": "lokal"
     },
     {
-      "name": "Theater heute",
-      "url": "https://www.theaterheute.de/rss.xml",
-      "priority": 90,
-      "type": "rss",
-      "category": "theater-fachpresse"
-    },
-    {
-      "name": "BR24",
-      "url": "https://www.br.de/nachrichten/index.xml",
+      "name": "NZZ - Feuilleton",
+      "url": "https://www.nzz.ch/feuilleton.rss",
       "priority": 85,
       "type": "rss",
+      "category": "ueberregional"
+    },
+    {
+      "name": "Der Standard - Kultur",
+      "url": "https://www.derstandard.at/rss/kultur",
+      "priority": 80,
+      "type": "rss",
+      "category": "ueberregional"
+    },
+    {
+      "name": "3sat - Kulturzeit",
+      "url": "https://www.3sat.de/kultur/kulturzeit/index.rss",
+      "priority": 80,
+      "type": "rss",
       "category": "oeffentlich-rechtlich"
+    },
+    {
+      "name": "ARD Mediathek - Kultur",
+      "url": "https://www.ardmediathek.de/rss/kultur",
+      "priority": 75,
+      "type": "rss",
+      "category": "oeffentlich-rechtlich"
+    },
+    {
+      "name": "Google News - aktuelle Produktionen",
+      "url": "google-news:Wallenstein Pinocchio Mephisto Kammerspiele",
+      "kind": "google-news",
+      "queries": [
+        "Wallenstein Kammerspiele",
+        "Pinocchio \"Wu Tsang\"",
+        "Mephisto Kammerspiele Klaus Mann",
+        "\"Wokey Wokey\" Abdel-Maksoud",
+        "\"Eurydike und Orpheus\" Smolar",
+        "\"Mein kleines Prachttier\" Böhm",
+        "\"Love me tender\" Brucker"
+      ],
+      "priority": 95,
+      "type": "rss",
+      "category": "aggregator"
+    },
+    {
+      "name": "Google News - Ensemble",
+      "url": "google-news:Ensemble Kammerspiele München",
+      "kind": "google-news",
+      "queries": [
+        "\"Wiebke Puls\" Kammerspiele",
+        "\"Barbara Mundel\" Intendantin",
+        "\"Walter Hess\" Schauspieler",
+        "\"Samuel Koch\" Kammerspiele",
+        "\"Thomas Schmauser\" Kammerspiele"
+      ],
+      "priority": 90,
+      "type": "rss",
+      "category": "aggregator"
     }
   ],
   "source_priorities": {
     "nachtkritik": 100,
     "Sueddeutsche": 100,
     "Süddeutsche": 100,
+    "SZ": 100,
     "Bayerischer Rundfunk": 95,
-    "BR24": 90,
+    "BR24": 95,
+    "BR ": 95,
     "Deutschlandfunk": 95,
+    "DLF": 95,
     "FAZ": 95,
     "Frankfurter Allgemeine": 95,
     "Theater heute": 90,
-    "Deutsche Buehne": 90,
+    "Deutsche Bühne": 90,
+    "NZZ": 85,
+    "Neue Zürcher": 85,
     "ZEIT": 90,
+    "Die Zeit": 90,
+    "Tagesschau": 85,
+    "Tagesspiegel": 85,
+    "Der Standard": 80,
+    "3sat": 80,
+    "ARD": 80,
     "taz": 85,
     "Spiegel": 85,
     "Welt": 80,
+    "Stern": 75,
     "Merkur": 75,
     "Abendzeitung": 75,
+    "ntv": 70,
+    "MUH": 70,
     "tz": 65,
     "default": 50
   }

@@ -8,7 +8,10 @@ const {
   hybridSearch,
   tokenizeAndStem,
   highlightTerms,
-  suggestQueries
+  suggestQueries,
+  didYouMean,
+  topMentions,
+  trends
 } = require('../src/search');
 
 const articles = [
@@ -97,4 +100,81 @@ test('suggestQueries liefert Vorschlaege fuer Praefix', () => {
 
 test('suggestQueries liefert leere Liste fuer kurze Praefixe', () => {
   assert.equal(suggestQueries('p', articles).length, 0);
+});
+
+test('hybridSearch akzeptiert NOT-Operator', () => {
+  const arts = [
+    { id: 1, title: 'Hamlet Premiere München' },
+    { id: 2, title: 'Hamburger Hamlet Premiere' }
+  ];
+  const results = hybridSearch(arts, 'Hamlet -Hamburger', { limit: 5 });
+  assert.equal(results.length, 1);
+  assert.equal(results[0].article.id, 1);
+});
+
+test('hybridSearch akzeptiert exakte Phrase', () => {
+  const arts = [
+    { id: 1, title: 'Wokey Wokey Premiere' },
+    { id: 2, title: 'Wokey Bar Wokey' }
+  ];
+  const results = hybridSearch(arts, '"Wokey Wokey"', { limit: 5 });
+  assert.equal(results[0].article.id, 1);
+});
+
+test('hybridSearch nutzt Synonyme (Premiere -> Erstauffuehrung)', () => {
+  const arts = [
+    { id: 1, title: 'Erstauffuehrung von Hamlet' },
+    { id: 2, title: 'Tanz' }
+  ];
+  const results = hybridSearch(arts, 'Premiere', { limit: 5, withSynonyms: true });
+  assert.ok(results.length >= 1);
+  assert.equal(results[0].article.id, 1);
+});
+
+test('didYouMean korrigiert Tippfehler', () => {
+  const arts = [
+    { id: 1, title: 'Pinocchio Wu Tsang Premiere Kammerspiele' }
+  ];
+  const suggestion = didYouMean('Pinokio', arts);
+  assert.ok(suggestion && suggestion.toLowerCase().includes('pinocchio'));
+});
+
+test('didYouMean gibt null wenn alles korrekt', () => {
+  const arts = [{ id: 1, title: 'Hamlet' }];
+  assert.equal(didYouMean('Hamlet', arts), null);
+});
+
+test('topMentions liefert haeufigste Begriffe sortiert', () => {
+  const arts = [
+    { title: 'Wallenstein Wallenstein Pinocchio' },
+    { title: 'Wallenstein' }
+  ];
+  const m = topMentions(arts, { limit: 5 });
+  assert.equal(m[0].term.startsWith('wallen'), true);
+});
+
+test('trends vergleicht zwei Zeitraeume', () => {
+  const a = [
+    { title: 'Hamlet Premiere' },
+    { title: 'Hamlet Kritik' },
+    { title: 'Hamlet Interview' }
+  ];
+  const b = [{ title: 'Hamlet' }];
+  const result = trends(a, b);
+  const hamlet = result.find(t => t.term.startsWith('haml'));
+  assert.ok(hamlet);
+  assert.ok(hamlet.change >= 1);
+});
+
+test('BM25Index gibt Recency-Bonus', () => {
+  const now = Date.now();
+  const dayAgo = new Date(now - 86400000).toISOString();
+  const yearAgo = new Date(now - 365 * 86400000).toISOString();
+  const arts = [
+    { id: 1, title: 'Hamlet Premiere', published_date: yearAgo },
+    { id: 2, title: 'Hamlet Premiere', published_date: dayAgo }
+  ];
+  const idx = new BM25Index(arts);
+  const results = idx.search('Hamlet', { applyRecency: true });
+  assert.equal(results[0].article.id, 2);
 });

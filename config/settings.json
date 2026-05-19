@@ -26,7 +26,7 @@
   },
   "deduplication": {
     "title_similarity_threshold": 0.85,
-    "text_similarity_threshold": 0.80,
+    "text_similarity_threshold": 0.8,
     "first_paragraph_chars": 800,
     "enabled": true
   },

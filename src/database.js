@@ -50,6 +50,30 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_duplicate_of ON articles(duplicate_of);
     CREATE INDEX IF NOT EXISTS idx_url_normalized ON articles(url_normalized);
 
+    CREATE TABLE IF NOT EXISTS article_tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      article_id INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      tag TEXT NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(article_id, tag)
+    );
+    CREATE INDEX IF NOT EXISTS idx_article_tags_tag ON article_tags(tag);
+    CREATE INDEX IF NOT EXISTS idx_article_tags_article ON article_tags(article_id);
+
+    CREATE TABLE IF NOT EXISTS bookmarks (
+      article_id INTEGER PRIMARY KEY REFERENCES articles(id) ON DELETE CASCADE,
+      note TEXT,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS saved_searches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      query TEXT,
+      filters TEXT,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS scan_runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -352,6 +376,68 @@ function parseArticleRow(row) {
   };
 }
 
+function addTag(articleId, tag) {
+  if (!tag || !tag.trim()) return;
+  try {
+    db.prepare('INSERT INTO article_tags (article_id, tag) VALUES (?, ?)').run(articleId, tag.trim().toLowerCase());
+  } catch (err) {
+    if (err.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw err;
+  }
+}
+
+function removeTag(articleId, tag) {
+  db.prepare('DELETE FROM article_tags WHERE article_id = ? AND tag = ?').run(articleId, tag.trim().toLowerCase());
+}
+
+function getTagsForArticle(articleId) {
+  return db.prepare('SELECT tag FROM article_tags WHERE article_id = ? ORDER BY tag').all(articleId).map(r => r.tag);
+}
+
+function getAllTags() {
+  return db.prepare('SELECT tag, COUNT(*) as count FROM article_tags GROUP BY tag ORDER BY count DESC').all();
+}
+
+function setBookmark(articleId, note) {
+  db.prepare(`
+    INSERT INTO bookmarks (article_id, note) VALUES (?, ?)
+    ON CONFLICT(article_id) DO UPDATE SET note = excluded.note
+  `).run(articleId, note || null);
+}
+
+function removeBookmark(articleId) {
+  db.prepare('DELETE FROM bookmarks WHERE article_id = ?').run(articleId);
+}
+
+function isBookmarked(articleId) {
+  return !!db.prepare('SELECT 1 FROM bookmarks WHERE article_id = ?').get(articleId);
+}
+
+function getBookmarks() {
+  return db.prepare(`
+    SELECT a.*, b.note as bookmark_note, b.created_at as bookmark_at
+    FROM bookmarks b JOIN articles a ON a.id = b.article_id
+    ORDER BY b.created_at DESC
+  `).all();
+}
+
+function saveSearch(name, query, filters) {
+  db.prepare(`
+    INSERT INTO saved_searches (name, query, filters) VALUES (?, ?, ?)
+    ON CONFLICT(name) DO UPDATE SET query = excluded.query, filters = excluded.filters
+  `).run(name, query || null, filters ? JSON.stringify(filters) : null);
+}
+
+function getSavedSearches() {
+  return db.prepare('SELECT * FROM saved_searches ORDER BY created_at DESC').all().map(r => ({
+    ...r,
+    filters: r.filters ? safeJsonParse(r.filters, {}) : {}
+  }));
+}
+
+function deleteSavedSearch(name) {
+  db.prepare('DELETE FROM saved_searches WHERE name = ?').run(name);
+}
+
 function transaction(fn) {
   return db.transaction(fn);
 }
@@ -375,6 +461,17 @@ module.exports = {
   recordSourceFailure,
   getSourceHealth,
   setSourceEnabled,
+  addTag,
+  removeTag,
+  getTagsForArticle,
+  getAllTags,
+  setBookmark,
+  removeBookmark,
+  isBookmarked,
+  getBookmarks,
+  saveSearch,
+  getSavedSearches,
+  deleteSavedSearch,
   transaction,
   close
 };

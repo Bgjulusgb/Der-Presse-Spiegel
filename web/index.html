@@ -23,6 +23,8 @@
     <button class="nav-item" data-tab="reports"><span class="nav-icon">▤</span> Reports</button>
     <button class="nav-item" data-tab="keywords"><span class="nav-icon">✦</span> Suchbegriffe</button>
     <button class="nav-item" data-tab="sources"><span class="nav-icon">⇄</span> Quellen</button>
+    <button class="nav-item" data-tab="bookmarks"><span class="nav-icon">♥</span> Lesezeichen</button>
+    <button class="nav-item" data-tab="trends"><span class="nav-icon">📈</span> Trends</button>
     <button class="nav-item" data-tab="duplicates"><span class="nav-icon">⊕</span> Duplikate</button>
     <button class="nav-item" data-tab="settings"><span class="nav-icon">⚙</span> Einstellungen</button>
     <button class="nav-item" data-tab="logs"><span class="nav-icon">≢</span> Logs</button>
@@ -75,9 +77,26 @@
         <p class="subtitle" id="articles-subtitle">Lade Artikel …</p>
       </div>
       <div class="page-actions">
+        <button class="btn" id="export-csv">↓ CSV</button>
+        <button class="btn" id="export-json">↓ JSON</button>
         <button class="btn" id="export-articles">Als HTML-Report</button>
       </div>
     </header>
+
+    <details class="search-help">
+      <summary>Such-Syntax (Operatoren, Felder, Phrasen)</summary>
+      <table>
+        <tr><th>Syntax</th><th>Effekt</th></tr>
+        <tr><td><code>Mundel</code></td><td>Einfache Suche (BM25 + Fuzzy + Synonyme)</td></tr>
+        <tr><td><code>"Wokey Wokey"</code></td><td>Exakte Phrase</td></tr>
+        <tr><td><code>Hamlet -Hamburger</code></td><td>NICHT-Operator</td></tr>
+        <tr><td><code>Wallenstein OR Mephisto</code></td><td>ODER</td></tr>
+        <tr><td><code>title:Premiere</code></td><td>Feldsuche (title, source, author, text, category, sentiment, type)</td></tr>
+        <tr><td><code>sentiment:negativ category:sehr_relevant</code></td><td>Mehrere Felder</td></tr>
+      </table>
+    </details>
+
+    <p id="did-you-mean" class="did-you-mean" style="display:none"></p>
 
     <div class="toolbar">
       <div class="search-wrap">
@@ -245,6 +264,47 @@
     </div>
 
     <div id="sources-list" class="sources-list"></div>
+  </section>
+
+  <section class="tab" id="tab-bookmarks">
+    <header class="page-head">
+      <div>
+        <h1>Lesezeichen</h1>
+        <p class="subtitle">Markierte Artikel</p>
+      </div>
+    </header>
+    <div id="bookmarks-list" class="article-list"></div>
+    <div id="bookmarks-empty" class="empty-state" style="display:none">Noch keine Lesezeichen.</div>
+  </section>
+
+  <section class="tab" id="tab-trends">
+    <header class="page-head">
+      <div>
+        <h1>Trends</h1>
+        <p class="subtitle">Was wird mehr / weniger erwähnt</p>
+      </div>
+      <div class="page-actions">
+        <select id="trends-period">
+          <option value="7d">7 Tage vs. 7 Tage davor</option>
+          <option value="14d">14 vs. 14</option>
+          <option value="30d" selected>30 vs. 30</option>
+        </select>
+      </div>
+    </header>
+    <div class="grid-2">
+      <div class="card">
+        <h2>Häufigste Begriffe</h2>
+        <div id="top-mentions" class="word-cloud"></div>
+      </div>
+      <div class="card">
+        <h2>Aufsteiger</h2>
+        <div id="trends-up"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Tag-Wolke</h2>
+      <div id="all-tags" class="word-cloud"></div>
+    </div>
   </section>
 
   <section class="tab" id="tab-duplicates">

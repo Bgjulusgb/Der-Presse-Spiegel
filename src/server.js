@@ -12,7 +12,7 @@ const { settings, loadJson, saveJson } = require('./config');
 const { runScan } = require('./pipeline');
 const { generateReport, findLatestReport, REPORTS_DIR } = require('./reporter');
 const { parseDateRange } = require('./utils');
-const { hybridSearch, suggestQueries } = require('./search');
+const { hybridSearch, suggestQueries, didYouMean, topMentions, trends } = require('./search');
 
 const WEB_DIR = path.resolve(__dirname, '..', 'web');
 
@@ -133,6 +133,104 @@ function buildApp() {
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.get('/api/did-you-mean', (req, res) => {
+    try {
+      const q = req.query.q || '';
+      const articles = database.getArticlesByRange(subDays(new Date(), 365), new Date());
+      const suggestion = didYouMean(q, articles);
+      res.json({ query: q, suggestion });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get('/api/mentions', (req, res) => {
+    try {
+      const { from, to } = parseDateRange({ from: req.query.from, to: req.query.to, last: req.query.last || '30d' });
+      const articles = database.getArticlesByRange(from, to);
+      res.json({ from: from.toISOString(), to: to.toISOString(), mentions: topMentions(articles, { limit: parseInt(req.query.limit || '30', 10) }) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get('/api/trends', (req, res) => {
+    try {
+      const period = req.query.period || '30d';
+      const days = parseInt(period.replace(/[^\d]/g, ''), 10) || 30;
+      const now = new Date();
+      const recent = database.getArticlesByRange(subDays(now, days), now);
+      const previous = database.getArticlesByRange(subDays(now, days * 2), subDays(now, days));
+      res.json({ trends: trends(recent, previous), period: { days } });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get('/api/tags', (req, res) => {
+    res.json({ tags: database.getAllTags() });
+  });
+  app.get('/api/article/:id/tags', (req, res) => {
+    res.json({ tags: database.getTagsForArticle(parseInt(req.params.id, 10)) });
+  });
+  app.post('/api/article/:id/tags', (req, res) => {
+    const { tag } = req.body || {};
+    if (!tag) return res.status(400).json({ error: 'tag erforderlich' });
+    database.addTag(parseInt(req.params.id, 10), tag);
+    res.json({ ok: true });
+  });
+  app.delete('/api/article/:id/tags/:tag', (req, res) => {
+    database.removeTag(parseInt(req.params.id, 10), req.params.tag);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/bookmarks', (req, res) => {
+    res.json({ bookmarks: database.getBookmarks() });
+  });
+  app.post('/api/article/:id/bookmark', (req, res) => {
+    database.setBookmark(parseInt(req.params.id, 10), req.body?.note);
+    res.json({ ok: true });
+  });
+  app.delete('/api/article/:id/bookmark', (req, res) => {
+    database.removeBookmark(parseInt(req.params.id, 10));
+    res.json({ ok: true });
+  });
+
+  app.get('/api/saved-searches', (req, res) => {
+    res.json({ searches: database.getSavedSearches() });
+  });
+  app.post('/api/saved-searches', (req, res) => {
+    const { name, query, filters } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'name erforderlich' });
+    database.saveSearch(name, query, filters);
+    res.json({ ok: true });
+  });
+  app.delete('/api/saved-searches/:name', (req, res) => {
+    database.deleteSavedSearch(req.params.name);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/export', (req, res) => {
+    try {
+      const { from, to } = parseDateRange({ from: req.query.from, to: req.query.to, last: req.query.last || '30d' });
+      const articles = database.getArticlesByRange(from, to);
+      const format = (req.query.format || 'json').toLowerCase();
+      if (format === 'csv') {
+        const cols = ['id', 'title', 'source', 'author', 'published_date', 'url', 'category', 'sentiment', 'relevance_score', 'word_count', 'paywall'];
+        const escape = (v) => {
+          if (v === null || v === undefined) return '';
+          const s = String(v).replace(/"/g, '""').replace(/\n/g, ' ');
+          return /[",;\n]/.test(s) ? `"${s}"` : s;
+        };
+        let csv = cols.join(';') + '\n';
+        for (const a of articles) csv += cols.map(c => escape(a[c])).join(';') + '\n';
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="pressespiegel-${format}-${Date.now()}.csv"`);
+        return res.send('﻿' + csv);
+      }
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="pressespiegel-${Date.now()}.json"`);
+        return res.send(JSON.stringify(articles, null, 2));
+      }
+      res.status(400).json({ error: 'Unbekanntes Format' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
   app.get('/api/sources', (req, res) => {
