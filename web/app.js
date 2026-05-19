@@ -50,6 +50,19 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function safeNum(v, fallback = 0) {
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function safePct(n, max, fallback = 0) {
+  const num = safeNum(n, fallback);
+  const m = safeNum(max, 0);
+  if (m <= 0) return fallback;
+  const pct = (num / m) * 100;
+  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : fallback;
+}
+
 function fmtDate(d, withTime = false) {
   if (!d) return '–';
   const date = new Date(d);
@@ -145,15 +158,15 @@ async function loadTagsTab() {
     const sorted = [...byCat.entries()].sort((a, b) => a[0].localeCompare(b[0]));
     container.innerHTML = sorted.map(([cat, list]) => {
       list.sort((a, b) => b.count - a.count);
-      const max = Math.max(...list.map(t => t.count), 1);
+      const max = Math.max(1, ...list.map(t => safeNum(t.count)));
       return `
         <div class="card">
-          <h2>${escapeHtml(cat)} <small>${list.length} Tags, gesamt ${list.reduce((a, b) => a + b.count, 0)}</small></h2>
+          <h2>${escapeHtml(cat)} <small>${list.length} Tags, gesamt ${list.reduce((a, b) => a + safeNum(b.count), 0)}</small></h2>
           <div class="word-cloud">
             ${list.map(t => {
-              const size = 11 + Math.round((t.count / max) * 14);
+              const size = 11 + Math.round(safePct(t.count, max) * 0.14);
               const display = t.tag.includes(':') ? t.tag.split(':').slice(1).join(':') : t.tag;
-              return `<span class="word tag" style="font-size:${size}px" data-tag="${escapeHtml(t.tag)}" title="${t.count} Artikel: ${escapeHtml(t.tag)}">${escapeHtml(display)} <small>(${t.count})</small></span>`;
+              return `<span class="word tag" style="font-size:${size}px" data-tag="${escapeHtml(t.tag)}" title="${safeNum(t.count)} Artikel: ${escapeHtml(t.tag)}">${escapeHtml(display)} <small>(${safeNum(t.count)})</small></span>`;
             }).join(' ')}
           </div>
         </div>
@@ -247,22 +260,25 @@ async function loadDashboard() {
 }
 
 function renderSentimentChart(o) {
-  const total = (o.positive || 0) + (o.negative || 0) + (o.neutral || 0);
+  const pos = safeNum(o.positive);
+  const neu = safeNum(o.neutral);
+  const neg = safeNum(o.negative);
+  const total = pos + neu + neg;
   if (total === 0) {
     $('#sentiment-chart').innerHTML = '<p class="muted">Noch keine Daten.</p>';
     return;
   }
   const segs = [
-    { l: 'Positiv', v: o.positive, c: 'var(--c-pos)' },
-    { l: 'Neutral', v: o.neutral, c: 'var(--c-neu)' },
-    { l: 'Negativ', v: o.negative, c: 'var(--c-neg)' }
+    { l: 'Positiv', v: pos, c: 'var(--c-pos)' },
+    { l: 'Neutral', v: neu, c: 'var(--c-neu)' },
+    { l: 'Negativ', v: neg, c: 'var(--c-neg)' }
   ];
   let acc = 0;
   const stops = segs.map(s => {
-    const start = (acc / total) * 100;
+    const start = safePct(acc, total);
     acc += s.v;
-    const end = (acc / total) * 100;
-    return `${s.c} ${start}% ${end}%`;
+    const end = safePct(acc, total);
+    return `${s.c} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
   }).join(', ');
   $('#sentiment-chart').innerHTML = `
     <div style="display:flex;align-items:center;gap:24px;justify-content:center;flex-wrap:wrap;">
@@ -272,7 +288,7 @@ function renderSentimentChart(o) {
       <ul class="legend" style="margin:0">
         ${segs.map(s => `
           <li><span class="dot" style="background:${s.c}"></span><strong>${s.l}</strong>
-              <span class="legend-value">${s.v} (${Math.round((s.v / total) * 100)}%)</span></li>
+              <span class="legend-value">${s.v} (${Math.round(safePct(s.v, total))}%)</span></li>
         `).join('')}
       </ul>
     </div>
@@ -280,18 +296,18 @@ function renderSentimentChart(o) {
 }
 
 function renderSourceBars(rows) {
-  if (!rows.length) {
+  if (!rows || !rows.length) {
     $('#sources-chart').innerHTML = '<p class="muted">Noch keine Daten.</p>';
     return;
   }
-  const max = Math.max(...rows.map(r => r.count));
+  const max = Math.max(1, ...rows.map(r => safeNum(r.count)));
   $('#sources-chart').innerHTML = `
     <div class="source-bars">
       ${rows.slice(0, 10).map(r => `
         <div class="source-row">
           <span class="src-name">${escapeHtml(r.source)}</span>
-          <span class="src-count">${r.count}</span>
-          <div class="src-bar"><span style="width:${(r.count / max) * 100}%"></span></div>
+          <span class="src-count">${safeNum(r.count)}</span>
+          <div class="src-bar"><span style="width:${safePct(r.count, max).toFixed(2)}%"></span></div>
         </div>
       `).join('')}
     </div>
@@ -341,6 +357,9 @@ function buildArticleQuery() {
 async function loadArticles() {
   try {
     $('#articles-subtitle').textContent = 'Lade …';
+    showSkeletonArticles(5);
+    renderActiveFilterChips();
+    loadSavedSearches();
     const data = await api(`/api/articles?${buildArticleQuery()}`);
     state.articles = data.articles;
     state.total = data.total;
@@ -351,6 +370,7 @@ async function loadArticles() {
       sources.map(s => `<option value="${escapeHtml(s)}"${s === cur ? ' selected' : ''}>${escapeHtml(s)} (${data.articles.filter(a => a.source === s).length})</option>`).join('');
 
     renderArticleList(data.articles);
+    renderActiveFilterChips();
     $('#articles-subtitle').textContent = `${data.returned} von ${data.total} Artikeln · Zeitraum ${fmtDate(data.from)} – ${fmtDate(data.to)}`;
   } catch (err) {
     toast(err.message, 'error');
@@ -480,6 +500,223 @@ async function showArticleDetail(id) {
   }
 }
 
+function renderActiveFilterChips() {
+  const box = $('#active-filters');
+  if (!box) return;
+  const chips = [];
+  const labels = {
+    category: 'Kategorie',
+    sentiment: 'Stimmung',
+    source: 'Quelle',
+    tag: 'Tag',
+    bookmark: 'Lesezeichen'
+  };
+  const valueLabels = {
+    sehr_relevant: 'Sehr relevant',
+    moeglich_relevant: 'Moeglich',
+    irrelevant: 'Niedrig',
+    yes: 'Ja',
+    no: 'Nein'
+  };
+  for (const key of Object.keys(labels)) {
+    const v = state.filters[key];
+    if (v) chips.push({ key, label: labels[key], value: valueLabels[v] || v });
+  }
+  if (state.search) chips.push({ key: 'search', label: 'Suche', value: state.search });
+  if (state.filters.period && state.filters.period !== '30d') {
+    chips.push({ key: 'period', label: 'Zeitraum', value: state.filters.period });
+  }
+  box.innerHTML = chips.map(c => `
+    <span class="active-filter-chip" data-key="${escapeHtml(c.key)}">
+      <strong>${escapeHtml(c.label)}:</strong> ${escapeHtml(c.value)}
+      <span class="x" data-clear="${escapeHtml(c.key)}" title="Filter entfernen">×</span>
+    </span>
+  `).join('');
+  $$('.active-filter-chip .x', box).forEach(x => {
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = x.dataset.clear;
+      if (key === 'search') {
+        state.search = '';
+        $('#article-search').value = '';
+      } else if (key === 'period') {
+        state.filters.period = '30d';
+        $('#filter-period').value = '30d';
+      } else {
+        state.filters[key] = '';
+        const sel = $(`#filter-${key}`);
+        if (sel) sel.value = '';
+      }
+      loadArticles();
+    });
+  });
+}
+
+async function loadSavedSearches() {
+  const box = $('#saved-searches');
+  if (!box) return;
+  try {
+    const data = await api('/api/saved-searches');
+    box.innerHTML = (data.searches || []).map(s => `
+      <span class="saved-search-chip" data-name="${escapeHtml(s.name)}">
+        ${escapeHtml(s.name)}
+        <span class="x" data-delete="${escapeHtml(s.name)}" title="Loeschen">×</span>
+      </span>
+    `).join('');
+    $$('.saved-search-chip', box).forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        if (e.target.classList.contains('x')) return;
+        const name = chip.dataset.name;
+        const found = (data.searches || []).find(s => s.name === name);
+        if (!found) return;
+        if (found.query) {
+          state.search = found.query;
+          $('#article-search').value = found.query;
+        }
+        if (found.filters) {
+          state.filters = { ...state.filters, ...found.filters };
+          for (const key of ['category', 'sentiment', 'source', 'tag', 'bookmark', 'period', 'sort']) {
+            const sel = $(`#filter-${key}`);
+            if (sel && state.filters[key] != null) sel.value = state.filters[key];
+          }
+        }
+        loadArticles();
+      });
+    });
+    $$('.saved-search-chip .x', box).forEach(x => {
+      x.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const name = x.dataset.delete;
+        if (!confirm(`Suche "${name}" loeschen?`)) return;
+        try {
+          await api(`/api/saved-searches/${encodeURIComponent(name)}`, { method: 'DELETE' });
+          loadSavedSearches();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+    });
+  } catch { /* silent */ }
+}
+
+const QUICK_PRESETS = {
+  all: { category: '', sentiment: '', bookmark: '', period: '30d' },
+  top: { category: 'sehr_relevant', sentiment: '', bookmark: '', period: '30d' },
+  reviews: { category: '', sentiment: '', bookmark: '', period: '30d', search: 'type:review' },
+  interviews: { category: '', sentiment: '', bookmark: '', period: '30d', search: 'type:interview' },
+  positive: { category: '', sentiment: 'positiv', bookmark: '', period: '30d' },
+  negative: { category: '', sentiment: 'negativ', bookmark: '', period: '30d' },
+  today: { category: '', sentiment: '', bookmark: '', period: '7d' },
+  bookmarked: { category: '', sentiment: '', bookmark: 'yes', period: '90d' }
+};
+
+function applyQuickPreset(name) {
+  const preset = QUICK_PRESETS[name];
+  if (!preset) return;
+  state.filters = { ...state.filters, ...preset };
+  if (preset.search !== undefined) {
+    state.search = preset.search;
+    $('#article-search').value = preset.search;
+  }
+  for (const k of ['category', 'sentiment', 'source', 'tag', 'bookmark', 'period']) {
+    const sel = $(`#filter-${k}`);
+    if (sel && state.filters[k] != null) sel.value = state.filters[k];
+  }
+  $$('.quick-filter').forEach(b => b.classList.toggle('active', b.dataset.quick === name));
+  loadArticles();
+}
+
+function initQuickFilters() {
+  $$('.quick-filter').forEach(btn => {
+    btn.addEventListener('click', () => applyQuickPreset(btn.dataset.quick));
+  });
+}
+
+function showSkeletonArticles(count = 5) {
+  const list = $('#article-list');
+  if (!list) return;
+  list.innerHTML = Array(count).fill(0).map(() => `
+    <div class="article-item">
+      <div class="skeleton lg" style="width:40%"></div>
+      <div class="skeleton" style="width:80%"></div>
+      <div class="skeleton" style="width:60%"></div>
+    </div>
+  `).join('');
+}
+
+function initHelpOverlay() {
+  if ($('#help-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'help-overlay';
+  overlay.id = 'help-overlay';
+  overlay.innerHTML = `
+    <div class="help-overlay-card">
+      <h2>Tastenkuerzel & Such-Syntax</h2>
+      <table>
+        <tr><td><span class="kbd">/</span></td><td>Suche fokussieren</td></tr>
+        <tr><td><span class="kbd">?</span></td><td>Diese Hilfe ein/ausblenden</td></tr>
+        <tr><td><span class="kbd">Esc</span></td><td>Suche/Modal schliessen</td></tr>
+        <tr><td><span class="kbd">g</span> <span class="kbd">d</span></td><td>Dashboard</td></tr>
+        <tr><td><span class="kbd">g</span> <span class="kbd">a</span></td><td>Artikel</td></tr>
+        <tr><td><span class="kbd">g</span> <span class="kbd">s</span></td><td>Scan</td></tr>
+        <tr><td><span class="kbd">t</span></td><td>Theme umschalten</td></tr>
+      </table>
+      <h2 style="margin-top:18px">Such-Operatoren</h2>
+      <table>
+        <tr><td><code>"Phrase"</code></td><td>Exakte Phrase</td></tr>
+        <tr><td><code>Wort -Nicht</code></td><td>Ausschluss</td></tr>
+        <tr><td><code>A OR B</code></td><td>Oder</td></tr>
+        <tr><td><code>title:X</code></td><td>Feldsuche</td></tr>
+        <tr><td><code>tag:X</code></td><td>Tag-Filter</td></tr>
+        <tr><td><code>after:2024-01-01</code></td><td>Datum-Filter</td></tr>
+        <tr><td><code>score:&gt;=50</code></td><td>Score-Filter</td></tr>
+      </table>
+      <p style="text-align:right;margin-top:14px;">
+        <button class="btn" id="help-close">Schliessen</button>
+      </p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  $('#help-close').addEventListener('click', () => overlay.classList.remove('open'));
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+}
+
+function toggleHelp() {
+  initHelpOverlay();
+  $('#help-overlay').classList.toggle('open');
+}
+
+let lastKeyG = 0;
+function initGlobalKeys() {
+  document.addEventListener('keydown', (e) => {
+    const isInput = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+    if (e.key === 'Escape') {
+      const overlay = $('#help-overlay');
+      if (overlay && overlay.classList.contains('open')) { overlay.classList.remove('open'); return; }
+      if (isInput && document.activeElement.id === 'article-search') {
+        document.activeElement.blur();
+      }
+    }
+    if (isInput) return;
+    if (e.key === '?') { e.preventDefault(); toggleHelp(); return; }
+    if (e.key === 't' || e.key === 'T') {
+      const tg = $('#theme-toggle');
+      if (tg) tg.click();
+      return;
+    }
+    if (e.key === 'g' || e.key === 'G') { lastKeyG = Date.now(); return; }
+    if (Date.now() - lastKeyG < 800) {
+      const map = { d: 'dashboard', a: 'articles', s: 'scan', r: 'reports', k: 'keywords', q: 'sources', b: 'bookmarks', l: 'logs', T: 'tags' };
+      const tab = map[e.key] || map[e.key.toLowerCase()];
+      if (tab) {
+        const btn = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+        if (btn) btn.click();
+        lastKeyG = 0;
+      }
+    }
+  });
+}
+
 function initArticleFilters() {
   const debounced = debounce(() => loadArticles(), 250);
   $('#article-search').addEventListener('input', (e) => {
@@ -522,6 +759,28 @@ function initArticleFilters() {
   $('#export-articles').addEventListener('click', exportCurrentArticles);
   $('#export-csv').addEventListener('click', () => downloadExport('csv'));
   $('#export-json').addEventListener('click', () => downloadExport('json'));
+
+  const saveBtn = $('#filter-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const name = prompt('Name fuer die Suche:');
+      if (!name || !name.trim()) return;
+      try {
+        await api('/api/saved-searches', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: name.trim(),
+            query: state.search,
+            filters: { ...state.filters }
+          })
+        });
+        toast(`Suche "${name}" gespeichert`, 'success');
+        loadSavedSearches();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+  }
 
   document.addEventListener('keydown', (e) => {
     if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
@@ -620,12 +879,12 @@ async function loadTrends() {
       api(`/api/trends?period=${period}`),
       api('/api/tags')
     ]);
-    const maxM = Math.max(...mentionsData.mentions.map(m => m.count), 1);
+    const maxM = Math.max(1, ...mentionsData.mentions.map(m => safeNum(m.count)));
     $('#top-mentions').innerHTML = mentionsData.mentions.length === 0
       ? '<p class="muted">Keine Daten.</p>'
       : mentionsData.mentions.map(m => {
-          const size = 11 + Math.round((m.count / maxM) * 18);
-          return `<span class="word" style="font-size:${size}px" title="${m.count}x">${escapeHtml(m.term)}</span>`;
+          const size = 11 + Math.round(safePct(m.count, maxM) * 0.18);
+          return `<span class="word" style="font-size:${size}px" title="${safeNum(m.count)}x">${escapeHtml(m.term)}</span>`;
         }).join(' ');
 
     const upTrends = trendsData.trends.filter(t => t.change > 0).slice(0, 15);
@@ -634,17 +893,17 @@ async function loadTrends() {
       : upTrends.map(t => `
           <div class="trend-row">
             <span class="trend-term">${escapeHtml(t.term)}</span>
-            <span class="trend-change">'+'+(t.change > 0 ? '+' : ''}${t.change}</span>
+            <span class="trend-change">${t.change > 0 ? '+' : ''}${t.change}</span>
             <span class="trend-count">${t.count}</span>
           </div>
         `).join('');
 
-    const maxTag = Math.max(...tagsData.tags.map(t => t.count), 1);
+    const maxTag = Math.max(1, ...tagsData.tags.map(t => safeNum(t.count)));
     $('#all-tags').innerHTML = tagsData.tags.length === 0
       ? '<p class="muted">Noch keine Tags. Markiere Artikel im Detail-View.</p>'
       : tagsData.tags.map(t => {
-          const size = 11 + Math.round((t.count / maxTag) * 12);
-          return `<span class="word tag" style="font-size:${size}px" data-tag="${escapeHtml(t.tag)}" title="${t.count}x">${escapeHtml(t.tag)}</span>`;
+          const size = 11 + Math.round(safePct(t.count, maxTag) * 0.12);
+          return `<span class="word tag" style="font-size:${size}px" data-tag="${escapeHtml(t.tag)}" title="${safeNum(t.count)}x">${escapeHtml(t.tag)}</span>`;
         }).join(' ');
     $$('.word.tag').forEach(el => el.addEventListener('click', () => {
       $('#article-search').value = `tag:${el.dataset.tag}`;
@@ -705,16 +964,17 @@ async function loadScan() {
     if (!health.length) {
       $('#feed-health').innerHTML = '<p class="muted">Noch keine Health-Daten. Führe einen Scan aus.</p>';
     } else {
+      const sorted = [...health].sort((a, b) => safeNum(b.consecutive_failures) - safeNum(a.consecutive_failures) || (a.source || '').localeCompare(b.source || ''));
       $('#feed-health').innerHTML = `
         <div class="feed-health-list">
-          ${health.map(h => `
+          ${sorted.map(h => `
             <div class="feed-row">
-              <span class="h-status ${h.consecutive_failures > 0 ? 'err' : 'ok'}">${h.consecutive_failures > 0 ? 'X' : 'OK'}</span>
+              <span class="h-status ${safeNum(h.consecutive_failures) > 0 ? 'err' : 'ok'}">${safeNum(h.consecutive_failures) > 0 ? '✕' : '✓'}</span>
               <div>
                 <div>${escapeHtml(h.source)}</div>
-                <div class="h-meta">Erfolg: ${h.last_success ? fmtDate(h.last_success, true) : 'nie'} · Fehler: ${h.last_failure ? fmtDate(h.last_failure, true) : 'nie'}</div>
+                <div class="h-meta">Erfolg: ${h.last_success ? fmtDate(h.last_success, true) : 'nie'} · Fehler: ${h.last_failure ? fmtDate(h.last_failure, true) : 'nie'}${h.last_response_ms ? ' · ' + h.last_response_ms + 'ms' : ''}</div>
               </div>
-              <span class="h-meta">${h.consecutive_failures > 0 ? h.consecutive_failures + 'x Fehler' : ''}</span>
+              <span class="h-meta">${safeNum(h.consecutive_failures) > 0 ? safeNum(h.consecutive_failures) + 'x Fehler' : 'OK'}</span>
             </div>
           `).join('')}
         </div>
@@ -968,16 +1228,16 @@ function renderSourcesList() {
         });
         if (r.ok) {
           resBox.innerHTML = `
-            <span class="badge badge-sent-positiv">[${r.type.toUpperCase()}</span>
+            <span class="badge badge-sent-positiv">${escapeHtml((r.type || 'feed').toUpperCase())}</span>
             <strong>${r.itemCount}</strong> Eintraege · ${r.responseTimeMs}ms
             ${r.title ? ` · ${escapeHtml(r.title)}` : ''}
             ${r.sample && r.sample.length ? `<ul style="margin:8px 0 0 16px;font-size:12px;">${r.sample.map(s => `<li>${escapeHtml(s.title || '(ohne Titel)')}</li>`).join('')}</ul>` : ''}
           `;
         } else {
-          resBox.innerHTML = `<span class="badge badge-sent-negativ">Fehler</span> ${escapeHtml(r.error)}`;
+          resBox.innerHTML = `<span class="badge badge-sent-negativ">Fehler</span> ${escapeHtml(r.error || 'unbekannt')}`;
         }
       } catch (err) {
-        resBox.innerHTML = `<span class="badge badge-sent-negativ"></span> ${escapeHtml(err.message)}`;
+        resBox.innerHTML = `<span class="badge badge-sent-negativ">Fehler</span> ${escapeHtml(err.message)}`;
       } finally {
         btn.disabled = false; btn.textContent = 'Testen';
       }
@@ -1150,6 +1410,7 @@ function init() {
   initTabs();
   initWebSocket();
   initArticleFilters();
+  initQuickFilters();
   initScanTab();
   initReportsTab();
   initKeywordsTab();
@@ -1159,6 +1420,7 @@ function init() {
   initDuplicatesTab();
   initTrendsTab();
   initTagsTab();
+  initGlobalKeys();
   loadDashboard();
 }
 

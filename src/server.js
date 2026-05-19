@@ -94,11 +94,36 @@ function buildApp() {
         bookmarked: bookmarkIds.has(a.id)
       }));
 
-      const { category, sentiment, source, tag, bookmark, q, limit } = req.query;
-      if (category) articles = articles.filter(a => a.category === category);
-      if (sentiment) articles = articles.filter(a => a.sentiment === sentiment);
-      if (source) articles = articles.filter(a => a.source === source);
-      if (tag) articles = articles.filter(a => a.tags.includes(tag));
+      const { category, sentiment, source, tag, bookmark, q, limit, minScore, maxScore, type } = req.query;
+      const splitMulti = (v) => String(v).split(/[,;|]/).map(s => s.trim()).filter(Boolean);
+      if (category) {
+        const cats = splitMulti(category);
+        articles = articles.filter(a => cats.includes(a.category));
+      }
+      if (sentiment) {
+        const sents = splitMulti(sentiment);
+        articles = articles.filter(a => sents.includes(a.sentiment));
+      }
+      if (source) {
+        const srcs = splitMulti(source);
+        articles = articles.filter(a => srcs.includes(a.source));
+      }
+      if (tag) {
+        const tags = splitMulti(tag);
+        articles = articles.filter(a => tags.every(t => a.tags.includes(t)));
+      }
+      if (type) {
+        const types = splitMulti(type);
+        articles = articles.filter(a => types.includes(a.article_type));
+      }
+      if (minScore !== undefined && minScore !== '') {
+        const n = parseInt(minScore, 10);
+        if (Number.isFinite(n)) articles = articles.filter(a => (a.relevance_score || 0) >= n);
+      }
+      if (maxScore !== undefined && maxScore !== '') {
+        const n = parseInt(maxScore, 10);
+        if (Number.isFinite(n)) articles = articles.filter(a => (a.relevance_score || 0) <= n);
+      }
       if (bookmark === 'yes') articles = articles.filter(a => a.bookmarked);
       if (bookmark === 'no') articles = articles.filter(a => !a.bookmarked);
 

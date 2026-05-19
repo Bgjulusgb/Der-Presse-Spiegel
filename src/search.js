@@ -54,8 +54,51 @@ function tokenizeAndStem(text, { withSynonyms = false } = {}) {
   return withSynonyms ? expandWithSynonyms(stems) : stems;
 }
 
+function tokenizePositions(text) {
+  if (!text) return [];
+  const normalized = normalize(text);
+  const tokens = tokenizer.tokenize(normalized) || [];
+  const positions = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (tok.length < 3 || GERMAN_STOPWORDS.has(tok)) continue;
+    positions.push({ stem: stemmer.stem(tok), pos: i });
+  }
+  return positions;
+}
+
+function proximityBoost(queryStems, doc, { maxWindow = 8 } = {}) {
+  if (!doc.positions || queryStems.length < 2) return 0;
+  const uniqQuery = [...new Set(queryStems)];
+  const indexByStem = new Map();
+  for (const { stem, pos } of doc.positions) {
+    if (!indexByStem.has(stem)) indexByStem.set(stem, []);
+    indexByStem.get(stem).push(pos);
+  }
+  const presentTerms = uniqQuery.filter(t => indexByStem.has(t));
+  if (presentTerms.length < 2) return 0;
+
+  let bestSpan = Infinity;
+  for (let i = 0; i < presentTerms.length; i++) {
+    for (let j = i + 1; j < presentTerms.length; j++) {
+      const posA = indexByStem.get(presentTerms[i]);
+      const posB = indexByStem.get(presentTerms[j]);
+      for (const a of posA) {
+        for (const b of posB) {
+          const diff = Math.abs(a - b);
+          if (diff < bestSpan) bestSpan = diff;
+        }
+      }
+    }
+  }
+  if (!isFinite(bestSpan) || bestSpan > maxWindow * 4) return 0;
+  if (bestSpan <= 1) return 0.5;
+  if (bestSpan <= maxWindow) return 0.5 * (1 - (bestSpan - 1) / maxWindow);
+  return 0.1 * (1 - Math.min(1, bestSpan / (maxWindow * 4)));
+}
+
 class BM25Index {
-  constructor(articles, { k1 = 1.5, b = 0.75, titleBoost = 3, recencyHalfLife = 30 } = {}) {
+  constructor(articles, { k1 = 1.5, b = 0.75, titleBoost = 3, recencyHalfLife = 30, withPositions = true } = {}) {
     this.k1 = k1;
     this.b = b;
     this.titleBoost = titleBoost;
@@ -86,12 +129,18 @@ class BM25Index {
         recency = Math.pow(0.5, Math.max(0, ageDays) / this.recencyHalfLife);
       }
 
+      const positions = withPositions
+        ? tokenizePositions(`${article.title || ''} ${article.summary || ''} ${article.full_text || article.fullText || ''}`)
+        : null;
+
       this.docs.push({
         article,
         tf,
         len: allTokens.length,
         recency,
-        sourcePriority: article.source_priority || 50
+        sourcePriority: article.source_priority || 50,
+        positions,
+        titleStems: new Set(titleTokens)
       });
       totalLen += allTokens.length;
     }
@@ -104,26 +153,40 @@ class BM25Index {
     return Math.log(1 + (this.N - n + 0.5) / (n + 0.5));
   }
 
-  score(queryStems, doc, { applyRecency = true } = {}) {
+  score(queryStems, doc, { applyRecency = true, applyProximity = true, applyCoverage = true } = {}) {
     let score = 0;
+    let matched = 0;
     for (const term of queryStems) {
       const tf = doc.tf.get(term) || 0;
       if (tf === 0) continue;
+      matched++;
       const idf = this.idf(term);
       const norm = 1 - this.b + this.b * (doc.len / (this.avgdl || 1));
       score += idf * ((tf * (this.k1 + 1)) / (tf + this.k1 * norm));
+    }
+    if (score === 0) return 0;
+    if (applyCoverage && queryStems.length > 1) {
+      const coverage = matched / queryStems.length;
+      score *= (0.4 + 0.6 * coverage);
+    }
+    if (applyProximity && doc.positions && queryStems.length >= 2) {
+      score *= (1 + proximityBoost(queryStems, doc));
+    }
+    if (doc.titleStems && doc.titleStems.size) {
+      const titleHits = queryStems.filter(t => doc.titleStems.has(t)).length;
+      if (titleHits > 0) score *= (1 + 0.15 * titleHits);
     }
     if (applyRecency) score *= (0.5 + doc.recency);
     return score;
   }
 
-  search(query, { limit = 50, withSynonyms = true, applyRecency = true } = {}) {
+  search(query, { limit = 50, withSynonyms = true, applyRecency = true, applyProximity = true } = {}) {
     if (!query || !query.trim()) return [];
     const stems = tokenizeAndStem(query, { withSynonyms });
     if (stems.length === 0) return [];
     const scored = this.docs.map(doc => ({
       article: doc.article,
-      score: this.score(stems, doc, { applyRecency })
+      score: this.score(stems, doc, { applyRecency, applyProximity })
     })).filter(r => r.score > 0);
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, limit);

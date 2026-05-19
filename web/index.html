@@ -99,6 +99,17 @@
 
     <p id="did-you-mean" class="did-you-mean" style="display:none"></p>
 
+    <div class="quick-filters" id="quick-filters">
+      <button class="quick-filter" data-quick="all">Alle</button>
+      <button class="quick-filter" data-quick="top">Sehr relevant</button>
+      <button class="quick-filter" data-quick="reviews">Kritiken</button>
+      <button class="quick-filter" data-quick="interviews">Interviews</button>
+      <button class="quick-filter" data-quick="positive">Positiv</button>
+      <button class="quick-filter" data-quick="negative">Negativ</button>
+      <button class="quick-filter" data-quick="today">Heute</button>
+      <button class="quick-filter" data-quick="bookmarked">Lesezeichen</button>
+    </div>
+
     <div class="toolbar">
       <div class="search-wrap">
         <input type="search" id="article-search" placeholder="Suchen mit BM25 + Fuzzy-Match (Taste /)" autocomplete="off">
@@ -139,8 +150,12 @@
         <option value="date-asc">Datum alt zu neu</option>
         <option value="relevance" id="relevance-opt">Suchrelevanz</option>
       </select>
+      <button class="btn-secondary" id="filter-save" title="Aktuelle Suche speichern">Speichern</button>
       <button class="btn-secondary" id="filter-reset" title="Filter zuruecksetzen">Reset</button>
     </div>
+
+    <div class="active-filters" id="active-filters"></div>
+    <div class="saved-searches" id="saved-searches"></div>
 
     <p class="results-count" id="results-count"></p>
     <div id="article-list" class="article-list"></div>

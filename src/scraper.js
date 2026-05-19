@@ -253,11 +253,16 @@ function extractArticleContent(html, url) {
   const paywallSignals = [
     'paywall', 'sz-plus', 'sueddeutsche-plus', 'spplus', 'subscriber-only',
     'plus-artikel', 'nur-fuer-abonnenten', 'abo-artikel', 'premium-content',
-    '"isAccessibleForFree":false', 'data-paywall', 'class="paywall',
-    'm-paywall', 'paid-content', 'metered-content'
+    '"isaccessibleforfree":false', 'data-paywall', 'class="paywall',
+    'm-paywall', 'paid-content', 'metered-content', 'piano-paywall',
+    'fazplus', 'taz-plus', 'tazplus', 'welt-plus', 'weltplus',
+    'jetzt-abonnent-werden', 'jetzt-abonnieren', 'abonnement-abschliessen',
+    'noch-nicht-abonnent', 'plus-inhalt', 'bezahlinhalt', 'piano-id',
+    'access-paywall', 'register-wall', 'soft-paywall',
+    'als-abonnent-anmelden', 'unbegrenzt-lesen', 'zum-vollen-artikel'
   ];
   const htmlLower = html.toLowerCase();
-  const paywall = paywallSignals.some(s => htmlLower.includes(s.toLowerCase()));
+  const paywall = paywallSignals.some(s => htmlLower.includes(s));
 
   let finalText = text;
   let finalTitle = title;
