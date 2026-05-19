@@ -32,7 +32,26 @@ function section(title) {
 program
   .name('pressespiegel')
   .description('Lokales Pressespiegel-Tool fuer die Muenchner Kammerspiele')
-  .version('1.1.0');
+  .version('2.0.0');
+
+program
+  .command('ui')
+  .description('Startet die grafische Bedienoberflaeche (lokaler Server + Browser)')
+  .option('-p, --port <port>', 'Port', '4711')
+  .option('--no-open', 'Browser nicht automatisch oeffnen')
+  .action(async (opts) => {
+    const { start } = require('../src/server');
+    try {
+      const info = await start({ port: parseInt(opts.port, 10) });
+      const url = `http://${info.host}:${info.port}/`;
+      console.log(chalk.cyan(`\n▶ UI laeuft auf ${chalk.bold.underline(url)}`));
+      console.log(chalk.gray('  Stoppen mit Ctrl+C\n'));
+      if (opts.open !== false) openFile(url);
+    } catch (err) {
+      console.error(chalk.red(`✗ Server-Start fehlgeschlagen: ${err.message}`));
+      process.exit(1);
+    }
+  });
 
 program
   .command('scan')
@@ -358,6 +377,58 @@ program
   .action(() => {
     console.log(chalk.cyan('▶ Starte lokalen Scheduler...'));
     scheduler.start();
+  });
+
+program
+  .command('test-feed <url>')
+  .description('Testet eine RSS/Atom/JSON-Feed-URL ohne sie zu speichern')
+  .action(async (url) => {
+    const { testFeed } = require('../src/scraper');
+    section(`Test: ${url}`);
+    const result = await testFeed(url);
+    if (result.ok) {
+      console.log(chalk.green(`  ✓ OK (${result.responseTimeMs}ms)`));
+      console.log(`    Typ:          ${result.type}`);
+      console.log(`    Encoding:     ${result.encoding || '-'}`);
+      console.log(`    Content-Type: ${result.contentType || '-'}`);
+      console.log(`    Titel:        ${result.title || '-'}`);
+      console.log(`    Eintraege:    ${chalk.bold(result.itemCount)}`);
+      if (result.sample.length) {
+        console.log(chalk.cyan('\n  Beispiele:'));
+        result.sample.forEach(s => {
+          console.log(`    - ${chalk.bold(s.title || '(ohne Titel)')}`);
+          console.log(`      ${chalk.gray(s.url || '')}`);
+        });
+      }
+    } else {
+      console.log(chalk.red(`  ✗ Fehler (${result.responseTimeMs}ms)`));
+      console.log(`    ${result.error}`);
+    }
+    database.close();
+  });
+
+program
+  .command('test-all-feeds')
+  .description('Testet alle konfigurierten Feeds und gibt eine Tabelle aus')
+  .action(async () => {
+    const { testFeed } = require('../src/scraper');
+    const { sources: srcCfg } = require('../src/config');
+    section(`Pruefe ${srcCfg.feeds.length} Feeds`);
+    const results = await Promise.all(
+      srcCfg.feeds.map(async (f) => ({ feed: f, result: await testFeed(f.url, f.name) }))
+    );
+    let ok = 0, fail = 0;
+    for (const { feed, result } of results) {
+      if (result.ok) {
+        ok++;
+        console.log(`  ${chalk.green('✓')} ${chalk.bold(feed.name.padEnd(38))} ${result.itemCount.toString().padStart(4)} Eintraege  ${chalk.gray(result.responseTimeMs + 'ms')}`);
+      } else {
+        fail++;
+        console.log(`  ${chalk.red('✗')} ${chalk.bold(feed.name.padEnd(38))} ${chalk.red(result.error)}`);
+      }
+    }
+    console.log(`\n  ${chalk.green(ok + ' OK')} · ${chalk.red(fail + ' fehlgeschlagen')} von ${srcCfg.feeds.length}`);
+    database.close();
   });
 
 program

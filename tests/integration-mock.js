@@ -4,10 +4,13 @@ const fs = require('fs');
 const path = require('path');
 process.env.LOG_LEVEL = 'warn';
 
-const TEST_DB = path.join(__dirname, '..', 'data', 'test-mock.db');
-if (fs.existsSync(TEST_DB)) fs.unlinkSync(TEST_DB);
+const useProd = process.argv.includes('--prod');
+const TEST_DB = useProd
+  ? path.join(__dirname, '..', 'data', 'pressespiegel.db')
+  : path.join(__dirname, '..', 'data', 'test-mock.db');
+if (!useProd && fs.existsSync(TEST_DB)) fs.unlinkSync(TEST_DB);
 const settings = require('../config/settings.json');
-settings.database.path = './data/test-mock.db';
+if (!useProd) settings.database.path = './data/test-mock.db';
 
 const database = require('../src/database');
 const { analyze } = require('../src/analyzer');
@@ -134,9 +137,11 @@ generateReport({ from, to, articles, format: 'html', title: 'TESTBERICHT (Mock-D
   .then((result) => {
     console.log(`\n✓ Report: ${result.html}`);
     database.close();
-    if (fs.existsSync(TEST_DB)) fs.unlinkSync(TEST_DB);
-    if (fs.existsSync(TEST_DB + '-wal')) fs.unlinkSync(TEST_DB + '-wal');
-    if (fs.existsSync(TEST_DB + '-shm')) fs.unlinkSync(TEST_DB + '-shm');
+    if (!useProd) {
+      if (fs.existsSync(TEST_DB)) fs.unlinkSync(TEST_DB);
+      if (fs.existsSync(TEST_DB + '-wal')) fs.unlinkSync(TEST_DB + '-wal');
+      if (fs.existsSync(TEST_DB + '-shm')) fs.unlinkSync(TEST_DB + '-shm');
+    }
   })
   .catch((err) => {
     console.error('Error:', err.message);

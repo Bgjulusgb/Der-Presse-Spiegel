@@ -11,12 +11,13 @@
     "max_summary_length": 320
   },
   "scraping": {
-    "user_agent": "PressespiegelBot/1.1 (+lokale-installation)",
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
     "request_timeout_ms": 20000,
     "max_retries": 3,
     "retry_backoff_ms": 2000,
     "max_concurrent_requests": 4,
     "rate_limit_per_domain_ms": 1000,
+    "puppeteer_fallback": true,
     "puppeteer": {
       "headless": true,
       "navigation_timeout_ms": 30000,

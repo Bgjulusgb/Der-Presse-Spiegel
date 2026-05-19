@@ -1,13 +1,21 @@
 {
   "name": "pressespiegel-kammerspiele",
-  "version": "1.1.0",
-  "description": "Lokales Pressespiegel-Tool fuer die Muenchner Kammerspiele - alles offline, keine APIs, keine Cloud",
-  "main": "bin/cli.js",
+  "version": "2.0.0",
+  "description": "Lokales Pressespiegel-Tool fuer die Muenchner Kammerspiele - Desktop-App mit UI, alles offline",
+  "main": "electron/main.js",
   "bin": {
     "pressespiegel": "./bin/cli.js"
   },
   "scripts": {
     "start": "node bin/cli.js",
+    "ui": "node bin/cli.js ui",
+    "electron": "electron .",
+    "electron:dev": "ELECTRON_DEV=1 electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
+    "build:linux": "electron-builder --linux --x64",
+    "build:mac": "electron-builder --mac --x64 --arm64",
+    "build:all": "electron-builder -mwl",
     "scan": "node bin/cli.js scan",
     "report": "node bin/cli.js report",
     "schedule": "node bin/cli.js schedule",
@@ -22,26 +30,107 @@
     "muenchen",
     "scraping",
     "rss",
-    "local"
+    "electron",
+    "desktop"
   ],
   "author": "Muenchner Kammerspiele",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
-    "axios": "^1.7.7",
-    "better-sqlite3": "^11.3.0",
+    "axios": "^1.16.1",
+    "better-sqlite3": "^12.10.0",
     "chalk": "^4.1.2",
-    "cheerio": "^1.0.0",
-    "commander": "^12.1.0",
-    "date-fns": "^4.1.0",
+    "cheerio": "^1.2.0",
+    "commander": "^14.0.3",
+    "date-fns": "^4.2.1",
     "dotenv": "^16.4.5",
-    "natural": "^8.0.1",
-    "node-cron": "^3.0.3",
+    "express": "^5.2.1",
+    "fuse.js": "^7.3.0",
+    "he": "^1.2.0",
+    "iconv-lite": "^0.7.2",
+    "natural": "^8.1.1",
+    "node-cron": "^4.2.1",
     "p-limit": "^3.1.0",
-    "puppeteer": "^23.5.0",
+    "puppeteer": "^25.0.4",
     "rss-parser": "^3.13.0",
-    "winston": "^3.15.0"
+    "winston": "^3.19.0",
+    "ws": "^8.20.1",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "electron": "^42.1.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "de.kammerspiele.pressespiegel",
+    "productName": "Pressespiegel Kammerspiele",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "bin/**/*",
+      "web/**/*",
+      "config/**/*",
+      "package.json",
+      "!data/**/*",
+      "!logs/**/*",
+      "!reports/**/*",
+      "!tests/**/*",
+      "!dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "config",
+        "to": "config"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/puppeteer/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Pressespiegel-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Pressespiegel Kammerspiele"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity"
+    }
   }
 }

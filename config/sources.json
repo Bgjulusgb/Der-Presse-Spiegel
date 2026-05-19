@@ -8,18 +8,28 @@
       "category": "theater-fachpresse"
     },
     {
+      "name": "taz - Kultur",
+      "url": "https://taz.de/!s=feuilleton/?ressort=t1;rss",
+      "priority": 85,
+      "type": "rss",
+      "category": "ueberregional"
+    },
+    {
       "name": "Sueddeutsche Zeitung - Kultur",
       "url": "https://rss.sueddeutsche.de/rss/Kultur",
       "priority": 100,
       "type": "rss",
-      "category": "ueberregional"
+      "category": "ueberregional",
+      "use_browser": true,
+      "notes": "Cloudflare-geschuetzt - benoetigt Browser-Fetch"
     },
     {
       "name": "Sueddeutsche Zeitung - Muenchen",
       "url": "https://rss.sueddeutsche.de/rss/Muenchen",
       "priority": 100,
       "type": "rss",
-      "category": "lokal"
+      "category": "lokal",
+      "use_browser": true
     },
     {
       "name": "Bayerischer Rundfunk - Kultur",
@@ -54,70 +64,85 @@
       "url": "https://www.faz.net/rss/aktuell/feuilleton/buehne-und-konzert/",
       "priority": 95,
       "type": "rss",
-      "category": "ueberregional"
+      "category": "ueberregional",
+      "use_browser": true
     },
     {
       "name": "ZEIT - Kultur",
       "url": "https://newsfeed.zeit.de/kultur/index",
       "priority": 90,
       "type": "rss",
-      "category": "ueberregional"
-    },
-    {
-      "name": "taz - Kultur",
-      "url": "https://taz.de/!s=feuilleton/?ressort=t1;rss",
-      "priority": 85,
-      "type": "rss",
-      "category": "ueberregional"
+      "category": "ueberregional",
+      "use_browser": true
     },
     {
       "name": "Spiegel - Kultur",
       "url": "https://www.spiegel.de/kultur/index.rss",
       "priority": 85,
       "type": "rss",
-      "category": "ueberregional"
+      "category": "ueberregional",
+      "use_browser": true
     },
     {
       "name": "Welt - Kultur",
       "url": "https://www.welt.de/feeds/section/kultur.rss",
       "priority": 80,
       "type": "rss",
-      "category": "ueberregional"
+      "category": "ueberregional",
+      "use_browser": true
     },
     {
       "name": "Merkur - Kultur",
       "url": "https://www.merkur.de/kultur/rssfeed.rdf",
       "priority": 75,
       "type": "rss",
-      "category": "lokal"
+      "category": "lokal",
+      "use_browser": true
     },
     {
       "name": "Merkur - Muenchen",
       "url": "https://www.merkur.de/lokales/muenchen/rssfeed.rdf",
       "priority": 75,
       "type": "rss",
-      "category": "lokal"
+      "category": "lokal",
+      "use_browser": true
     },
     {
-      "name": "Abendzeitung Muenchen - Kultur",
-      "url": "https://www.abendzeitung-muenchen.de/rss/kultur",
+      "name": "Abendzeitung Muenchen",
+      "url": "https://www.abendzeitung-muenchen.de/feed",
       "priority": 75,
       "type": "rss",
-      "category": "lokal"
+      "category": "lokal",
+      "use_browser": true
     },
     {
-      "name": "tz Muenchen - Kultur",
-      "url": "https://www.tz.de/kultur/rssfeed.rdf",
+      "name": "tz Muenchen",
+      "url": "https://www.tz.de/muenchen/rssfeed.rdf",
       "priority": 65,
       "type": "rss",
-      "category": "lokal"
+      "category": "lokal",
+      "use_browser": true
     },
     {
-      "name": "muenchen.de - Veranstaltungen",
-      "url": "https://www.muenchen.de/aktuell.rss",
-      "priority": 60,
+      "name": "Deutsche Buehne",
+      "url": "https://www.die-deutsche-buehne.de/rss.xml",
+      "priority": 90,
       "type": "rss",
-      "category": "lokal"
+      "category": "theater-fachpresse"
+    },
+    {
+      "name": "Theater heute",
+      "url": "https://www.theaterheute.de/rss.xml",
+      "priority": 90,
+      "type": "rss",
+      "category": "theater-fachpresse"
+    },
+    {
+      "name": "BR24",
+      "url": "https://www.br.de/nachrichten/index.xml",
+      "priority": 85,
+      "type": "rss",
+      "category": "oeffentlich-rechtlich"
     }
   ],
   "source_priorities": {
@@ -125,9 +150,12 @@
     "Sueddeutsche": 100,
     "Süddeutsche": 100,
     "Bayerischer Rundfunk": 95,
+    "BR24": 90,
     "Deutschlandfunk": 95,
     "FAZ": 95,
     "Frankfurter Allgemeine": 95,
+    "Theater heute": 90,
+    "Deutsche Buehne": 90,
     "ZEIT": 90,
     "taz": 85,
     "Spiegel": 85,
@@ -135,7 +163,6 @@
     "Merkur": 75,
     "Abendzeitung": 75,
     "tz": 65,
-    "muenchen.de": 60,
     "default": 50
   }
 }

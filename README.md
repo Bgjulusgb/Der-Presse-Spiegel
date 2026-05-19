@@ -1,28 +1,26 @@
-# Pressespiegel Muenchner Kammerspiele
+# Pressespiegel Münchner Kammerspiele
 
-Ein vollstaendig **lokales** Node.js-Tool zur Beobachtung der Presse
-rund um die Muenchner Kammerspiele.
+Ein vollständig **lokales** Pressespiegel-Tool für die Münchner Kammerspiele
+mit grafischer Bedienoberfläche, Desktop-App (`.exe`/`.dmg`/`.AppImage`)
+und ohne jegliche kostenpflichtigen APIs.
 
-**Alles bleibt auf dem eigenen Rechner.**
-Keine Cloud-API, kein E-Mail-Versand, keine externen Dienste. Reports werden lokal als HTML/PDF im Ordner `reports/` abgelegt.
+**Alles bleibt auf dem eigenen Rechner.** Keine Cloud, keine externen Dienste,
+kein E-Mail-Versand. Reports landen lokal in `reports/`, die Datenbank in `data/`.
 
 ## Was das Tool tut
 
-- Saugt RSS-Feeds von seriosen Theater- und Kulturredaktionen ab
-  (nachtkritik.de, SZ, FAZ, ZEIT, BR, Deutschlandfunk Kultur, taz, Spiegel,
-  Welt, Merkur, AZ, tz, …)
-- Reichert jeden Artikel an: holt den Volltext, extrahiert Datum, Autor, Paywall-Status
-- Erkennt Duplikate (URL, Titel-Levenshtein, Text-Cosine) – behaelt den
-  hochwertigsten Treffer und merkt alle weiteren Fundstellen
-- Bewertet jeden Artikel nach **aktuellem Spielplan** der Kammerspiele
-  (Wokey Wokey, Pinocchio, Wallenstein, Mephisto, Tristan, Eurydike und
-  Orpheus, …), nach Ensemble-Namen (Wiebke Puls, Walter Hess, Samuel Koch, …),
-  nach Spielstaetten und Theater-Kontext
-- Sentiment-Analyse mit Theater-spezifischem Wortbuch
-  (positiv/negativ/neutral, mit Negationen und Verstaerkern)
-- Erstellt einen modernen, interaktiven HTML-Report mit Live-Filter,
-  Live-Suche (Taste `/`), Sortierung, Dark-Mode und mobile-responsive
-  Layout. Optional PDF via Puppeteer.
+- Saugt RSS-/Atom-/RDF-/JSON-Feeds seriöser Theater- und Kulturredaktionen ab
+- Robuster Fetcher mit browser-ähnlichen Headern, Auto-Encoding-Erkennung
+  (UTF-8, ISO-8859-1, Windows-1252, …) und Conditional GET (ETag/Last-Modified)
+- Puppeteer-Fallback für Cloudflare-geschützte Seiten (SZ, FAZ, ZEIT, …)
+- Holt jeden Artikel: Volltext, Datum, Autor, Paywall-Status
+- Multi-Stufen Duplikat-Erkennung (URL → Titel-Levenshtein → Text-Cosine)
+- Hybride Suche aus **BM25** (für Relevanz) + **Fuse.js** (für Tippfehler)
+- Relevanz-Scoring nach aktuellem Spielplan, Ensemble, Spielstätten
+- Sentiment-Analyse mit Theater-spezifischem Wortbuch + Negationen + Verstärker
+- Moderne **Web-UI** mit Dashboard, Live-Scan, Filter, Suche, Editor
+- **Desktop-App** (Electron) bauen als `.exe`, `.dmg`, `.AppImage`, `.deb`
+- Live-Updates per WebSocket während Scans
 
 ## Schnellstart
 
@@ -31,146 +29,226 @@ git clone <repo>
 cd Der-Presse-Spiegel
 npm install
 
-# Zuletzt 7 Tage scannen
-npm start scan --last 7d
+# Grafische Oberfläche im Browser:
+npm run ui                    # öffnet http://localhost:4711
 
-# Report erstellen und im Browser oeffnen
-npm start report --last 7d --open
+# Als Desktop-App (Electron):
+npm run electron
+
+# Als .exe / .dmg / .AppImage bauen:
+npm run build:win             # Windows: installer + portable
+npm run build:linux           # Linux: AppImage + deb
+npm run build:mac             # macOS: dmg + zip
+npm run build:all             # alle Plattformen
 ```
+
+Die fertige `.exe` landet in `dist/Pressespiegel-2.0.0-x64.exe`.
+
+## Bedienoberfläche (Web-UI / Electron)
+
+Die UI hat 9 Tabs:
+
+1. **Dashboard** — Übersicht, Top-Artikel, Sentiment-Donut, Quellen-Statistik
+2. **Artikel** — Filterbare/durchsuchbare Liste mit BM25-Hybrid-Suche.
+   Tastenkürzel `/` fokussiert die Suche.
+3. **Scan** — Scan starten mit Datums-Picker, Live-Log per WebSocket,
+   Feed-Gesundheit
+4. **Reports** — HTML/PDF-Reports generieren, auflisten, öffnen, löschen
+5. **Suchbegriffe** — Spielplan, Ensemble, Personen, Ausschluss
+   live als Chips bearbeiten (Tab `Suchbegriffe`)
+6. **Quellen** — RSS-Feeds verwalten, einzeln aktivieren/deaktivieren,
+   **Test-Button** prüft sofort, ob ein Feed erreichbar ist und wie viele
+   Einträge er liefert
+7. **Duplikate** — Duplikat-Prüfung der letzten 90 Tage starten
+8. **Einstellungen** — Scraping, Dedup-Schwellen, Cron-Zeitpläne
+9. **Logs** — letzte 200 Log-Einträge
+
+### Live-Funktionen über WebSocket
+
+Während ein Scan läuft, sendet der Server Live-Log-Events an die UI.
+Du siehst in Echtzeit, welches Feed gerade abgerufen wird, wie viele
+Artikel gefunden wurden und wenn Fehler auftreten.
 
 ## CLI-Befehle
 
 ```bash
-pressespiegel scan --last 7d                       # Letzte 7 Tage scannen
-pressespiegel scan --from 2026-05-01 --to 2026-05-31
+pressespiegel ui                                    # GUI im Browser
+pressespiegel electron                              # Desktop-App
 
-pressespiegel report --last 30d --open             # HTML-Report + im Browser
-pressespiegel report --last 7d --format pdf        # PDF
-pressespiegel report --last 7d --format both       # HTML + PDF
+pressespiegel scan --last 7d                        # Scan
+pressespiegel report --last 30d --open              # Report + Browser
 
-pressespiegel open                                 # Neuesten Report oeffnen
-pressespiegel list-reports                         # Alle Reports auflisten
+pressespiegel search "Pinocchio"                    # Lokale Suche
+pressespiegel stats --last 30d
+pressespiegel health
 
-pressespiegel search "Pinocchio"                   # In lokaler DB suchen
-pressespiegel search "Mundel" --limit 50
+pressespiegel test-feed <url>                       # Einzelnen Feed testen
+pressespiegel test-all-feeds                        # Alle Feeds prüfen
+pressespiegel dedupe --dry-run
+pressespiegel open                                  # Neuesten Report öffnen
+pressespiegel list-reports
 
-pressespiegel stats --last 30d                     # Statistiken
-pressespiegel health                               # Feed-Gesundheit
+pressespiegel config list
+pressespiegel config add-keyword "..." --type productions
+pressespiegel config add-source "..." --priority 80
 
-pressespiegel config list                          # Konfiguration zeigen
-pressespiegel config add-keyword "Neues Stueck" --type productions
-pressespiegel config add-keyword "Neuer Regisseur" --type people
-pressespiegel config remove-keyword "Hamlet" --type productions
-pressespiegel config add-source "https://example.com/rss" --name "Beispiel" --priority 70
-
-pressespiegel dedupe --dry-run                     # Duplikate suchen
-pressespiegel dedupe                               # Duplikate markieren
-
-pressespiegel schedule                             # Cron-Modus (Vordergrund)
+pressespiegel schedule                              # Cron-Modus
 ```
 
 ## Such-Algorithmus
 
-Stufenweise Bewertung jedes Artikels:
+Drei-Stufen-Pipeline:
 
-1. **Pflichtfilter**: Ohne mindestens einen `required`-Begriff (`Kammerspiele`,
-   `Muenchner Kammerspiele`) wird verworfen. Treffer auf `exclude` (Hamburger
-   Kammerspiele, Berliner Kammerspiele, Stellenanzeige …) werden auch verworfen.
+### 1. Pflichtfilter
+Mindestens einer der `required`-Begriffe (`Kammerspiele`, …) muss vorkommen.
+Treffer auf `exclude` (Hamburger/Berliner Kammerspiele, Stellenanzeige, …)
+führen sofort zum Verwerfen.
 
-2. **Relevanz-Scoring**:
-   - Required im Titel: **+80**
-   - Required im Text (bis 5x): **+10 pro Treffer**
-   - Aktuelle Produktion im Titel (Pinocchio, Wallenstein, …): **+50**
-   - Aktuelle Produktion im Text mit Kammerspiele-Kontext: **+25**
-   - Aktuelle Produktion im Text ohne Kontext: **+12**
-   - Fuzzy-Match (Tippfehler) auf Produktion: **+30**
-   - Kammerspiele + Produktion im selben Titel: zusaetzlich **+100**
-   - Ensemble-Mitglied / Regie / Dramaturgie im Titel: **+40**
-   - Im Text mit Kontext: **+20**
-   - Spielstaette (Schauspielhaus, Werkraum, Therese-Giehse-Halle): **+10**
-   - Theater-Kontext (≥2 Begriffe wie Inszenierung, Buehne, Ensemble): **+8**
-   - Typ: Kritik **+30**, Interview **+25**, Ankuendigung **+20**
-   - Premiere erwaehnt: **+20**
-   - Kurzer Artikel (<100 Worte): **-20**, sehr kurz (<50): **-50**
-   - Top-Quelle (nachtkritik, SZ, FAZ, BR, DLF): **+15**
+### 2. Relevanz-Scoring
 
-3. **Kategorisierung**:
-   - Score ≥ 80 → **sehr_relevant** (★★★)
-   - Score ≥ 50 → **relevant** (★★)
-   - Score ≥ 30 → **moeglich_relevant** (★)
-   - darunter → verworfen
+| Faktor | Punkte |
+|---|---:|
+| Required-Begriff im Titel | +80 |
+| Required-Begriff im Text (max. 5×) | +10/Treffer |
+| Produktion im Titel | +50 |
+| Produktion im Text mit Kammerspiele-Kontext (±400 Zeichen) | +25 |
+| Produktion im Text ohne Kontext | +12 |
+| Fuzzy-Match Produktion (Tippfehler) | +30 |
+| Titel kombiniert Kammerspiele + Produktion | +100 |
+| Person im Titel | +40 |
+| Person im Text mit Kontext | +20 |
+| Spielstätte | +10 |
+| Theater-Kontext (≥2 Begriffe) | +8 |
+| Typ: Kritik / Interview / Ankündigung | +30 / +25 / +20 |
+| Premiere erwähnt | +20 |
+| Kurzer Artikel (<100 Worte) | −20 |
+| Sehr kurz (<50 Worte) | −50 |
+| Top-Quelle (Score ≥95) | +15 |
 
-## Duplikat-Erkennung (dreistufig)
+Schwellen: `sehr_relevant`≥80, `relevant`≥50, `moeglich_relevant`≥30.
 
-1. **URL-Match** nach Entfernung aller Tracking-Parameter
-2. **Titel-Aehnlichkeit** via Levenshtein > 85 %
-3. **Text-Aehnlichkeit** auf erstem Absatz via Cosine > 80 %
+### 3. Volltextsuche (UI)
 
-Bei Duplikat-Treffer: Sieger nach Quellen-Prioritaet
-(nachtkritik = SZ = 100, FAZ = BR = DLF = 95, ZEIT = 90 …),
-alle anderen URLs werden als "auch erschienen in" verlinkt.
+In der Artikel-UI wird jede Suchanfrage über zwei Engines parallel ausgewertet
+und gewichtet zusammengeführt:
 
-## Aktueller Spielplan (in `config/keywords.json`)
+- **BM25** (Term-Frequency × Inverse-Document-Frequency, mit Stemming + Stopwortfilter)
+  fängt exakte und teilweise Übereinstimmungen ab
+- **Fuse.js** (Bitap mit Levenshtein-Distanz, Threshold 0.45) fängt
+  Tippfehler und Wortdrehungen
+
+Gewichtung: 65 % BM25 + 35 % Fuse. Der Suchindex wird pro Anfrage neu gebaut
+(ist bei ein paar tausend Artikeln in <50 ms erledigt).
+
+## Feed-Fetcher
+
+Robuste Pipeline pro Feed:
+
+1. **Browser-ähnliche Header** (Firefox-UA, Accept-Encoding, Sec-Fetch-*).
+   Umgeht die meisten einfachen Bot-Blocker.
+2. **Conditional GET** mit ETag und Last-Modified (pro Feed in DB gespeichert).
+   Spart Bandbreite, vermeidet Rate-Limits, reduziert Ladezeiten beim
+   wiederholten Scan um >80 %.
+3. **Auto-Encoding** aus HTTP-Header, BOM, XML-Declaration, Meta-Tag.
+   Korrekt umgewandelt mit `iconv-lite`.
+4. **Multi-Format-Parser**: RSS 2.0, Atom, RDF (RSS 1.0), JSON Feed
+5. **Puppeteer-Fallback** für Feeds mit Cloudflare-Schutz (per Feed `use_browser: true`)
+6. **Retry mit Exponential Backoff** bei vorübergehenden Netzwerkfehlern
+7. **Rate-Limit pro Domain** (Default 1 Request/Sekunde)
+8. **Feed-Health-Tracking**: ETag/Last-Modified/Response-Zeit/Itemzahl
+   werden pro Feed in der DB festgehalten
+
+## Duplikat-Erkennung
+
+Pro Artikel werden drei Stufen geprüft:
+
+1. **URL-Match** nach Entfernung aller Tracking-Parameter (utm_*, gclid, fbclid, …)
+2. **Titel-Ähnlichkeit** via Levenshtein > 85 %
+3. **Text-Ähnlichkeit** auf erstem Absatz via Cosine > 80 %
+
+Bei Treffer: Sieger nach Quellen-Priorität (nachtkritik=SZ=FAZ=100 → …),
+alle URLs als "auch erschienen in" mit dem Sieger verknüpft.
+
+## Aktueller Spielplan & Ensemble
+
+Vorkonfiguriert in `config/keywords.json`:
 
 **Produktionen 2025/26**: Wachse oder weiche · Eurydike und Orpheus ·
 Wokey Wokey · Pinocchio · Love me tender · Enjoy Schatz · Mein kleines
-Prachttier · Meister und Margarita · Fraeulein Else · Fremd · Bevor ich
-es vergesse · Play Auerbach · Mephisto · Very Rich Angels · Tristan (und
-Isolde) · Wallenstein · Was ihr wollt
+Prachttier · Meister und Margarita · Fräulein Else · Fremd · Bevor ich
+es vergesse · Play Auerbach · Mephisto · Very Rich Angels · Tristan
+(und Isolde) · Wallenstein · Was ihr wollt
 
-**Personen**: Barbara Mundel (Intendantin), Daniel Veldhoen (Kuenstlerische
-Leitung), Viola Hasselberg (stv. Intendantin), das gesamte Ensemble
-(Wiebke Puls, Walter Hess, Samuel Koch, Thomas Schmauser, Annette Paulmann,
-Lucy Wilke, Luisa Woellisch, Stefan Merki, Edmund Telgenkaemper, Jelena
-Kuljic, …), aktuelle Gastregien (Nora Abdel-Maksoud, Wu Tsang, Felicitas
-Brucker, Anna Smolar, Leonie Boehm, Maxi Schafroth, Sarah Kohm, …).
+**Personen**: Barbara Mundel (Intendantin), Daniel Veldhoen, Viola Hasselberg,
+das gesamte Ensemble (Wiebke Puls, Walter Hess, Samuel Koch, Thomas Schmauser,
+Annette Paulmann, Lucy Wilke, Luisa Wöllisch, Stefan Merki, Edmund
+Telgenkämper, Jelena Kuljić, …), aktuelle Gastregien (Nora Abdel-Maksoud,
+Wu Tsang, Felicitas Brucker, Anna Smolar, Leonie Böhm, …).
 
-Anpassen via:
-```bash
-pressespiegel config add-keyword "Neue Inszenierung" --type productions
-pressespiegel config add-keyword "Neuer Schauspieler" --type people
-```
-
-## UI/UX der HTML-Reports
-
-- Sticky-Toolbar mit Live-Suche, Filter (Kategorie, Sentiment, Quelle),
-  Sortierung (Score / Datum)
-- Tastatur-Shortcut: `/` fokussiert die Suche, `Esc` setzt zurueck
-- Dark-Mode-Toggle (speichert Praeferenz lokal)
-- Responsive: funktioniert auch auf Tablet/Mobil
-- Donut-Chart fuer Sentiment, Balken fuer Zeitverlauf, Quellen-Tabelle
-- Pro Artikel: Kategorie-Badge, Sentiment-Badge, Artikeltyp, Score,
-  Paywall-Hinweis, "auch erschienen in"-Liste, Trefferbegruendungen
-- Print-optimiert (Filter werden ausgeblendet)
+Anpassen über die UI (Tab "Suchbegriffe") oder per CLI.
 
 ## Projekt-Struktur
 
 ```
 .
-├── bin/cli.js               # CLI-Einstiegspunkt (Commander)
+├── bin/cli.js                # CLI-Einstiegspunkt
+├── electron/
+│   ├── main.js               # Electron Main-Prozess
+│   └── preload.js            # Sicherer Bridge
+├── web/
+│   ├── index.html            # SPA-UI
+│   ├── styles.css            # Design-System mit Dark-Mode
+│   └── app.js                # UI-Logik + WebSocket
 ├── src/
-│   ├── analyzer.js          # Relevanz + Sentiment + Artikeltyp
-│   ├── config.js            # JSON-Konfig + .env laden
-│   ├── database.js          # SQLite (WAL), Schema, Statements
-│   ├── deduplicator.js      # Multi-Level Duplikat-Erkennung
-│   ├── logger.js            # Winston (Console + File, rotierend)
-│   ├── pipeline.js          # fetch -> analyze -> dedupe -> save
-│   ├── reporter.js          # HTML + optional PDF
-│   ├── scheduler.js         # Cron-Jobs (lokal, keine E-Mail)
-│   ├── scraper.js           # RSS, HTTP-Fetch, HTML-Extraction
-│   └── utils.js             # URL, Levenshtein, Cosine, Date-Parse
+│   ├── analyzer.js           # Relevanz + Sentiment + Artikeltyp
+│   ├── config.js             # JSON + .env laden
+│   ├── database.js           # SQLite (WAL), Schema, Feed-Health
+│   ├── deduplicator.js       # Multi-Level Dedup
+│   ├── feed-fetcher.js       # Robuster RSS/Atom/JSON Fetcher
+│   ├── logger.js             # Winston (Console + File)
+│   ├── pipeline.js           # fetch → analyze → dedupe → save
+│   ├── puppeteer-fetcher.js  # Browser-Fallback für blockierte Feeds
+│   ├── reporter.js           # HTML + PDF Reports
+│   ├── scheduler.js          # Cron-Jobs (lokal)
+│   ├── scraper.js            # Artikel-Extraction
+│   ├── search.js             # BM25 + Fuse.js Hybrid
+│   ├── server.js             # Express + WebSocket
+│   └── utils.js              # URL, Levenshtein, Cosine, Date
 ├── config/
-│   ├── sources.json         # 17 RSS-Quellen mit Prioritaeten
-│   ├── keywords.json        # Pflicht/Produktionen/Personen/Venues
-│   ├── settings.json        # Tool-Einstellungen
-│   └── sentiment.json       # Theater-Wortschatz
-├── tests/                   # 56 Unit-Tests (node --test)
-├── data/                    # SQLite-DB (lokal)
-├── logs/                    # Log-Dateien (lokal)
-├── reports/                 # HTML/PDF-Reports (lokal)
-├── package.json
-└── .env.example             # Nur Logging-Settings, kein SMTP
+│   ├── sources.json          # RSS-Quellen + Prioritäten
+│   ├── keywords.json         # Spielplan, Ensemble
+│   ├── settings.json         # Tool-Settings
+│   └── sentiment.json        # Theater-Wortschatz
+├── tests/                    # 78 Unit + Integration Tests
+├── data/                     # SQLite-DB (lokal)
+├── logs/                     # Logs (lokal)
+├── reports/                  # HTML/PDF Reports (lokal)
+├── dist/                     # Gebaute Apps (.exe, .dmg, .AppImage)
+└── package.json
 ```
+
+## Tech-Stack (alles neueste Versionen)
+
+| Bereich | Library | Version |
+|---|---|---|
+| HTTP | axios | ^1.16 |
+| Encoding | iconv-lite | ^0.7 |
+| XML | xml2js, cheerio | ^0.6, ^1.2 |
+| HTML-Entities | he | ^1.2 |
+| RSS-Fallback | rss-parser | ^3.13 |
+| Browser | puppeteer | ^25.0 |
+| Datenbank | better-sqlite3 | ^12.10 |
+| Suche | fuse.js, natural | ^7.3, ^8.1 |
+| Datum | date-fns | ^4.2 |
+| Server | express | ^5.2 |
+| WebSocket | ws | ^8.20 |
+| Scheduler | node-cron | ^4.2 |
+| Logging | winston | ^3.19 |
+| CLI | commander | ^14.0 |
+| Concurrency | p-limit | ^3.1 |
+| Desktop | electron | ^42.1 |
+| Build | electron-builder | ^26.8 |
+| Tests | Node built-in test | — |
 
 ## Tests
 
@@ -178,58 +256,40 @@ pressespiegel config add-keyword "Neuer Schauspieler" --type people
 npm test
 ```
 
-56 Unit-Tests mit Node built-in `--test` (keine Test-Framework-Dependency).
+**78 Tests, 100 % grün.** Coverage:
 
-Bereiche:
-- Utils (URL-Normalize, Levenshtein, Cosine, Datums-Parsing, Escaping)
-- Analyzer (Relevanz, Sentiment mit Negationen, Stem-Match, Artikeltyp,
-  Kontext-Suche, Fuzzy-Match, Hamburger-Kammerspiele-Ausschluss)
-- Deduplicator (alle 3 Stufen, Winner-Selection)
-- Scraper (Datums-Extraktion aus Meta/JSON-LD/URL/Text, Paywall)
+- `utils.test.js` — URL-Normalize, Levenshtein, Cosine, Date-Parse, Escape
+- `analyzer.test.js` — Relevanz, Sentiment + Negationen, Fuzzy, Kontext
+- `deduplicator.test.js` — 3-stufige Dedup, Winner-Selection
+- `scraper.test.js` — Datums-Extraction aus Meta/JSON-LD/URL/Text
+- `search.test.js` — BM25, Fuse-Hybrid, Stemming, Suggestions
+- `feed-fetcher.test.js` — RSS/Atom/RDF/JSON parsen, Encoding-Detection,
+  HTML-Entity-Decoding
 
 ## Edge Cases
 
-- **Paywall**: erkannt und markiert; RSS-Snippet bleibt verwertbar
-- **Kein Datum**: Warnung im Log, aktuelles Datum + `date_warning` Flag
+- **Cloudflare/Bot-Block**: Puppeteer-Fallback automatisch via `use_browser: true`
+- **Paywall**: erkannt und markiert; RSS-Snippet wird verwertet
+- **Kein Datum**: Multi-Stage-Detection (Meta → JSON-LD → time-Element → URL → Text)
+- **Falsches Encoding**: Auto-Detection und Re-Decoding mit iconv-lite
 - **RSS-Feed down**: Eintrag in `source_health`, andere Feeds laufen weiter
-- **Tracking-Parameter** (utm_*, gclid, fbclid, …): vor URL-Vergleich entfernt
+- **Tracking-Parameter**: vor URL-Vergleich entfernt
 - **Schwester-Theater**: Hamburger/Berliner/Wiener Kammerspiele per Exclude
-- **Artikel ohne Volltext**: Fallback auf RSS-`contentSnippet`
-- **Tippfehler in Produktion**: Fuzzy-Match via Levenshtein
-- **Stueck im Text, aber nicht im Kammerspiele-Kontext**: halber Score
-
-## Logging
-
-- Console: farbig, Level `info`
-- Datei: JSON in `logs/pressespiegel.log` (rotierend, max 10 MB, 14 Tage)
-- Errors zusaetzlich in `logs/error.log`
-- Level via `LOG_LEVEL` in `.env` steuerbar
-
-## Automatisierung
-
-Cron-Modus (Reports werden lokal abgelegt, kein E-Mail-Versand):
-
-```bash
-# In tmux, screen, pm2 oder systemd:
-pressespiegel schedule
-```
-
-Vorkonfiguriert (in `config/settings.json` aenderbar):
-- **Daily Scan**: 06:00 Uhr (letzte 24 h)
-- **Wochenbericht**: Montag 08:00 Uhr (in `reports/` abgelegt)
-- **Monatsbericht**: 1. des Monats 08:00 Uhr (in `reports/` abgelegt)
+- **Tippfehler in Suche**: Fuse-Hybrid fängt das ab
+- **HTML-Entities in Titeln**: `he`-Decoder
+- **304 Not Modified**: korrekt erkannt, kein Re-Fetch nötig
 
 ## Datenschutz
 
-Alles, was dieses Tool tut, passiert lokal:
+Alles bleibt lokal:
 - SQLite-DB in `data/`
 - HTML/PDF-Reports in `reports/`
 - Logs in `logs/`
 - Konfiguration in `config/`
 
-Es werden **keine** Daten an Server, Cloud-Dienste oder per E-Mail versandt.
-Lediglich die RSS-Feeds der eingestellten Nachrichtenquellen werden abgerufen –
-exakt das, was jeder Browser bei einem Besuch dieser Webseiten auch tut.
+**Es werden keine Daten an Server, Cloud oder per E-Mail versandt.**
+Lediglich die konfigurierten RSS-Feeds werden abgerufen — exakt was
+jeder Browser bei einem Besuch dieser Seiten auch tut.
 
 ## Lizenz
 
