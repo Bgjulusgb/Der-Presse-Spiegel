@@ -3,7 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
-require('dotenv').config();
+const dotenvPath = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(dotenvPath)) {
+  try { require('dotenv').config({ path: dotenvPath, quiet: true }); } catch { /* optional */ }
+}
 
 const CONFIG_DIR = path.join(__dirname, '..', 'config');
 

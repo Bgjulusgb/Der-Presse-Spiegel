@@ -69,9 +69,26 @@ function migrate() {
       last_success DATETIME,
       last_failure DATETIME,
       consecutive_failures INTEGER DEFAULT 0,
-      last_error TEXT
+      last_error TEXT,
+      etag TEXT,
+      last_modified TEXT,
+      last_response_ms INTEGER,
+      last_item_count INTEGER,
+      content_type TEXT,
+      feed_type TEXT,
+      enabled INTEGER DEFAULT 1
     );
   `);
+
+  const cols = db.prepare("PRAGMA table_info(source_health)").all().map(c => c.name);
+  const ensure = (name, ddl) => { if (!cols.includes(name)) db.exec(`ALTER TABLE source_health ADD COLUMN ${ddl}`); };
+  ensure('etag', 'etag TEXT');
+  ensure('last_modified', 'last_modified TEXT');
+  ensure('last_response_ms', 'last_response_ms INTEGER');
+  ensure('last_item_count', 'last_item_count INTEGER');
+  ensure('content_type', 'content_type TEXT');
+  ensure('feed_type', 'feed_type TEXT');
+  ensure('enabled', 'enabled INTEGER DEFAULT 1');
 }
 
 migrate();
@@ -164,21 +181,30 @@ const stmts = {
     WHERE id = @id
   `),
   upsertHealthSuccess: db.prepare(`
-    INSERT INTO source_health (source, last_success, consecutive_failures)
-    VALUES (@source, CURRENT_TIMESTAMP, 0)
+    INSERT INTO source_health (source, last_success, consecutive_failures, etag, last_modified, last_response_ms, last_item_count, content_type, feed_type)
+    VALUES (@source, CURRENT_TIMESTAMP, 0, @etag, @last_modified, @response_ms, @item_count, @content_type, @feed_type)
     ON CONFLICT(source) DO UPDATE SET
       last_success = CURRENT_TIMESTAMP,
       consecutive_failures = 0,
-      last_error = NULL
+      last_error = NULL,
+      etag = COALESCE(excluded.etag, source_health.etag),
+      last_modified = COALESCE(excluded.last_modified, source_health.last_modified),
+      last_response_ms = excluded.last_response_ms,
+      last_item_count = excluded.last_item_count,
+      content_type = excluded.content_type,
+      feed_type = excluded.feed_type
   `),
   upsertHealthFailure: db.prepare(`
-    INSERT INTO source_health (source, last_failure, consecutive_failures, last_error)
-    VALUES (@source, CURRENT_TIMESTAMP, 1, @error)
+    INSERT INTO source_health (source, last_failure, consecutive_failures, last_error, last_response_ms)
+    VALUES (@source, CURRENT_TIMESTAMP, 1, @error, @response_ms)
     ON CONFLICT(source) DO UPDATE SET
       last_failure = CURRENT_TIMESTAMP,
       consecutive_failures = consecutive_failures + 1,
-      last_error = @error
+      last_error = @error,
+      last_response_ms = excluded.last_response_ms
   `),
+  getHealth: db.prepare('SELECT * FROM source_health WHERE source = ?'),
+  toggleEnabled: db.prepare('UPDATE source_health SET enabled = @enabled WHERE source = @source'),
   healthAll: db.prepare('SELECT * FROM source_health ORDER BY source')
 };
 
@@ -287,16 +313,33 @@ function finishScanRun(id, summary) {
   });
 }
 
-function recordSourceSuccess(source) {
-  stmts.upsertHealthSuccess.run({ source });
+function recordSourceSuccess(source, info = {}) {
+  stmts.upsertHealthSuccess.run({
+    source,
+    etag: info.etag || null,
+    last_modified: info.lastModified || null,
+    response_ms: info.responseTimeMs || 0,
+    item_count: info.itemCount || 0,
+    content_type: info.contentType || null,
+    feed_type: info.feedType || null
+  });
 }
 
-function recordSourceFailure(source, error) {
-  stmts.upsertHealthFailure.run({ source, error: String(error).slice(0, 500) });
+function recordSourceFailure(source, error, info = {}) {
+  stmts.upsertHealthFailure.run({
+    source,
+    error: String(error).slice(0, 500),
+    response_ms: info.responseTimeMs || 0
+  });
 }
 
-function getSourceHealth() {
+function getSourceHealth(source) {
+  if (source) return stmts.getHealth.get(source);
   return stmts.healthAll.all();
+}
+
+function setSourceEnabled(source, enabled) {
+  stmts.toggleEnabled.run({ source, enabled: enabled ? 1 : 0 });
 }
 
 function parseArticleRow(row) {
@@ -331,6 +374,7 @@ module.exports = {
   recordSourceSuccess,
   recordSourceFailure,
   getSourceHealth,
+  setSourceEnabled,
   transaction,
   close
 };

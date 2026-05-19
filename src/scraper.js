@@ -1,74 +1,15 @@
 'use strict';
 
-const axios = require('axios');
 const cheerio = require('cheerio');
-const Parser = require('rss-parser');
 const pLimit = require('p-limit');
 const { parse: parseDate, isValid } = require('date-fns');
 
 const logger = require('./logger');
 const { settings, sources } = require('./config');
-const { normalizeUrl, sleep } = require('./utils');
+const { normalizeUrl } = require('./utils');
 const { extractFirstParagraph } = require('./deduplicator');
 const database = require('./database');
-
-const rssParser = new Parser({
-  timeout: settings.scraping.request_timeout_ms,
-  headers: { 'User-Agent': settings.scraping.user_agent },
-  customFields: {
-    item: [
-      ['media:content', 'media'],
-      ['content:encoded', 'contentEncoded'],
-      ['dc:creator', 'creator']
-    ]
-  }
-});
-
-const http = axios.create({
-  timeout: settings.scraping.request_timeout_ms,
-  headers: {
-    'User-Agent': settings.scraping.user_agent,
-    'Accept': 'text/html,application/xhtml+xml,application/xml,application/rss+xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8'
-  },
-  maxRedirects: 5,
-  validateStatus: status => status < 500
-});
-
-const lastRequestByDomain = new Map();
-async function throttleDomain(url) {
-  try {
-    const domain = new URL(url).hostname;
-    const limit = settings.scraping.rate_limit_per_domain_ms || 1000;
-    const last = lastRequestByDomain.get(domain) || 0;
-    const wait = limit - (Date.now() - last);
-    if (wait > 0) await sleep(wait);
-    lastRequestByDomain.set(domain, Date.now());
-  } catch {
-    /* invalid url */
-  }
-}
-
-async function fetchWithRetry(url, options = {}) {
-  const maxRetries = settings.scraping.max_retries || 3;
-  let lastErr = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      await throttleDomain(url);
-      const res = await http.get(url, options);
-      if (res.status >= 400) {
-        throw new Error(`HTTP ${res.status} fuer ${url}`);
-      }
-      return res;
-    } catch (err) {
-      lastErr = err;
-      const backoff = (settings.scraping.retry_backoff_ms || 2000) * Math.pow(2, attempt);
-      logger.warn(`Fetch fehlgeschlagen (Versuch ${attempt + 1}/${maxRetries + 1}): ${err.message}`, { url });
-      if (attempt < maxRetries) await sleep(backoff);
-    }
-  }
-  throw lastErr;
-}
+const { fetchFeed, fetchText, testFeed } = require('./feed-fetcher');
 
 function extractArticleDate(html, url) {
   if (!html) return tryUrlDate(url) || null;
@@ -76,13 +17,18 @@ function extractArticleDate(html, url) {
 
   const metaSelectors = [
     'meta[property="article:published_time"]',
+    'meta[property="article:published"]',
     'meta[name="article:published_time"]',
     'meta[property="og:published_time"]',
+    'meta[property="og:article:published_time"]',
     'meta[name="published"]',
     'meta[name="pubdate"]',
+    'meta[name="publish-date"]',
     'meta[name="date"]',
     'meta[itemprop="datePublished"]',
-    'meta[name="DC.date.issued"]'
+    'meta[name="DC.date.issued"]',
+    'meta[name="parsely-pub-date"]',
+    'meta[name="sailthru.date"]'
   ];
   for (const sel of metaSelectors) {
     const content = $(sel).attr('content');
@@ -98,9 +44,10 @@ function extractArticleDate(html, url) {
       const raw = $(jsonLdNodes[i]).html();
       if (!raw) continue;
       const data = JSON.parse(raw);
-      const items = Array.isArray(data) ? data : [data];
+      const items = Array.isArray(data) ? data : (data['@graph'] ? data['@graph'] : [data]);
       for (const item of items) {
-        const candidates = [item.datePublished, item.dateCreated, item.uploadDate];
+        if (!item) continue;
+        const candidates = [item.datePublished, item.dateCreated, item.uploadDate, item.dateModified];
         for (const c of candidates) {
           if (c) {
             const parsed = new Date(c);
@@ -113,7 +60,9 @@ function extractArticleDate(html, url) {
     }
   }
 
-  const timeAttr = $('time[datetime]').first().attr('datetime');
+  const timeAttr = $('time[datetime]').first().attr('datetime') ||
+                   $('[itemprop="datePublished"]').first().attr('datetime') ||
+                   $('[itemprop="datePublished"]').first().attr('content');
   if (timeAttr) {
     const parsed = new Date(timeAttr);
     if (!isNaN(parsed.getTime())) return parsed;
@@ -122,8 +71,8 @@ function extractArticleDate(html, url) {
   const urlDate = tryUrlDate(url);
   if (urlDate) return urlDate;
 
-  const text = $('body').text().slice(0, 3000);
-  const textDate = tryTextDate(text);
+  const bodyText = $('body').text().slice(0, 4000);
+  const textDate = tryTextDate(bodyText);
   if (textDate) return textDate;
 
   return null;
@@ -131,7 +80,7 @@ function extractArticleDate(html, url) {
 
 function tryUrlDate(url) {
   if (!url) return null;
-  const m = url.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  const m = url.match(/(\d{4})[\/\-_](\d{1,2})[\/\-_](\d{1,2})/);
   if (!m) return null;
   const year = parseInt(m[1], 10);
   const month = parseInt(m[2], 10);
@@ -144,16 +93,26 @@ function tryUrlDate(url) {
 }
 
 const MONTHS = {
-  januar: 0, februar: 1, maerz: 2, märz: 2, april: 3, mai: 4, juni: 5,
-  juli: 6, august: 7, september: 8, oktober: 9, november: 10, dezember: 11
+  januar: 0, jan: 0,
+  februar: 1, feb: 1,
+  maerz: 2, märz: 2, mar: 2,
+  april: 3, apr: 3,
+  mai: 4,
+  juni: 5, jun: 5,
+  juli: 6, jul: 6,
+  august: 7, aug: 7,
+  september: 8, sep: 8, sept: 8,
+  oktober: 9, okt: 9, oct: 9,
+  november: 10, nov: 10,
+  dezember: 11, dez: 11, dec: 11
 };
 
 function tryTextDate(text) {
   if (!text) return null;
-  const m = text.match(/(\d{1,2})\.\s*(Januar|Februar|M[aä]rz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s*(\d{4})/i);
+  const m = text.match(/(\d{1,2})\.\s*(Januar|Februar|M[aä]rz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|Jan|Feb|M[aä]r|Apr|Mai|Jun|Jul|Aug|Sep|Sept|Okt|Nov|Dez)\.?\s*(\d{4})/i);
   if (m) {
     const day = parseInt(m[1], 10);
-    const monthKey = m[2].toLowerCase();
+    const monthKey = m[2].toLowerCase().replace('.', '');
     const month = MONTHS[monthKey];
     const year = parseInt(m[3], 10);
     if (month !== undefined) {
@@ -169,42 +128,102 @@ function tryTextDate(text) {
   return null;
 }
 
+const ARTICLE_SELECTORS = [
+  'article[itemtype*="NewsArticle"]',
+  '[itemprop="articleBody"]',
+  'article.article',
+  'div.article-body',
+  'div.article__body',
+  'div.entry-content',
+  'div.post-content',
+  'div.content__article-body',
+  'div.story-body',
+  'div.text-block',
+  'main article',
+  'article',
+  'main'
+];
+
+const REMOVE_SELECTORS = [
+  'script', 'style', 'noscript', 'iframe', 'embed', 'object',
+  'nav', 'header', 'footer', 'aside', 'form',
+  '.ad', '.ads', '.advertisement', '.advertising', '.banner',
+  '.newsletter', '.newsletter-signup', '.subscribe',
+  '.related', '.related-articles', '.recommendations', '.read-more',
+  '.share', '.social', '.social-share', '.sharing',
+  '.comments', '.comment-section', '.disqus',
+  '.cookie', '.cookie-banner', '.gdpr',
+  '.popup', '.modal', '.overlay',
+  '.breadcrumb', '.breadcrumbs', '.tags', '.taglist',
+  '.author-box', '.author-info',
+  '[role="banner"]', '[role="navigation"]', '[role="contentinfo"]',
+  '[aria-label*="cookie" i]', '[aria-label*="werbung" i]',
+  'figure figcaption', '.image-credit', '.photo-credit',
+  '.amp-ad', 'amp-ad'
+];
+
 function extractArticleContent(html, url) {
   if (!html) return { title: '', text: '', firstParagraph: '', paywall: false };
   const $ = cheerio.load(html);
 
-  $('script, style, noscript, iframe, nav, header, footer, aside, form, .ad, .ads, .advertisement, .newsletter, .related, .recommendations').remove();
+  REMOVE_SELECTORS.forEach(sel => { try { $(sel).remove(); } catch {} });
 
   let title = $('meta[property="og:title"]').attr('content') ||
               $('meta[name="twitter:title"]').attr('content') ||
+              $('meta[itemprop="headline"]').attr('content') ||
+              $('h1[itemprop="headline"]').first().text().trim() ||
               $('h1').first().text().trim() ||
               $('title').first().text().trim();
   title = (title || '').replace(/\s+/g, ' ').trim();
+  title = title.split(/\s[\-–|·]\s/)[0].trim() || title;
 
   let author = $('meta[name="author"]').attr('content') ||
                $('meta[property="article:author"]').attr('content') ||
+               $('[itemprop="author"] [itemprop="name"]').first().text() ||
+               $('[itemprop="author"]').first().text() ||
                $('[rel="author"]').first().text().trim() ||
+               $('.author').first().text().trim() ||
+               $('.byline').first().text().trim() ||
                null;
-  if (author) author = author.replace(/\s+/g, ' ').trim();
+  if (author) author = author.replace(/\s+/g, ' ').replace(/^(von|by)\s+/i, '').trim();
+  if (author && author.length > 80) author = null;
 
-  const articleSelectors = ['article', '[itemprop="articleBody"]', '.article-body', '.entry-content', 'main'];
-  let textContainer = null;
-  for (const sel of articleSelectors) {
-    const el = $(sel).first();
-    if (el.length && el.text().trim().length > 200) {
-      textContainer = el;
-      break;
-    }
+  let description = $('meta[property="og:description"]').attr('content') ||
+                    $('meta[name="description"]').attr('content') ||
+                    $('meta[name="twitter:description"]').attr('content') ||
+                    '';
+  description = description.replace(/\s+/g, ' ').trim();
+
+  let bestContainer = null;
+  let bestScore = 0;
+  for (const sel of ARTICLE_SELECTORS) {
+    const els = $(sel);
+    els.each((_, el) => {
+      const $el = $(el);
+      const text = $el.text().trim();
+      if (text.length < 200) return;
+      const pCount = $el.find('p').length;
+      const score = text.length + pCount * 100;
+      if (score > bestScore) {
+        bestScore = score;
+        bestContainer = $el;
+      }
+    });
+    if (bestContainer && bestScore > 1000) break;
   }
-  if (!textContainer) textContainer = $('body');
+  if (!bestContainer) bestContainer = $('body');
 
   const paragraphs = [];
-  textContainer.find('p').each((_, p) => {
-    const t = $(p).text().replace(/\s+/g, ' ').trim();
-    if (t.length >= 30) paragraphs.push(t);
+  bestContainer.find('p, h2, h3, blockquote, li').each((_, el) => {
+    const $el = $(el);
+    const text = $el.text().replace(/\s+/g, ' ').trim();
+    if (text.length >= 25) {
+      paragraphs.push(text);
+    }
   });
+
   if (paragraphs.length === 0) {
-    const fallback = textContainer.text().replace(/\s+/g, ' ').trim();
+    const fallback = bestContainer.text().replace(/\s+/g, ' ').trim();
     if (fallback) paragraphs.push(fallback);
   }
   const text = paragraphs.join('\n\n');
@@ -212,53 +231,108 @@ function extractArticleContent(html, url) {
 
   const paywallSignals = [
     'paywall', 'sz-plus', 'sueddeutsche-plus', 'spplus', 'subscriber-only',
-    'plus-artikel', 'nur-fuer-abonnenten', 'abo-artikel'
+    'plus-artikel', 'nur-fuer-abonnenten', 'abo-artikel', 'premium-content',
+    '"isAccessibleForFree":false', 'data-paywall', 'class="paywall',
+    'm-paywall', 'paid-content', 'metered-content'
   ];
   const htmlLower = html.toLowerCase();
-  const paywall = paywallSignals.some(s => htmlLower.includes(s));
+  const paywall = paywallSignals.some(s => htmlLower.includes(s.toLowerCase()));
 
-  return { title, author, text, firstParagraph, paywall };
+  return { title, author, description, text, firstParagraph, paywall };
 }
 
 async function fetchRssFeed(feed) {
-  try {
-    const parsed = await rssParser.parseURL(feed.url);
-    database.recordSourceSuccess(feed.name);
-    const items = (parsed.items || []).map(item => ({
-      title: item.title || '',
-      url: item.link || item.guid,
-      publishedDate: item.isoDate ? new Date(item.isoDate) : (item.pubDate ? new Date(item.pubDate) : null),
-      summary: item.contentSnippet || item.summary || '',
-      content: item.contentEncoded || item.content || '',
-      author: item.creator || item.author || null,
-      source: feed.name,
-      sourcePriority: feed.priority || 50
-    })).filter(it => it.url);
-    logger.info(`RSS: ${feed.name} → ${items.length} Eintraege`);
-    return items;
-  } catch (err) {
-    database.recordSourceFailure(feed.name, err.message);
-    logger.error(`RSS fehlgeschlagen: ${feed.name}`, { url: feed.url, error: err.message });
+  const health = database.getSourceHealth(feed.name);
+  const conditional = health
+    ? { etag: health.etag, lastModified: health.last_modified }
+    : {};
+
+  let result;
+  if (feed.use_browser === true) {
+    const { fetchFeedViaBrowser } = require('./puppeteer-fetcher');
+    result = await fetchFeedViaBrowser(feed);
+  } else {
+    result = await fetchFeed(feed, conditional);
+
+    const shouldRetryWithBrowser =
+      result.status === 'error' &&
+      typeof result.error === 'string' &&
+      (result.error.includes('HTTP 403') || result.error.includes('HTTP 429') || result.error.includes('challenge')) &&
+      feed.use_browser !== false &&
+      settings.scraping.puppeteer_fallback !== false;
+
+    if (shouldRetryWithBrowser) {
+      logger.info(`Versuche Puppeteer-Fallback fuer ${feed.name} nach: ${result.error}`);
+      const { fetchFeedViaBrowser } = require('./puppeteer-fetcher');
+      const browserResult = await fetchFeedViaBrowser(feed);
+      if (browserResult.status === 'ok') {
+        result = browserResult;
+      }
+    }
+  }
+
+  if (result.status === 'not-modified') {
+    database.recordSourceSuccess(feed.name, {
+      etag: health.etag,
+      lastModified: health.last_modified,
+      responseTimeMs: result.responseTimeMs,
+      itemCount: 0,
+      feedType: 'unchanged'
+    });
+    logger.info(`RSS: ${feed.name} - 304 Not Modified (${result.responseTimeMs}ms)`);
     return [];
   }
+
+  if (result.status === 'error') {
+    database.recordSourceFailure(feed.name, result.error, {
+      responseTimeMs: result.responseTimeMs
+    });
+    logger.error(`RSS fehlgeschlagen: ${feed.name}: ${result.error}`);
+    return [];
+  }
+
+  database.recordSourceSuccess(feed.name, {
+    etag: result.etag,
+    lastModified: result.lastModified,
+    responseTimeMs: result.responseTimeMs,
+    itemCount: result.items.length,
+    contentType: result.contentType,
+    feedType: 'rss/atom'
+  });
+  logger.info(`RSS: ${feed.name} -> ${result.items.length} Eintraege (${result.responseTimeMs}ms)`);
+
+  return result.items.map(item => ({
+    title: item.title,
+    url: item.url,
+    publishedDate: item.publishedDate,
+    summary: item.summary,
+    content: item.content,
+    author: item.author,
+    source: feed.name,
+    sourcePriority: feed.priority || 50
+  })).filter(it => it.url);
 }
 
 async function fetchArticleDetails(item) {
   try {
-    const res = await fetchWithRetry(item.url);
-    const html = res.data;
+    const res = await fetchText(item.url);
+    if (res.status === 304) {
+      return null;
+    }
+    const html = res.text;
     const content = extractArticleContent(html, item.url);
     let publishedDate = item.publishedDate;
     if (!publishedDate) {
       publishedDate = extractArticleDate(html, item.url);
     }
-    const title = item.title || content.title;
+    const title = (item.title || content.title || '').replace(/\s+/g, ' ').trim();
     const fullText = content.text || item.content || item.summary || '';
     const wordCount = fullText.split(/\s+/).filter(Boolean).length;
+
     return {
       url: item.url,
       urlNormalized: normalizeUrl(item.url),
-      title: (title || '').replace(/\s+/g, ' ').trim(),
+      title,
       source: item.source,
       sourcePriority: item.sourcePriority || 50,
       author: item.author || content.author,
@@ -267,7 +341,7 @@ async function fetchArticleDetails(item) {
       firstParagraph: content.firstParagraph || extractFirstParagraph(fullText),
       paywall: content.paywall,
       wordCount,
-      meta: { fetched_at: new Date().toISOString() }
+      meta: { fetched_at: new Date().toISOString(), description: content.description }
     };
   } catch (err) {
     logger.warn(`Artikel-Details fehlgeschlagen: ${item.url} (${err.message})`);
@@ -289,25 +363,61 @@ async function fetchArticleDetails(item) {
   }
 }
 
-async function gatherFromFeeds(feedsConfig = sources.feeds) {
+async function gatherFromFeeds(feedsConfig) {
+  const list = feedsConfig || sources.feeds || [];
+  const enabledFeeds = list.filter(f => {
+    if (f.disabled === true) return false;
+    const h = database.getSourceHealth(f.name);
+    return !h || h.enabled !== 0;
+  });
+  if (enabledFeeds.length < list.length) {
+    logger.info(`${list.length - enabledFeeds.length} Feeds deaktiviert, ${enabledFeeds.length} aktiv`);
+  }
   const limit = pLimit(settings.scraping.max_concurrent_requests || 4);
   const results = await Promise.all(
-    feedsConfig.map(feed => limit(() => fetchRssFeed(feed)))
+    enabledFeeds.map(feed => limit(() => fetchRssFeed(feed)))
   );
   return results.flat();
 }
 
 async function enrichItems(items, { from, to }) {
   const limit = pLimit(settings.scraping.max_concurrent_requests || 4);
-  const filtered = items.filter(item => {
+
+  const seen = new Set();
+  const deduped = [];
+  for (const item of items) {
+    const key = normalizeUrl(item.url);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+  }
+
+  const inRange = deduped.filter(item => {
     if (!item.publishedDate) return true;
     if (from && item.publishedDate < from) return false;
     if (to && item.publishedDate > to) return false;
     return true;
   });
-  logger.info(`Anreicherung: ${filtered.length} von ${items.length} Items im Zeitraum`);
-  const enriched = await Promise.all(filtered.map(item => limit(() => fetchArticleDetails(item))));
+
+  const existing = new Set();
+  for (const item of inRange) {
+    const norm = normalizeUrl(item.url);
+    const hit = database.findByNormalizedUrl(norm);
+    if (hit) existing.add(norm);
+  }
+  const fresh = inRange.filter(i => !existing.has(normalizeUrl(i.url)));
+  if (existing.size > 0) {
+    logger.info(`Anreicherung: ${fresh.length} neu, ${existing.size} schon in DB`);
+  } else {
+    logger.info(`Anreicherung: ${fresh.length} von ${items.length} Items im Zeitraum`);
+  }
+
+  const enriched = await Promise.all(
+    fresh.map(item => limit(() => fetchArticleDetails(item)))
+  );
+
   return enriched.filter(a => {
+    if (!a) return false;
     if (!a.publishedDate) {
       logger.warn(`Artikel ohne Datum, verwende aktuelles Datum: ${a.url}`);
       a.publishedDate = new Date();
@@ -322,7 +432,8 @@ async function enrichItems(items, { from, to }) {
 module.exports = {
   fetchRssFeed,
   fetchArticleDetails,
-  fetchWithRetry,
+  fetchText,
+  testFeed,
   extractArticleDate,
   extractArticleContent,
   gatherFromFeeds,

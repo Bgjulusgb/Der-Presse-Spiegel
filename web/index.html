@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pressespiegel · Münchner Kammerspiele</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a href="#main" class="skip-link">Zum Inhalt springen</a>
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark">PS</div>
+    <div>
+      <div class="brand-title">Pressespiegel</div>
+      <div class="brand-sub">Münchner Kammerspiele</div>
+    </div>
+  </div>
+  <nav class="nav" aria-label="Hauptnavigation">
+    <button class="nav-item active" data-tab="dashboard"><span class="nav-icon">◆</span> Dashboard</button>
+    <button class="nav-item" data-tab="articles"><span class="nav-icon">≡</span> Artikel</button>
+    <button class="nav-item" data-tab="scan"><span class="nav-icon">↻</span> Scan</button>
+    <button class="nav-item" data-tab="reports"><span class="nav-icon">▤</span> Reports</button>
+    <button class="nav-item" data-tab="keywords"><span class="nav-icon">✦</span> Suchbegriffe</button>
+    <button class="nav-item" data-tab="sources"><span class="nav-icon">⇄</span> Quellen</button>
+    <button class="nav-item" data-tab="duplicates"><span class="nav-icon">⊕</span> Duplikate</button>
+    <button class="nav-item" data-tab="settings"><span class="nav-icon">⚙</span> Einstellungen</button>
+    <button class="nav-item" data-tab="logs"><span class="nav-icon">≢</span> Logs</button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="status" id="ws-status">
+      <span class="dot offline"></span>
+      <span>verbinde …</span>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" title="Hell/Dunkel">◐</button>
+  </div>
+</aside>
+
+<main class="main" id="main">
+
+  <section class="tab active" id="tab-dashboard">
+    <header class="page-head">
+      <div>
+        <h1>Dashboard</h1>
+        <p class="subtitle">Übersicht der letzten 30 Tage</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-primary" id="quick-scan">↻ Schnell-Scan (24h)</button>
+      </div>
+    </header>
+
+    <div class="metrics" id="dashboard-metrics"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Sentiment <small>letzte 30 Tage</small></h2>
+        <div id="sentiment-chart" class="chart-area"></div>
+      </div>
+      <div class="card">
+        <h2>Top-Quellen</h2>
+        <div id="sources-chart" class="chart-area"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Höchste Relevanz <small>Top 10</small></h2>
+      <div id="top-articles" class="top-articles"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-articles">
+    <header class="page-head">
+      <div>
+        <h1>Artikel</h1>
+        <p class="subtitle" id="articles-subtitle">Lade Artikel …</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" id="export-articles">Als HTML-Report</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input type="search" id="article-search" placeholder="Suchen mit BM25 + Fuzzy-Match (Taste /)" autocomplete="off">
+        <div class="suggest" id="suggest"></div>
+      </div>
+      <select id="filter-period">
+        <option value="7d">Letzte 7 Tage</option>
+        <option value="30d" selected>Letzte 30 Tage</option>
+        <option value="90d">Letzte 90 Tage</option>
+        <option value="1y">Letztes Jahr</option>
+        <option value="custom">Eigener Zeitraum</option>
+      </select>
+      <input type="date" id="filter-from" style="display:none">
+      <input type="date" id="filter-to" style="display:none">
+      <select id="filter-category">
+        <option value="">Alle Kategorien</option>
+        <option value="sehr_relevant">★★★ Sehr relevant</option>
+        <option value="relevant">★★ Relevant</option>
+        <option value="moeglich_relevant">★ Möglich</option>
+      </select>
+      <select id="filter-sentiment">
+        <option value="">Alle Stimmungen</option>
+        <option value="positiv">Positiv</option>
+        <option value="neutral">Neutral</option>
+        <option value="negativ">Negativ</option>
+      </select>
+      <select id="filter-source"><option value="">Alle Quellen</option></select>
+      <select id="filter-sort">
+        <option value="score-desc">Score ↓</option>
+        <option value="score-asc">Score ↑</option>
+        <option value="date-desc">Datum ↓</option>
+        <option value="date-asc">Datum ↑</option>
+        <option value="relevance" id="relevance-opt">Suchrelevanz</option>
+      </select>
+      <button class="btn-secondary" id="filter-reset">↺</button>
+    </div>
+
+    <p class="results-count" id="results-count"></p>
+    <div id="article-list" class="article-list"></div>
+    <div id="article-empty" class="empty-state" style="display:none">
+      Keine Artikel entsprechen den Filtern.
+    </div>
+  </section>
+
+  <section class="tab" id="tab-scan">
+    <header class="page-head">
+      <div>
+        <h1>Scan</h1>
+        <p class="subtitle">RSS-Feeds abrufen und neue Artikel speichern</p>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>Neuen Scan starten</h2>
+      <div class="form-row">
+        <label>Zeitraum</label>
+        <select id="scan-period">
+          <option value="1d">Letzte 24 Stunden</option>
+          <option value="7d" selected>Letzte 7 Tage</option>
+          <option value="30d">Letzte 30 Tage</option>
+          <option value="custom">Eigener Zeitraum</option>
+        </select>
+      </div>
+      <div class="form-row" id="scan-custom" style="display:none">
+        <label>Von – Bis</label>
+        <input type="date" id="scan-from">
+        <input type="date" id="scan-to">
+      </div>
+      <div class="form-row">
+        <button class="btn-primary" id="start-scan">↻ Scan starten</button>
+        <span class="form-help" id="scan-status">Bereit</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Live-Log <small>Scan-Fortschritt</small></h2>
+      <div id="scan-log" class="log-stream"></div>
+    </div>
+
+    <div class="card">
+      <h2>Feed-Gesundheit</h2>
+      <div id="feed-health"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-reports">
+    <header class="page-head">
+      <div>
+        <h1>Reports</h1>
+        <p class="subtitle">Lokal gespeicherte HTML- und PDF-Berichte</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-primary" id="generate-report">+ Neuen Report</button>
+      </div>
+    </header>
+
+    <div class="card" id="report-generator" style="display:none">
+      <h2>Report generieren</h2>
+      <div class="form-row">
+        <label>Zeitraum</label>
+        <select id="report-period">
+          <option value="7d">Letzte 7 Tage</option>
+          <option value="30d" selected>Letzte 30 Tage</option>
+          <option value="90d">Letzte 90 Tage</option>
+          <option value="custom">Eigener Zeitraum</option>
+        </select>
+      </div>
+      <div class="form-row" id="report-custom" style="display:none">
+        <input type="date" id="report-from">
+        <input type="date" id="report-to">
+      </div>
+      <div class="form-row">
+        <label>Format</label>
+        <select id="report-format">
+          <option value="html">HTML</option>
+          <option value="pdf">PDF</option>
+          <option value="both">HTML + PDF</option>
+        </select>
+        <label style="margin-left:16px">Titel (optional)</label>
+        <input type="text" id="report-title" placeholder="z.B. Wochenbericht KW 21">
+      </div>
+      <div class="form-row">
+        <button class="btn-primary" id="run-report">Erstellen</button>
+        <button class="btn" id="cancel-report">Abbrechen</button>
+      </div>
+    </div>
+
+    <div id="reports-list" class="reports-list"></div>
+  </section>
+
+  <section class="tab" id="tab-keywords">
+    <header class="page-head">
+      <div>
+        <h1>Suchbegriffe</h1>
+        <p class="subtitle">Spielplan, Ensemble, Ausschluss</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-primary" id="save-keywords">✓ Speichern</button>
+      </div>
+    </header>
+
+    <div id="keywords-panels"></div>
+  </section>
+
+  <section class="tab" id="tab-sources">
+    <header class="page-head">
+      <div>
+        <h1>Quellen</h1>
+        <p class="subtitle">RSS-Feeds mit Prioritäten</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-primary" id="save-sources">✓ Speichern</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>Neue Quelle hinzufügen</h2>
+      <div class="form-row">
+        <input type="text" id="new-source-name" placeholder="Name">
+        <input type="url" id="new-source-url" placeholder="https://...rss" style="flex:1">
+        <input type="number" id="new-source-priority" placeholder="Prio (1-100)" min="1" max="100" value="50">
+        <button class="btn" id="add-source">+ Hinzufügen</button>
+      </div>
+    </div>
+
+    <div id="sources-list" class="sources-list"></div>
+  </section>
+
+  <section class="tab" id="tab-duplicates">
+    <header class="page-head">
+      <div>
+        <h1>Duplikat-Prüfung</h1>
+        <p class="subtitle">URL, Titel (Levenshtein), Text (Cosine)</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-primary" id="check-dupes">Prüfung starten</button>
+      </div>
+    </header>
+    <div id="dupes-result" class="card">
+      <p class="muted">Klicke auf "Prüfung starten", um Duplikate der letzten 90 Tage zu suchen.</p>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-settings">
+    <header class="page-head">
+      <div>
+        <h1>Einstellungen</h1>
+        <p class="subtitle">Datenbank, Scraping, Schedule</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn-primary" id="save-settings">✓ Speichern</button>
+      </div>
+    </header>
+    <div id="settings-panel"></div>
+  </section>
+
+  <section class="tab" id="tab-logs">
+    <header class="page-head">
+      <div>
+        <h1>Logs</h1>
+        <p class="subtitle">Letzte 200 Eintraege</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" id="refresh-logs">↻ Aktualisieren</button>
+      </div>
+    </header>
+    <div id="logs-list" class="log-stream"></div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<dialog id="article-detail" class="modal"></dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
