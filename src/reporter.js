@@ -15,16 +15,16 @@ if (!fs.existsSync(REPORTS_DIR)) {
 }
 
 const CATEGORY_LABELS = {
-  sehr_relevant: { label: 'Sehr relevant', stars: '★★★', color: '#16a34a', sort: 3 },
-  relevant: { label: 'Relevant', stars: '★★', color: '#2563eb', sort: 2 },
-  moeglich_relevant: { label: 'Moeglich relevant', stars: '★', color: '#a16207', sort: 1 },
-  irrelevant: { label: 'Niedrige Relevanz', stars: '·', color: '#64748b', sort: 0 }
+  sehr_relevant: { label: 'Sehr relevant', stars: '', color: '#16a34a', sort: 3 },
+  relevant: { label: 'Relevant', stars: '', color: '#2563eb', sort: 2 },
+  moeglich_relevant: { label: 'Moeglich relevant', stars: '', color: '#a16207', sort: 1 },
+  irrelevant: { label: 'Niedrige Relevanz', stars: '', color: '#64748b', sort: 0 }
 };
 
 const SENTIMENT_BADGE = {
-  positiv: { label: 'positiv', color: '#16a34a', emoji: '↑' },
-  negativ: { label: 'negativ', color: '#dc2626', emoji: '↓' },
-  neutral: { label: 'neutral', color: '#475569', emoji: '·' }
+  positiv: { label: 'positiv', color: '#16a34a', emoji: '' },
+  negativ: { label: 'negativ', color: '#dc2626', emoji: '' },
+  neutral: { label: 'neutral', color: '#475569', emoji: '' }
 };
 
 function fmtDate(date, withTime = false) {
@@ -631,9 +631,9 @@ function buildHtmlReport({ from, to, articles: rawArticles, title }) {
     <input id="filter-search" type="search" placeholder="Suchen (Taste / fokussiert)" aria-label="Artikel durchsuchen">
     <select id="filter-category" aria-label="Kategorie filtern">
       <option value="">Alle Kategorien</option>
-      <option value="sehr_relevant">★★★ Sehr relevant (${groups.sehr_relevant.length})</option>
-      <option value="relevant">★★ Relevant (${groups.relevant.length})</option>
-      <option value="moeglich_relevant">★ Moeglich relevant (${groups.moeglich_relevant.length})</option>
+      <option value="sehr_relevant">Sehr relevant (${groups.sehr_relevant.length})</option>
+      <option value="relevant">Relevant (${groups.relevant.length})</option>
+      <option value="moeglich_relevant">Moeglich relevant (${groups.moeglich_relevant.length})</option>
     </select>
     <select id="filter-sentiment" aria-label="Sentiment filtern">
       <option value="">Alle Stimmungen</option>

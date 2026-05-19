@@ -7,6 +7,16 @@ const { analyze } = require('./analyzer');
 const { findDuplicate, chooseWinner } = require('./deduplicator');
 const { sources } = require('./config');
 const { normalizeUrl } = require('./utils');
+const { autoTag } = require('./tagger');
+
+function applyTags(articleId, article, analysis) {
+  const tags = autoTag(article, analysis);
+  for (const tag of tags) {
+    try { database.addTag(articleId, tag); }
+    catch (e) { logger.debug(`Tag-Fehler ${tag}: ${e.message}`); }
+  }
+  return tags;
+}
 
 async function runScan({ from, to }) {
   const runId = database.startScanRun(from, to);
@@ -70,11 +80,17 @@ async function runScan({ from, to }) {
             const inserted = database.insertArticle(article);
             database.markAsDuplicate(inserted.id, dupHit.duplicate.id, article.url);
             summary.duplicatesFound++;
-            if (inserted.inserted) summary.articlesAdded++;
-            logger.info(`Duplikat erkannt → bestehend behalten: "${article.title}" (${dupHit.reason})`);
+            if (inserted.inserted) {
+              summary.articlesAdded++;
+              applyTags(inserted.id, article, analysis);
+            }
+            logger.info(`Duplikat erkannt -> bestehend behalten: "${article.title}" (${dupHit.reason})`);
           } else {
             const inserted = database.insertArticle(article);
-            if (inserted.inserted) summary.articlesAdded++;
+            if (inserted.inserted) {
+              summary.articlesAdded++;
+              applyTags(inserted.id, article, analysis);
+            }
             database.markAsDuplicate(dupHit.duplicate.id, inserted.id, dupHit.duplicate.url || normalizeUrl(dupHit.duplicate.url_normalized));
             summary.duplicatesFound++;
             existing.push({
@@ -85,12 +101,13 @@ async function runScan({ from, to }) {
               source: article.source,
               published_date: article.publishedDate ? article.publishedDate.toISOString() : null
             });
-            logger.info(`Duplikat erkannt → neuer Artikel wird Sieger: "${article.title}"`);
+            logger.info(`Duplikat erkannt -> neuer Artikel wird Sieger: "${article.title}"`);
           }
         } else {
           const inserted = database.insertArticle(article);
           if (inserted.inserted) {
             summary.articlesAdded++;
+            applyTags(inserted.id, article, analysis);
             existing.push({
               id: inserted.id,
               url_normalized: article.urlNormalized,

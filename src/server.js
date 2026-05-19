@@ -75,10 +75,33 @@ function buildApp() {
       if (!opts.from && !opts.to && !opts.last) opts.last = '30d';
       const { from, to } = parseDateRange(opts);
       let articles = database.getArticlesByRange(from, to);
-      const { category, sentiment, source, q, limit } = req.query;
+
+      const tagMap = new Map();
+      const allTagRows = database.db.prepare(`
+        SELECT t.article_id, t.tag FROM article_tags t
+        JOIN articles a ON a.id = t.article_id
+        WHERE a.published_date >= @from AND a.published_date <= @to
+      `).all({ from: from.toISOString(), to: to.toISOString() });
+      for (const row of allTagRows) {
+        if (!tagMap.has(row.article_id)) tagMap.set(row.article_id, []);
+        tagMap.get(row.article_id).push(row.tag);
+      }
+      const bookmarkIds = new Set(database.db.prepare('SELECT article_id FROM bookmarks').all().map(r => r.article_id));
+
+      articles = articles.map(a => ({
+        ...a,
+        tags: tagMap.get(a.id) || [],
+        bookmarked: bookmarkIds.has(a.id)
+      }));
+
+      const { category, sentiment, source, tag, bookmark, q, limit } = req.query;
       if (category) articles = articles.filter(a => a.category === category);
       if (sentiment) articles = articles.filter(a => a.sentiment === sentiment);
       if (source) articles = articles.filter(a => a.source === source);
+      if (tag) articles = articles.filter(a => a.tags.includes(tag));
+      if (bookmark === 'yes') articles = articles.filter(a => a.bookmarked);
+      if (bookmark === 'no') articles = articles.filter(a => !a.bookmarked);
+
       let scored = articles.map(a => ({ article: a, score: 0 }));
       if (q && q.trim()) {
         scored = hybridSearch(articles, q, { limit: 1000 });
@@ -165,6 +188,27 @@ function buildApp() {
 
   app.get('/api/tags', (req, res) => {
     res.json({ tags: database.getAllTags() });
+  });
+
+  app.post('/api/tags/retag-all', (req, res) => {
+    try {
+      const { autoTag } = require('./tagger');
+      const rows = database.db.prepare(`
+        SELECT id, title, full_text, summary, category, sentiment, paywall
+        FROM articles WHERE deleted_at IS NULL
+      `).all();
+      let added = 0;
+      for (const row of rows) {
+        const analysis = { category: row.category, sentiment: row.sentiment };
+        const tags = autoTag({ ...row, fullText: row.full_text }, analysis);
+        for (const tag of tags) {
+          try { database.addTag(row.id, tag); added++; } catch {}
+        }
+      }
+      res.json({ ok: true, articles: rows.length, tags_added: added });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
   app.get('/api/article/:id/tags', (req, res) => {
     res.json({ tags: database.getTagsForArticle(parseInt(req.params.id, 10)) });
@@ -264,6 +308,72 @@ function buildApp() {
       if (!name) return res.status(400).json({ error: 'name erforderlich' });
       database.setSourceEnabled(name, enabled);
       res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/sources/opml', (req, res) => {
+    try {
+      const data = loadJson('sources.json');
+      const escape = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const now = new Date().toISOString();
+      let opml = `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n  <head>\n    <title>Pressespiegel Kammerspiele Feeds</title>\n    <dateCreated>${now}</dateCreated>\n  </head>\n  <body>\n`;
+      const byCategory = new Map();
+      for (const f of data.feeds || []) {
+        const cat = f.category || 'andere';
+        if (!byCategory.has(cat)) byCategory.set(cat, []);
+        byCategory.get(cat).push(f);
+      }
+      for (const [cat, feeds] of byCategory) {
+        opml += `    <outline text="${escape(cat)}" title="${escape(cat)}">\n`;
+        for (const f of feeds) {
+          if (f.kind === 'google-news' || f.kind === 'bing-news') continue;
+          opml += `      <outline type="rss" text="${escape(f.name)}" title="${escape(f.name)}" xmlUrl="${escape(f.url)}" htmlUrl="${escape(f.url)}"/>\n`;
+        }
+        opml += '    </outline>\n';
+      }
+      opml += '  </body>\n</opml>\n';
+      res.setHeader('Content-Type', 'text/x-opml; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="pressespiegel-feeds.opml"`);
+      res.send(opml);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/sources/opml-import', async (req, res) => {
+    try {
+      const xml = req.body && req.body.opml;
+      if (!xml) return res.status(400).json({ error: 'opml erforderlich' });
+      const { parseFeedXml } = require('./feed-fetcher');
+      const xml2js = require('xml2js');
+      const parsed = await new xml2js.Parser({ explicitArray: false, mergeAttrs: true }).parseStringPromise(xml);
+      const outlines = [];
+      const walk = (node) => {
+        if (!node) return;
+        const items = Array.isArray(node) ? node : [node];
+        for (const it of items) {
+          if (it.xmlUrl) outlines.push(it);
+          if (it.outline) walk(it.outline);
+        }
+      };
+      walk(parsed.opml && parsed.opml.body && parsed.opml.body.outline);
+      const current = loadJson('sources.json');
+      const existing = new Set((current.feeds || []).map(f => f.url));
+      let added = 0;
+      for (const o of outlines) {
+        if (existing.has(o.xmlUrl)) continue;
+        current.feeds.push({
+          name: o.title || o.text || new URL(o.xmlUrl).hostname,
+          url: o.xmlUrl,
+          priority: 70,
+          type: 'rss',
+          category: 'imported'
+        });
+        added++;
+      }
+      const { saveJson } = require('./config');
+      saveJson('sources.json', current);
+      res.json({ ok: true, added, total: current.feeds.length });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

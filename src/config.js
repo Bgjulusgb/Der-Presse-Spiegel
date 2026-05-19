@@ -3,9 +3,20 @@
 const fs = require('fs');
 const path = require('path');
 
+process.env.DOTENV_CONFIG_QUIET = 'true';
+
 const dotenvPath = path.resolve(process.cwd(), '.env');
 if (fs.existsSync(dotenvPath)) {
-  try { require('dotenv').config({ path: dotenvPath, quiet: true }); } catch { /* optional */ }
+  const origWrite = process.stdout.write.bind(process.stdout);
+  process.stdout.write = (chunk, ...args) => {
+    const s = chunk && chunk.toString ? chunk.toString() : String(chunk);
+    if (s.includes('injected env') || s.includes('tip:') || /^[◇⌘⚀-⛿].*injected/.test(s)) return true;
+    return origWrite(chunk, ...args);
+  };
+  try {
+    require('dotenv').config({ path: dotenvPath, quiet: true, debug: false });
+  } catch { /* optional */ }
+  process.stdout.write = origWrite;
 }
 
 const CONFIG_DIR = path.join(__dirname, '..', 'config');

@@ -17,24 +17,25 @@
     </div>
   </div>
   <nav class="nav" aria-label="Hauptnavigation">
-    <button class="nav-item active" data-tab="dashboard"><span class="nav-icon">◆</span> Dashboard</button>
-    <button class="nav-item" data-tab="articles"><span class="nav-icon">≡</span> Artikel</button>
-    <button class="nav-item" data-tab="scan"><span class="nav-icon">↻</span> Scan</button>
-    <button class="nav-item" data-tab="reports"><span class="nav-icon">▤</span> Reports</button>
-    <button class="nav-item" data-tab="keywords"><span class="nav-icon">✦</span> Suchbegriffe</button>
-    <button class="nav-item" data-tab="sources"><span class="nav-icon">⇄</span> Quellen</button>
-    <button class="nav-item" data-tab="bookmarks"><span class="nav-icon">♥</span> Lesezeichen</button>
-    <button class="nav-item" data-tab="trends"><span class="nav-icon">📈</span> Trends</button>
-    <button class="nav-item" data-tab="duplicates"><span class="nav-icon">⊕</span> Duplikate</button>
-    <button class="nav-item" data-tab="settings"><span class="nav-icon">⚙</span> Einstellungen</button>
-    <button class="nav-item" data-tab="logs"><span class="nav-icon">≢</span> Logs</button>
+    <button class="nav-item active" data-tab="dashboard">Dashboard</button>
+    <button class="nav-item" data-tab="articles">Artikel</button>
+    <button class="nav-item" data-tab="scan">Scan</button>
+    <button class="nav-item" data-tab="reports">Reports</button>
+    <button class="nav-item" data-tab="tags">Tags</button>
+    <button class="nav-item" data-tab="keywords">Suchbegriffe</button>
+    <button class="nav-item" data-tab="sources">Quellen</button>
+    <button class="nav-item" data-tab="bookmarks">Lesezeichen</button>
+    <button class="nav-item" data-tab="trends">Trends</button>
+    <button class="nav-item" data-tab="duplicates">Duplikate</button>
+    <button class="nav-item" data-tab="settings">Einstellungen</button>
+    <button class="nav-item" data-tab="logs">Logs</button>
   </nav>
   <div class="sidebar-footer">
     <div class="status" id="ws-status">
       <span class="dot offline"></span>
       <span>verbinde …</span>
     </div>
-    <button class="theme-toggle" id="theme-toggle" title="Hell/Dunkel">◐</button>
+    <button class="theme-toggle" id="theme-toggle" title="Hell/Dunkel">Theme</button>
   </div>
 </aside>
 
@@ -47,7 +48,7 @@
         <p class="subtitle">Übersicht der letzten 30 Tage</p>
       </div>
       <div class="page-actions">
-        <button class="btn-primary" id="quick-scan">↻ Schnell-Scan (24h)</button>
+        <button class="btn-primary" id="quick-scan">Schnell-Scan (24h)</button>
       </div>
     </header>
 
@@ -77,8 +78,8 @@
         <p class="subtitle" id="articles-subtitle">Lade Artikel …</p>
       </div>
       <div class="page-actions">
-        <button class="btn" id="export-csv">↓ CSV</button>
-        <button class="btn" id="export-json">↓ JSON</button>
+        <button class="btn" id="export-csv">CSV exportieren</button>
+        <button class="btn" id="export-json">JSON exportieren</button>
         <button class="btn" id="export-articles">Als HTML-Report</button>
       </div>
     </header>
@@ -114,9 +115,9 @@
       <input type="date" id="filter-to" style="display:none">
       <select id="filter-category">
         <option value="">Alle Kategorien</option>
-        <option value="sehr_relevant">★★★ Sehr relevant</option>
-        <option value="relevant">★★ Relevant</option>
-        <option value="moeglich_relevant">★ Möglich</option>
+        <option value="sehr_relevant">Sehr relevant</option>
+        <option value="relevant">Relevant</option>
+        <option value="moeglich_relevant">Moeglich relevant</option>
       </select>
       <select id="filter-sentiment">
         <option value="">Alle Stimmungen</option>
@@ -125,14 +126,20 @@
         <option value="negativ">Negativ</option>
       </select>
       <select id="filter-source"><option value="">Alle Quellen</option></select>
+      <select id="filter-tag"><option value="">Alle Tags</option></select>
+      <select id="filter-bookmark">
+        <option value="">Alle</option>
+        <option value="yes">Mit Lesezeichen</option>
+        <option value="no">Ohne Lesezeichen</option>
+      </select>
       <select id="filter-sort">
-        <option value="score-desc">Score ↓</option>
-        <option value="score-asc">Score ↑</option>
-        <option value="date-desc">Datum ↓</option>
-        <option value="date-asc">Datum ↑</option>
+        <option value="score-desc">Score hoch zu niedrig</option>
+        <option value="score-asc">Score niedrig zu hoch</option>
+        <option value="date-desc">Datum neu zu alt</option>
+        <option value="date-asc">Datum alt zu neu</option>
         <option value="relevance" id="relevance-opt">Suchrelevanz</option>
       </select>
-      <button class="btn-secondary" id="filter-reset">↺</button>
+      <button class="btn-secondary" id="filter-reset" title="Filter zuruecksetzen">Reset</button>
     </div>
 
     <p class="results-count" id="results-count"></p>
@@ -167,7 +174,7 @@
         <input type="date" id="scan-to">
       </div>
       <div class="form-row">
-        <button class="btn-primary" id="start-scan">↻ Scan starten</button>
+        <button class="btn-primary" id="start-scan">Scan starten</button>
         <span class="form-help" id="scan-status">Bereit</span>
       </div>
     </div>
@@ -190,7 +197,7 @@
         <p class="subtitle">Lokal gespeicherte HTML- und PDF-Berichte</p>
       </div>
       <div class="page-actions">
-        <button class="btn-primary" id="generate-report">+ Neuen Report</button>
+        <button class="btn-primary" id="generate-report">Neuen Report</button>
       </div>
     </header>
 
@@ -235,7 +242,7 @@
         <p class="subtitle">Spielplan, Ensemble, Ausschluss</p>
       </div>
       <div class="page-actions">
-        <button class="btn-primary" id="save-keywords">✓ Speichern</button>
+        <button class="btn-primary" id="save-keywords">Speichern</button>
       </div>
     </header>
 
@@ -249,7 +256,7 @@
         <p class="subtitle">RSS-Feeds mit Prioritäten</p>
       </div>
       <div class="page-actions">
-        <button class="btn-primary" id="save-sources">✓ Speichern</button>
+        <button class="btn-primary" id="save-sources">Speichern</button>
       </div>
     </header>
 
@@ -259,11 +266,24 @@
         <input type="text" id="new-source-name" placeholder="Name">
         <input type="url" id="new-source-url" placeholder="https://...rss" style="flex:1">
         <input type="number" id="new-source-priority" placeholder="Prio (1-100)" min="1" max="100" value="50">
-        <button class="btn" id="add-source">+ Hinzufügen</button>
+        <button class="btn" id="add-source">Hinzufügen</button>
       </div>
     </div>
 
     <div id="sources-list" class="sources-list"></div>
+  </section>
+
+  <section class="tab" id="tab-tags">
+    <header class="page-head">
+      <div>
+        <h1>Tags</h1>
+        <p class="subtitle">Auto-Tags nach Kategorien sortiert. Klick auf Tag filtert Artikel.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn" id="tag-retag-all">Alle Artikel neu taggen</button>
+      </div>
+    </header>
+    <div id="tags-by-category"></div>
   </section>
 
   <section class="tab" id="tab-bookmarks">
@@ -329,7 +349,7 @@
         <p class="subtitle">Datenbank, Scraping, Schedule</p>
       </div>
       <div class="page-actions">
-        <button class="btn-primary" id="save-settings">✓ Speichern</button>
+        <button class="btn-primary" id="save-settings">Speichern</button>
       </div>
     </header>
     <div id="settings-panel"></div>
@@ -342,7 +362,7 @@
         <p class="subtitle">Letzte 200 Eintraege</p>
       </div>
       <div class="page-actions">
-        <button class="btn" id="refresh-logs">↻ Aktualisieren</button>
+        <button class="btn" id="refresh-logs">Aktualisieren</button>
       </div>
     </header>
     <div id="logs-list" class="log-stream"></div>

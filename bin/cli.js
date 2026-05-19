@@ -48,7 +48,7 @@ program
       console.log(chalk.gray('  Stoppen mit Ctrl+C\n'));
       if (opts.open !== false) openFile(url);
     } catch (err) {
-      console.error(chalk.red(`✗ Server-Start fehlgeschlagen: ${err.message}`));
+      console.error(chalk.red(`Server-Start fehlgeschlagen: ${err.message}`));
       process.exit(1);
     }
   });
@@ -64,7 +64,7 @@ program
       const { from, to } = parseDateRange(opts);
       section(`Scan-Zeitraum: ${format(from, 'yyyy-MM-dd')} bis ${format(to, 'yyyy-MM-dd')}`);
       const summary = await runScan({ from, to });
-      console.log(chalk.green('\n✓ Scan abgeschlossen'));
+      console.log(chalk.green('\nScan abgeschlossen'));
       console.log(`  ${chalk.bold('Gefunden:')}      ${summary.articlesFound}`);
       console.log(`  ${chalk.bold('Neu in DB:')}     ${chalk.green.bold(summary.articlesAdded)}`);
       console.log(`  ${chalk.bold('Duplikate:')}     ${summary.duplicatesFound}`);
@@ -74,7 +74,7 @@ program
       }
     } catch (err) {
       logger.error('Scan fehlgeschlagen', { error: err.message, stack: err.stack });
-      console.error(chalk.red(`✗ Fehler: ${err.message}`));
+      console.error(chalk.red(`Fehler: ${err.message}`));
       process.exit(1);
     } finally {
       database.close();
@@ -111,8 +111,8 @@ program
 
       const result = await generateReport({ from, to, articles, format: opts.format, title: opts.title });
       console.log('');
-      if (result.html) console.log(chalk.green(`  ✓ HTML: ${result.html}`));
-      if (result.pdf) console.log(chalk.green(`  ✓ PDF:  ${result.pdf}`));
+      if (result.html) console.log(chalk.green(`  HTML: ${result.html}`));
+      if (result.pdf) console.log(chalk.green(`  PDF:  ${result.pdf}`));
 
       if (opts.open && result.html) {
         openFile(result.html);
@@ -121,7 +121,7 @@ program
       }
     } catch (err) {
       logger.error('Report fehlgeschlagen', { error: err.message });
-      console.error(chalk.red(`✗ Fehler: ${err.message}`));
+      console.error(chalk.red(`Fehler: ${err.message}`));
       process.exit(1);
     } finally {
       database.close();
@@ -136,7 +136,7 @@ program
     if (filename) {
       filepath = path.isAbsolute(filename) ? filename : path.join(REPORTS_DIR, filename);
       if (!fs.existsSync(filepath)) {
-        console.error(chalk.red(`✗ Datei nicht gefunden: ${filepath}`));
+        console.error(chalk.red(`Datei nicht gefunden: ${filepath}`));
         process.exit(1);
       }
     } else {
@@ -230,7 +230,7 @@ configCmd
     }
     data[opts.type].push(kw);
     saveJson('keywords.json', data);
-    console.log(chalk.green(`✓ Hinzugefuegt zu ${opts.type}: ${kw}`));
+    console.log(chalk.green(`Hinzugefuegt zu ${opts.type}: ${kw}`));
   });
 
 configCmd
@@ -249,7 +249,7 @@ configCmd
       return;
     }
     saveJson('keywords.json', data);
-    console.log(chalk.green(`✓ Entfernt aus ${opts.type}: ${kw}`));
+    console.log(chalk.green(`Entfernt aus ${opts.type}: ${kw}`));
   });
 
 configCmd
@@ -269,7 +269,7 @@ configCmd
       type: 'rss'
     });
     saveJson('sources.json', data);
-    console.log(chalk.green(`✓ Hinzugefuegt: ${opts.name || url}`));
+    console.log(chalk.green(`Hinzugefuegt: ${opts.name || url}`));
   });
 
 configCmd
@@ -328,8 +328,8 @@ program
         section('Feed-Gesundheit');
         for (const h of health) {
           const status = h.consecutive_failures > 0
-            ? chalk.red(`✗ ${h.consecutive_failures}x Fehler in Folge`)
-            : chalk.green('✓ OK');
+            ? chalk.red(`Fehler: ${h.consecutive_failures}x Fehler in Folge`)
+            : chalk.green('OK');
           console.log(`  ${status}  ${h.source}`);
         }
       }
@@ -365,7 +365,7 @@ program
           }
         }
       }
-      console.log(chalk.green(`\n✓ ${dupCount} Duplikate ${opts.dryRun ? 'gefunden (dry-run)' : 'markiert'}`));
+      console.log(chalk.green(`\n${dupCount} Duplikate ${opts.dryRun ? 'gefunden (dry-run)' : 'markiert'}`));
     } finally {
       database.close();
     }
@@ -387,7 +387,7 @@ program
     section(`Test: ${url}`);
     const result = await testFeed(url);
     if (result.ok) {
-      console.log(chalk.green(`  ✓ OK (${result.responseTimeMs}ms)`));
+      console.log(chalk.green(`  OK (${result.responseTimeMs}ms)`));
       console.log(`    Typ:          ${result.type}`);
       console.log(`    Encoding:     ${result.encoding || '-'}`);
       console.log(`    Content-Type: ${result.contentType || '-'}`);
@@ -401,7 +401,7 @@ program
         });
       }
     } else {
-      console.log(chalk.red(`  ✗ Fehler (${result.responseTimeMs}ms)`));
+      console.log(chalk.red(`  Fehler (${result.responseTimeMs}ms)`));
       console.log(`    ${result.error}`);
     }
     database.close();
@@ -421,10 +421,10 @@ program
     for (const { feed, result } of results) {
       if (result.ok) {
         ok++;
-        console.log(`  ${chalk.green('✓')} ${chalk.bold(feed.name.padEnd(38))} ${result.itemCount.toString().padStart(4)} Eintraege  ${chalk.gray(result.responseTimeMs + 'ms')}`);
+        console.log(`  ${chalk.green('OK')} ${chalk.bold(feed.name.padEnd(38))} ${result.itemCount.toString().padStart(4)} Eintraege  ${chalk.gray(result.responseTimeMs + 'ms')}`);
       } else {
         fail++;
-        console.log(`  ${chalk.red('✗')} ${chalk.bold(feed.name.padEnd(38))} ${chalk.red(result.error)}`);
+        console.log(`  ${chalk.red('FAIL')} ${chalk.bold(feed.name.padEnd(38))} ${chalk.red(result.error)}`);
       }
     }
     console.log(`\n  ${chalk.green(ok + ' OK')} · ${chalk.red(fail + ' fehlgeschlagen')} von ${srcCfg.feeds.length}`);
@@ -456,17 +456,28 @@ program
 
 function openFile(filepath) {
   const platform = os.platform();
-  const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
-  const child = spawn(cmd, [filepath], { detached: true, stdio: 'ignore', shell: platform === 'win32' });
-  child.on('error', (err) => {
-    console.log(chalk.yellow(`Konnte Datei nicht automatisch oeffnen: ${err.message}`));
+  let child;
+  try {
+    if (platform === 'win32') {
+      child = spawn('cmd', ['/c', 'start', '""', filepath], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true });
+    } else if (platform === 'darwin') {
+      child = spawn('open', [filepath], { detached: true, stdio: 'ignore' });
+    } else {
+      child = spawn('xdg-open', [filepath], { detached: true, stdio: 'ignore' });
+    }
+    child.on('error', (err) => {
+      console.log(chalk.yellow(`Konnte Datei nicht automatisch oeffnen: ${err.message}`));
+      console.log(chalk.gray(`Pfad: ${filepath}`));
+    });
+    child.unref();
+  } catch (err) {
+    console.log(chalk.yellow(`Konnte Datei nicht oeffnen: ${err.message}`));
     console.log(chalk.gray(`Pfad: ${filepath}`));
-  });
-  child.unref();
+  }
 }
 
 program.parseAsync(process.argv).catch((err) => {
   logger.error('CLI fataler Fehler', { error: err.message, stack: err.stack });
-  console.error(chalk.red(`✗ ${err.message}`));
+  console.error(chalk.red(`Fehler: ${err.message}`));
   process.exit(1);
 });

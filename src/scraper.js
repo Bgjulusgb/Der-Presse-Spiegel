@@ -436,13 +436,20 @@ async function fetchArticleDetails(item) {
 
 async function gatherFromFeeds(feedsConfig) {
   const list = feedsConfig || sources.feeds || [];
+  const autoDisableAfter = settings.scraping.auto_disable_after_failures || 0;
   const enabledFeeds = list.filter(f => {
     if (f.disabled === true) return false;
     const h = database.getSourceHealth(f.name);
-    return !h || h.enabled !== 0;
+    if (!h) return true;
+    if (h.enabled === 0) return false;
+    if (autoDisableAfter > 0 && h.consecutive_failures >= autoDisableAfter) {
+      logger.warn(`Feed automatisch uebersprungen (${h.consecutive_failures}x Fehler): ${f.name}`);
+      return false;
+    }
+    return true;
   });
   if (enabledFeeds.length < list.length) {
-    logger.info(`${list.length - enabledFeeds.length} Feeds deaktiviert, ${enabledFeeds.length} aktiv`);
+    logger.info(`${list.length - enabledFeeds.length} Feeds uebersprungen, ${enabledFeeds.length} aktiv`);
   }
   const limit = pLimit(settings.scraping.max_concurrent_requests || 4);
   const results = await Promise.all(

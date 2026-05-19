@@ -85,3 +85,49 @@ test('parseQuery: leerer String liefert null', () => {
   assert.equal(parseQuery(''), null);
   assert.equal(parseQuery('   '), null);
 });
+
+test('articleMatchesStructured: tag-Feld', () => {
+  const p = parseQuery('tag:produktion:wallenstein');
+  const a1 = { title: 'X', tags: ['produktion:wallenstein'] };
+  const a2 = { title: 'X', tags: ['produktion:pinocchio'] };
+  assert.equal(articleMatchesStructured(a1, p), true);
+  assert.equal(articleMatchesStructured(a2, p), false);
+});
+
+test('articleMatchesStructured: score-Filter mit >=', () => {
+  const p = parseQuery('score:>=80');
+  const a1 = { title: 'X', relevance_score: 100 };
+  const a2 = { title: 'X', relevance_score: 50 };
+  assert.equal(articleMatchesStructured(a1, p), true);
+  assert.equal(articleMatchesStructured(a2, p), false);
+});
+
+test('articleMatchesStructured: score-Filter mit <', () => {
+  const p = parseQuery('score:<30');
+  const a1 = { title: 'X', relevance_score: 10 };
+  const a2 = { title: 'X', relevance_score: 80 };
+  assert.equal(articleMatchesStructured(a1, p), true);
+  assert.equal(articleMatchesStructured(a2, p), false);
+});
+
+test('articleMatchesStructured: after und before', () => {
+  const p = parseQuery('after:2026-01-01 before:2026-12-31');
+  const a1 = { title: 'X', published_date: '2026-06-15T10:00:00Z' };
+  const a2 = { title: 'X', published_date: '2025-12-15T10:00:00Z' };
+  assert.equal(articleMatchesStructured(a1, p), true);
+  assert.equal(articleMatchesStructured(a2, p), false);
+});
+
+test('articleMatchesStructured: bookmark-Filter', () => {
+  const p = parseQuery('bookmark:yes');
+  const a1 = { title: 'X', bookmarked: true };
+  const a2 = { title: 'X', bookmarked: false };
+  assert.equal(articleMatchesStructured(a1, p), true);
+  assert.equal(articleMatchesStructured(a2, p), false);
+});
+
+test('tokenize: Field-Alias t: wird als title behandelt', () => {
+  const t = tokenize('t:Premiere');
+  assert.equal(t[0].type, 'field');
+  assert.equal(t[0].field, 'title');
+});
