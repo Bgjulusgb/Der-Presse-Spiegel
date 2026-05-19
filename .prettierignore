@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+logs
+reports
+coverage
+package-lock.json
+config/sources.json

@@ -24,7 +24,7 @@ const GERMAN_STOPWORDS = new Set([
 const tokenizer = new natural.AggressiveTokenizerDe();
 const stemmer = natural.PorterStemmerDe;
 
-let SYNONYMS_MAP = new Map();
+const SYNONYMS_MAP = new Map();
 try {
   const syn = loadJson('synonyms.json');
   for (const group of syn.groups || []) {
