@@ -105,6 +105,8 @@ function onTabActivate(tab) {
     case 'reports': loadReports(); break;
     case 'keywords': loadKeywords(); break;
     case 'sources': loadSources(); break;
+    case 'bookmarks': loadBookmarks(); break;
+    case 'trends': loadTrends(); break;
     case 'settings': loadSettingsTab(); break;
     case 'logs': loadLogs(); break;
   }
@@ -348,15 +350,24 @@ function renderArticleItem(a, query) {
 
 async function showArticleDetail(id) {
   try {
-    const a = await api(`/api/article/${id}`);
+    const [a, tagsData] = await Promise.all([
+      api(`/api/article/${id}`),
+      api(`/api/article/${id}/tags`)
+    ]);
+    const tags = tagsData.tags || [];
     const dlg = $('#article-detail');
     const meta = a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : {};
     const alsoOn = a.also_on ? (typeof a.also_on === 'string' ? JSON.parse(a.also_on) : a.also_on) : [];
     const reasons = (meta && meta.reasons) || [];
+    const bookmarksData = await api('/api/bookmarks');
+    const isBookmarked = bookmarksData.bookmarks.some(b => b.id === a.id);
     dlg.innerHTML = `
       <div class="modal-head">
         <strong>${escapeHtml(a.title)}</strong>
-        <button class="modal-close" id="md-close">×</button>
+        <div style="display:flex;gap:6px;">
+          <button class="btn ${isBookmarked ? 'btn-primary' : ''}" id="md-bookmark">${isBookmarked ? '♥ markiert' : '♡ Lesezeichen'}</button>
+          <button class="modal-close" id="md-close">×</button>
+        </div>
       </div>
       <div class="modal-body">
         <div class="article-meta-row" style="margin-bottom:10px;">
@@ -370,7 +381,12 @@ async function showArticleDetail(id) {
           ${a.author ? ` · ${escapeHtml(a.author)}` : ''}
           · ${fmtDate(a.published_date, true)}
         </p>
-        <p><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.url)}</a></p>
+        <p><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.url.length > 100 ? a.url.slice(0, 100) + '…' : a.url)}</a></p>
+        <h3>Tags</h3>
+        <div class="keyword-chips" id="md-tags">
+          ${tags.map(t => `<span class="chip">${escapeHtml(t)}<span class="x" data-tag="${escapeHtml(t)}">×</span></span>`).join('')}
+          <input class="chip-input" id="md-tag-input" placeholder="+ Tag, Enter">
+        </div>
         ${a.summary ? `<h3>Zusammenfassung</h3><p>${escapeHtml(a.summary)}</p>` : ''}
         ${reasons.length ? `<h3>Trefferbegründungen</h3><div class="reason-list">${reasons.map(r => `<code>${escapeHtml(r)}</code>`).join('')}</div>` : ''}
         ${alsoOn.length ? `<h3>Auch erschienen in</h3><ul>${alsoOn.map(u => `<li><a href="${escapeHtml(u)}" target="_blank">${escapeHtml(u)}</a></li>`).join('')}</ul>` : ''}
@@ -379,6 +395,25 @@ async function showArticleDetail(id) {
     `;
     dlg.showModal();
     $('#md-close').addEventListener('click', () => dlg.close());
+    $('#md-bookmark').addEventListener('click', async () => {
+      await toggleBookmark(a.id, isBookmarked);
+      dlg.close();
+      showArticleDetail(id);
+    });
+    $('#md-tag-input').addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter' && e.target.value.trim()) {
+        await addTagToArticle(a.id, e.target.value.trim());
+        dlg.close();
+        showArticleDetail(id);
+      }
+    });
+    $$('#md-tags .x').forEach(x => x.addEventListener('click', async () => {
+      try {
+        await api(`/api/article/${a.id}/tags/${encodeURIComponent(x.dataset.tag)}`, { method: 'DELETE' });
+        dlg.close();
+        showArticleDetail(id);
+      } catch (err) { toast(err.message, 'error'); }
+    }));
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -392,6 +427,7 @@ function initArticleFilters() {
     if (state.search) { relOpt.disabled = false; $('#filter-sort').value = 'relevance'; state.filters.sort = 'relevance'; }
     else { state.filters.sort = 'score-desc'; $('#filter-sort').value = 'score-desc'; }
     handleSuggestInput(e.target.value);
+    loadDidYouMean(e.target.value);
     debounced();
   });
   $('#filter-period').addEventListener('change', (e) => {
@@ -419,6 +455,8 @@ function initArticleFilters() {
     loadArticles();
   });
   $('#export-articles').addEventListener('click', exportCurrentArticles);
+  $('#export-csv').addEventListener('click', () => downloadExport('csv'));
+  $('#export-json').addEventListener('click', () => downloadExport('json'));
 
   document.addEventListener('keydown', (e) => {
     if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
@@ -450,6 +488,127 @@ async function handleSuggestInput(q) {
       });
     });
   } catch { /* ignore */ }
+}
+
+function downloadExport(format) {
+  const params = new URLSearchParams();
+  if (state.filters.period === 'custom') {
+    if (state.filters.from) params.set('from', state.filters.from);
+    if (state.filters.to) params.set('to', state.filters.to);
+  } else {
+    params.set('last', state.filters.period);
+  }
+  params.set('format', format);
+  window.open(`/api/export?${params.toString()}`, '_blank');
+}
+
+async function loadDidYouMean(query) {
+  const dym = $('#did-you-mean');
+  if (!query || query.length < 4) { dym.style.display = 'none'; return; }
+  try {
+    const data = await api(`/api/did-you-mean?q=${encodeURIComponent(query)}`);
+    if (data.suggestion) {
+      dym.style.display = '';
+      dym.innerHTML = `Meinten Sie: <a href="#" id="dym-link">${escapeHtml(data.suggestion)}</a>?`;
+      $('#dym-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        $('#article-search').value = data.suggestion;
+        state.search = data.suggestion;
+        loadArticles();
+        dym.style.display = 'none';
+      });
+    } else {
+      dym.style.display = 'none';
+    }
+  } catch { dym.style.display = 'none'; }
+}
+
+async function loadBookmarks() {
+  try {
+    const data = await api('/api/bookmarks');
+    const list = $('#bookmarks-list');
+    const empty = $('#bookmarks-empty');
+    if (!data.bookmarks.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = data.bookmarks.map(a => renderArticleItem({
+      ...a,
+      summary: a.summary || a.bookmark_note || ''
+    }, '')).join('');
+    $$('.article-item', list).forEach(el => {
+      el.addEventListener('click', (ev) => {
+        if (ev.target.tagName === 'A') return;
+        showArticleDetail(el.dataset.id);
+      });
+    });
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function loadTrends() {
+  try {
+    const period = $('#trends-period').value;
+    const [mentionsData, trendsData, tagsData] = await Promise.all([
+      api(`/api/mentions?last=${period}`),
+      api(`/api/trends?period=${period}`),
+      api('/api/tags')
+    ]);
+    const maxM = Math.max(...mentionsData.mentions.map(m => m.count), 1);
+    $('#top-mentions').innerHTML = mentionsData.mentions.length === 0
+      ? '<p class="muted">Keine Daten.</p>'
+      : mentionsData.mentions.map(m => {
+          const size = 11 + Math.round((m.count / maxM) * 18);
+          return `<span class="word" style="font-size:${size}px" title="${m.count}x">${escapeHtml(m.term)}</span>`;
+        }).join(' ');
+
+    const upTrends = trendsData.trends.filter(t => t.change > 0).slice(0, 15);
+    $('#trends-up').innerHTML = upTrends.length === 0
+      ? '<p class="muted">Keine Trends.</p>'
+      : upTrends.map(t => `
+          <div class="trend-row">
+            <span class="trend-term">${escapeHtml(t.term)}</span>
+            <span class="trend-change">↑ ${t.change > 0 ? '+' : ''}${t.change}</span>
+            <span class="trend-count">${t.count}</span>
+          </div>
+        `).join('');
+
+    const maxTag = Math.max(...tagsData.tags.map(t => t.count), 1);
+    $('#all-tags').innerHTML = tagsData.tags.length === 0
+      ? '<p class="muted">Noch keine Tags. Markiere Artikel im Detail-View.</p>'
+      : tagsData.tags.map(t => {
+          const size = 11 + Math.round((t.count / maxTag) * 12);
+          return `<span class="word tag" style="font-size:${size}px" data-tag="${escapeHtml(t.tag)}" title="${t.count}x">${escapeHtml(t.tag)}</span>`;
+        }).join(' ');
+    $$('.word.tag').forEach(el => el.addEventListener('click', () => {
+      $('#article-search').value = `tag:${el.dataset.tag}`;
+      state.search = `tag:${el.dataset.tag}`;
+      $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === 'articles'));
+      $$('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-articles'));
+      loadArticles();
+    }));
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function toggleBookmark(articleId, isBookmarked) {
+  try {
+    if (isBookmarked) {
+      await api(`/api/article/${articleId}/bookmark`, { method: 'DELETE' });
+      toast('Lesezeichen entfernt', 'success');
+    } else {
+      await api(`/api/article/${articleId}/bookmark`, { method: 'POST', body: JSON.stringify({}) });
+      toast('Lesezeichen hinzugefügt', 'success');
+    }
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function addTagToArticle(articleId, tag) {
+  if (!tag || !tag.trim()) return;
+  try {
+    await api(`/api/article/${articleId}/tags`, { method: 'POST', body: JSON.stringify({ tag: tag.trim() }) });
+    toast(`Tag "${tag}" hinzugefügt`, 'success');
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 async function exportCurrentArticles() {
@@ -898,6 +1057,10 @@ function initDuplicatesTab() {
   });
 }
 
+function initTrendsTab() {
+  $('#trends-period').addEventListener('change', loadTrends);
+}
+
 function init() {
   initTheme();
   initTabs();
@@ -910,6 +1073,7 @@ function init() {
   initSettingsTab();
   initLogsTab();
   initDuplicatesTab();
+  initTrendsTab();
   loadDashboard();
 }
 

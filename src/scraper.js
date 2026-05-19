@@ -162,8 +162,29 @@ const REMOVE_SELECTORS = [
   '.amp-ad', 'amp-ad'
 ];
 
+function tryReadability(html, url) {
+  try {
+    const { Readability } = require('@mozilla/readability');
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM(html, { url });
+    const reader = new Readability(dom.window.document, { charThreshold: 200 });
+    const article = reader.parse();
+    if (!article || !article.textContent) return null;
+    return {
+      title: article.title || '',
+      author: article.byline || null,
+      text: article.textContent.replace(/\s+/g, ' ').trim(),
+      excerpt: article.excerpt || '',
+      siteName: article.siteName || ''
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
 function extractArticleContent(html, url) {
   if (!html) return { title: '', text: '', firstParagraph: '', paywall: false };
+
   const $ = cheerio.load(html);
 
   REMOVE_SELECTORS.forEach(sel => { try { $(sel).remove(); } catch {} });
@@ -238,7 +259,25 @@ function extractArticleContent(html, url) {
   const htmlLower = html.toLowerCase();
   const paywall = paywallSignals.some(s => htmlLower.includes(s.toLowerCase()));
 
-  return { title, author, description, text, firstParagraph, paywall };
+  let finalText = text;
+  let finalTitle = title;
+  let finalAuthor = author;
+  const readabilityResult = tryReadability(html, url);
+  if (readabilityResult && readabilityResult.text.length > finalText.length * 0.8) {
+    finalText = readabilityResult.text;
+    if (readabilityResult.title && readabilityResult.title.length > 5) finalTitle = readabilityResult.title;
+    if (readabilityResult.author && !finalAuthor) finalAuthor = readabilityResult.author;
+  }
+  const finalFirstParagraph = extractFirstParagraph(finalText);
+
+  return {
+    title: finalTitle,
+    author: finalAuthor,
+    description,
+    text: finalText,
+    firstParagraph: finalFirstParagraph,
+    paywall
+  };
 }
 
 async function fetchRssFeed(feed) {
@@ -313,14 +352,58 @@ async function fetchRssFeed(feed) {
   })).filter(it => it.url);
 }
 
-async function fetchArticleDetails(item) {
-  try {
-    const res = await fetchText(item.url);
-    if (res.status === 304) {
-      return null;
+function buildFromRss(item, originalUrl) {
+  const fallbackText = item.content || item.summary || '';
+  return {
+    url: item.url,
+    urlNormalized: normalizeUrl(item.url),
+    title: (item.title || '').replace(/\s+/g, ' ').trim(),
+    source: item.source,
+    sourcePriority: item.sourcePriority || 50,
+    author: item.author,
+    publishedDate: item.publishedDate,
+    fullText: fallbackText,
+    firstParagraph: extractFirstParagraph(fallbackText),
+    paywall: false,
+    wordCount: fallbackText.split(/\s+/).filter(Boolean).length,
+    meta: {
+      fallback: 'rss-only',
+      original_url: originalUrl || item.url,
+      fetched_at: new Date().toISOString()
     }
+  };
+}
+
+async function fetchArticleDetails(item) {
+  const isGoogleNews = item.googleNewsRedirect || (item.url && item.url.includes('news.google.com'));
+  const fetchTimeout = isGoogleNews ? 10000 : (settings.scraping.request_timeout_ms || 20000);
+
+  try {
+    let targetUrl = item.url;
+    if (isGoogleNews) {
+      try {
+        const { resolveGoogleNewsUrl } = require('./news-search');
+        const resolved = await Promise.race([
+          require('./news-search').resolveGoogleNewsUrl(targetUrl),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Redirect-Timeout')), 8000))
+        ]);
+        if (resolved && resolved !== targetUrl && !resolved.includes('news.google.com')) {
+          targetUrl = resolved;
+          item.url = targetUrl;
+        }
+      } catch (e) {
+        logger.debug(`Google-News-Redirect ueberprungen: ${e.message}`);
+        return buildFromRss(item);
+      }
+    }
+
+    const res = await Promise.race([
+      fetchText(targetUrl, { timeout: fetchTimeout }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch-Timeout')), fetchTimeout + 2000))
+    ]);
+    if (res.status === 304) return null;
     const html = res.text;
-    const content = extractArticleContent(html, item.url);
+    const content = extractArticleContent(html, targetUrl);
     let publishedDate = item.publishedDate;
     if (!publishedDate) {
       publishedDate = extractArticleDate(html, item.url);
@@ -344,22 +427,10 @@ async function fetchArticleDetails(item) {
       meta: { fetched_at: new Date().toISOString(), description: content.description }
     };
   } catch (err) {
-    logger.warn(`Artikel-Details fehlgeschlagen: ${item.url} (${err.message})`);
-    const fallbackText = item.content || item.summary || '';
-    return {
-      url: item.url,
-      urlNormalized: normalizeUrl(item.url),
-      title: (item.title || '').replace(/\s+/g, ' ').trim(),
-      source: item.source,
-      sourcePriority: item.sourcePriority || 50,
-      author: item.author,
-      publishedDate: item.publishedDate,
-      fullText: fallbackText,
-      firstParagraph: extractFirstParagraph(fallbackText),
-      paywall: false,
-      wordCount: fallbackText.split(/\s+/).filter(Boolean).length,
-      meta: { fetch_error: err.message, fetched_at: new Date().toISOString() }
-    };
+    logger.debug(`Artikel-Details fehlgeschlagen: ${item.url} (${err.message})`);
+    const fallback = buildFromRss(item);
+    fallback.meta = { ...fallback.meta, fetch_error: err.message };
+    return fallback;
   }
 }
 
