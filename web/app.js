@@ -7,7 +7,7 @@ const state = {
   articles: [],
   total: 0,
   search: '',
-  filters: { category: '', sentiment: '', source: '', period: '30d', from: '', to: '', sort: 'score-desc' },
+  filters: { category: '', sentiment: '', source: '', tag: '', bookmark: '', period: '30d', from: '', to: '', sort: 'score-desc' },
   keywords: null,
   sources: null,
   settings: null,
@@ -16,9 +16,9 @@ const state = {
 };
 
 const CAT_LABEL = {
-  sehr_relevant: '★★★ Sehr relevant',
-  relevant: '★★ Relevant',
-  moeglich_relevant: '★ Möglich',
+  sehr_relevant: 'Sehr relevant',
+  relevant: 'Relevant',
+  moeglich_relevant: 'Moeglich',
   irrelevant: 'Niedrig'
 };
 const SENT_LABEL = { positiv: 'positiv', negativ: 'negativ', neutral: 'neutral' };
@@ -100,9 +100,10 @@ function initTabs() {
 function onTabActivate(tab) {
   switch (tab) {
     case 'dashboard': loadDashboard(); break;
-    case 'articles': loadArticles(); break;
+    case 'articles': loadArticles(); loadTagFilter(); break;
     case 'scan': loadScan(); break;
     case 'reports': loadReports(); break;
+    case 'tags': loadTagsTab(); break;
     case 'keywords': loadKeywords(); break;
     case 'sources': loadSources(); break;
     case 'bookmarks': loadBookmarks(); break;
@@ -110,6 +111,64 @@ function onTabActivate(tab) {
     case 'settings': loadSettingsTab(); break;
     case 'logs': loadLogs(); break;
   }
+}
+
+async function loadTagFilter() {
+  try {
+    const data = await api('/api/tags');
+    const sel = document.getElementById('filter-tag');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Alle Tags</option>' +
+      (data.tags || []).slice(0, 100).map(t =>
+        `<option value="${escapeHtml(t.tag)}"${t.tag === cur ? ' selected' : ''}>${escapeHtml(t.tag)} (${t.count})</option>`
+      ).join('');
+  } catch { /* ignore */ }
+}
+
+async function loadTagsTab() {
+  try {
+    const data = await api('/api/tags');
+    const tags = data.tags || [];
+    const byCat = new Map();
+    for (const { tag, count } of tags) {
+      const cat = tag.includes(':') ? tag.split(':')[0] : 'ohne-kategorie';
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat).push({ tag, count });
+    }
+    const container = document.getElementById('tags-by-category');
+    if (!container) return;
+    if (byCat.size === 0) {
+      container.innerHTML = '<div class="card"><p class="muted">Noch keine Tags. Tags werden beim Scan automatisch vergeben.</p></div>';
+      return;
+    }
+    const sorted = [...byCat.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    container.innerHTML = sorted.map(([cat, list]) => {
+      list.sort((a, b) => b.count - a.count);
+      const max = Math.max(...list.map(t => t.count), 1);
+      return `
+        <div class="card">
+          <h2>${escapeHtml(cat)} <small>${list.length} Tags, gesamt ${list.reduce((a, b) => a + b.count, 0)}</small></h2>
+          <div class="word-cloud">
+            ${list.map(t => {
+              const size = 11 + Math.round((t.count / max) * 14);
+              const display = t.tag.includes(':') ? t.tag.split(':').slice(1).join(':') : t.tag;
+              return `<span class="word tag" style="font-size:${size}px" data-tag="${escapeHtml(t.tag)}" title="${t.count} Artikel: ${escapeHtml(t.tag)}">${escapeHtml(display)} <small>(${t.count})</small></span>`;
+            }).join(' ')}
+          </div>
+        </div>
+      `;
+    }).join('');
+    document.querySelectorAll('#tags-by-category .word.tag').forEach(el => {
+      el.addEventListener('click', () => {
+        document.getElementById('article-search').value = `tag:${el.dataset.tag}`;
+        state.search = `tag:${el.dataset.tag}`;
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === 'articles'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-articles'));
+        loadArticles();
+      });
+    });
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 function initWebSocket() {
@@ -142,13 +201,13 @@ function handleWsMessage(type, payload) {
       $('#scan-log').innerHTML = '';
       break;
     case 'scan-complete':
-      $('#scan-status').textContent = `✓ Fertig: ${payload.summary.articlesAdded} neue Artikel, ${payload.summary.duplicatesFound} Duplikate, ${payload.summary.errors} Fehler`;
+      $('#scan-status').textContent = `Fertig: ${payload.summary.articlesAdded} neue Artikel, ${payload.summary.duplicatesFound} Duplikate, ${payload.summary.errors} Fehler`;
       $('#start-scan').disabled = false;
       toast(`Scan beendet: ${payload.summary.articlesAdded} neue Artikel`, 'success');
       if ($('#tab-dashboard').classList.contains('active')) loadDashboard();
       break;
     case 'scan-error':
-      $('#scan-status').textContent = `✗ Fehler: ${payload.error}`;
+      $('#scan-status').textContent = `Fehler: ${payload.error}`;
       $('#start-scan').disabled = false;
       toast(`Scan-Fehler: ${payload.error}`, 'error');
       break;
@@ -272,6 +331,8 @@ function buildArticleQuery() {
   if (state.filters.category) params.set('category', state.filters.category);
   if (state.filters.sentiment) params.set('sentiment', state.filters.sentiment);
   if (state.filters.source) params.set('source', state.filters.source);
+  if (state.filters.tag) params.set('tag', state.filters.tag);
+  if (state.filters.bookmark) params.set('bookmark', state.filters.bookmark);
   if (state.search) params.set('q', state.search);
   params.set('limit', '500');
   return params.toString();
@@ -365,7 +426,7 @@ async function showArticleDetail(id) {
       <div class="modal-head">
         <strong>${escapeHtml(a.title)}</strong>
         <div style="display:flex;gap:6px;">
-          <button class="btn ${isBookmarked ? 'btn-primary' : ''}" id="md-bookmark">${isBookmarked ? '♥ markiert' : '♡ Lesezeichen'}</button>
+          <button class="btn ${isBookmarked ? 'btn-primary' : ''}" id="md-bookmark">${isBookmarked ? 'Lesezeichen entfernen' : 'Lesezeichen hinzufuegen'}</button>
           <button class="modal-close" id="md-close">×</button>
         </div>
       </div>
@@ -442,15 +503,19 @@ function initArticleFilters() {
   $('#filter-category').addEventListener('change', (e) => { state.filters.category = e.target.value; loadArticles(); });
   $('#filter-sentiment').addEventListener('change', (e) => { state.filters.sentiment = e.target.value; loadArticles(); });
   $('#filter-source').addEventListener('change', (e) => { state.filters.source = e.target.value; loadArticles(); });
+  $('#filter-tag').addEventListener('change', (e) => { state.filters.tag = e.target.value; loadArticles(); });
+  $('#filter-bookmark').addEventListener('change', (e) => { state.filters.bookmark = e.target.value; loadArticles(); });
   $('#filter-sort').addEventListener('change', (e) => { state.filters.sort = e.target.value; renderArticleList(state.articles); });
   $('#filter-reset').addEventListener('click', () => {
-    state.filters = { category: '', sentiment: '', source: '', period: '30d', from: '', to: '', sort: 'score-desc' };
+    state.filters = { category: '', sentiment: '', source: '', tag: '', bookmark: '', period: '30d', from: '', to: '', sort: 'score-desc' };
     state.search = '';
     $('#article-search').value = '';
     $('#filter-period').value = '30d';
     $('#filter-category').value = '';
     $('#filter-sentiment').value = '';
     $('#filter-source').value = '';
+    $('#filter-tag').value = '';
+    $('#filter-bookmark').value = '';
     $('#filter-sort').value = 'score-desc';
     loadArticles();
   });
@@ -569,7 +634,7 @@ async function loadTrends() {
       : upTrends.map(t => `
           <div class="trend-row">
             <span class="trend-term">${escapeHtml(t.term)}</span>
-            <span class="trend-change">↑ ${t.change > 0 ? '+' : ''}${t.change}</span>
+            <span class="trend-change">'+'+(t.change > 0 ? '+' : ''}${t.change}</span>
             <span class="trend-count">${t.count}</span>
           </div>
         `).join('');
@@ -644,7 +709,7 @@ async function loadScan() {
         <div class="feed-health-list">
           ${health.map(h => `
             <div class="feed-row">
-              <span class="h-status ${h.consecutive_failures > 0 ? 'err' : 'ok'}">${h.consecutive_failures > 0 ? '✗' : '✓'}</span>
+              <span class="h-status ${h.consecutive_failures > 0 ? 'err' : 'ok'}">${h.consecutive_failures > 0 ? 'X' : 'OK'}</span>
               <div>
                 <div>${escapeHtml(h.source)}</div>
                 <div class="h-meta">Erfolg: ${h.last_success ? fmtDate(h.last_success, true) : 'nie'} · Fehler: ${h.last_failure ? fmtDate(h.last_failure, true) : 'nie'}</div>
@@ -698,7 +763,7 @@ async function loadReports() {
           <div class="r-name">${escapeHtml(r.name)}</div>
           <div class="r-meta">${fmtDate(r.mtime, true)} · ${(r.size / 1024 | 0)} KB · ${r.type.toUpperCase()}</div>
           <div class="r-actions">
-            <button class="btn" data-action="open" data-name="${escapeHtml(r.name)}">↗ Öffnen</button>
+            <button class="btn" data-action="open" data-name="${escapeHtml(r.name)}">Oeffnen</button>
             <button class="btn btn-danger" data-action="delete" data-name="${escapeHtml(r.name)}">✕</button>
           </div>
         </div>
@@ -835,9 +900,9 @@ function renderSourcesList() {
     const h = f.health || {};
     const enabled = h.enabled !== 0;
     const statusBadge = h.consecutive_failures > 0
-      ? `<span class="badge badge-sent-negativ">✗ ${h.consecutive_failures}x Fehler</span>`
+      ? `<span class="badge badge-sent-negativ">Fehler: ${h.consecutive_failures}x</span>`
       : h.last_success
-      ? `<span class="badge badge-sent-positiv">✓ OK</span>`
+      ? `<span class="badge badge-sent-positiv">OK</span>`
       : `<span class="badge outline">Neu</span>`;
     const meta = [
       h.last_item_count != null ? `${h.last_item_count} Eintr.` : null,
@@ -903,16 +968,16 @@ function renderSourcesList() {
         });
         if (r.ok) {
           resBox.innerHTML = `
-            <span class="badge badge-sent-positiv">✓ ${r.type.toUpperCase()}</span>
+            <span class="badge badge-sent-positiv">[${r.type.toUpperCase()}</span>
             <strong>${r.itemCount}</strong> Eintraege · ${r.responseTimeMs}ms
             ${r.title ? ` · ${escapeHtml(r.title)}` : ''}
             ${r.sample && r.sample.length ? `<ul style="margin:8px 0 0 16px;font-size:12px;">${r.sample.map(s => `<li>${escapeHtml(s.title || '(ohne Titel)')}</li>`).join('')}</ul>` : ''}
           `;
         } else {
-          resBox.innerHTML = `<span class="badge badge-sent-negativ">✗ Fehler</span> ${escapeHtml(r.error)}`;
+          resBox.innerHTML = `<span class="badge badge-sent-negativ">Fehler</span> ${escapeHtml(r.error)}`;
         }
       } catch (err) {
-        resBox.innerHTML = `<span class="badge badge-sent-negativ">✗</span> ${escapeHtml(err.message)}`;
+        resBox.innerHTML = `<span class="badge badge-sent-negativ"></span> ${escapeHtml(err.message)}`;
       } finally {
         btn.disabled = false; btn.textContent = 'Testen';
       }
@@ -1038,7 +1103,7 @@ function initDuplicatesTab() {
     try {
       const data = await api('/api/duplicates/check');
       if (data.duplicates.length === 0) {
-        box.innerHTML = `<p class="muted">✓ Keine Duplikate gefunden bei ${data.checked} Artikeln.</p>`;
+        box.innerHTML = `<p class="muted">Keine Duplikate gefunden bei ${data.checked} Artikeln.</p>`;
         return;
       }
       box.innerHTML = `
@@ -1046,7 +1111,7 @@ function initDuplicatesTab() {
         ${data.duplicates.map(d => `
           <div class="dupe-card">
             <div class="dupe-title">${escapeHtml(d.title)}</div>
-            <div class="dupe-orig">↻ Original: <strong>${escapeHtml(d.duplicateOf.title)}</strong> (${escapeHtml(d.duplicateOf.source || '')})</div>
+            <div class="dupe-orig">Original: <strong>${escapeHtml(d.duplicateOf.title)}</strong> (${escapeHtml(d.duplicateOf.source || '')})</div>
             <div class="dupe-reason">Grund: ${escapeHtml(d.reason)}</div>
           </div>
         `).join('')}
@@ -1059,6 +1124,25 @@ function initDuplicatesTab() {
 
 function initTrendsTab() {
   $('#trends-period').addEventListener('change', loadTrends);
+}
+
+function initTagsTab() {
+  const btn = document.getElementById('tag-retag-all');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Alle Artikel neu taggen? Das kann etwas dauern.')) return;
+      btn.disabled = true; btn.textContent = 'Tagge ...';
+      try {
+        const res = await api('/api/tags/retag-all', { method: 'POST', body: JSON.stringify({}) });
+        toast(`${res.tags_added} Tags fuer ${res.articles} Artikel`, 'success');
+        loadTagsTab();
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Alle Artikel neu taggen';
+      }
+    });
+  }
 }
 
 function init() {
@@ -1074,6 +1158,7 @@ function init() {
   initLogsTab();
   initDuplicatesTab();
   initTrendsTab();
+  initTagsTab();
   loadDashboard();
 }
 

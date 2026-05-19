@@ -17,6 +17,7 @@
     "retry_backoff_ms": 2000,
     "max_concurrent_requests": 4,
     "rate_limit_per_domain_ms": 1000,
+    "auto_disable_after_failures": 8,
     "puppeteer_fallback": true,
     "puppeteer": {
       "headless": true,
