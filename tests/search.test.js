@@ -178,3 +178,39 @@ test('BM25Index gibt Recency-Bonus', () => {
   const results = idx.search('Hamlet', { applyRecency: true });
   assert.equal(results[0].article.id, 2);
 });
+
+test('BM25Index gibt Proximity-Bonus fuer nahe Terme', () => {
+  const arts = [
+    {
+      id: 1,
+      title: 'Wallenstein Premiere',
+      full_text: 'Wallenstein Premiere an den Kammerspielen war ein Ereignis.'
+    },
+    {
+      id: 2,
+      title: 'Wallenstein Premiere',
+      full_text: 'Wallenstein wird gegeben. Sehr viele weitere unwichtige Worte trennen die Begriffe. Dann ist die Premiere.'
+    }
+  ];
+  const idx = new BM25Index(arts);
+  const results = idx.search('Wallenstein Premiere Kammerspielen', { applyRecency: false });
+  assert.equal(results[0].article.id, 1, 'naehere Treffer sollten hoeher ranken');
+});
+
+test('BM25Index Coverage-Penalty: vollstaendige Matches gewinnen', () => {
+  const arts = [
+    {
+      id: 1,
+      title: 'Wallenstein Premiere',
+      full_text: 'Wallenstein wird oft erwaehnt. Wallenstein Wallenstein Wallenstein.'
+    },
+    {
+      id: 2,
+      title: 'Wallenstein Premiere Kammerspielen',
+      full_text: 'Wallenstein hatte Premiere an den Kammerspielen.'
+    }
+  ];
+  const idx = new BM25Index(arts);
+  const results = idx.search('Wallenstein Premiere Kammerspielen', { applyRecency: false });
+  assert.equal(results[0].article.id, 2, 'Artikel mit allen drei Termen sollte gewinnen');
+});
