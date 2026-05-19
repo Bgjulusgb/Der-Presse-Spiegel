@@ -80,7 +80,7 @@ function extractArticleDate(html, url) {
 
 function tryUrlDate(url) {
   if (!url) return null;
-  const m = url.match(/(\d{4})[\/\-_](\d{1,2})[\/\-_](\d{1,2})/);
+  const m = url.match(/(\d{4})[/\-_](\d{1,2})[/\-_](\d{1,2})/);
   if (!m) return null;
   const year = parseInt(m[1], 10);
   const month = parseInt(m[2], 10);
@@ -196,7 +196,7 @@ function extractArticleContent(html, url) {
               $('h1').first().text().trim() ||
               $('title').first().text().trim();
   title = (title || '').replace(/\s+/g, ' ').trim();
-  title = title.split(/\s[\-–|·]\s/)[0].trim() || title;
+  title = title.split(/\s[-–|·]\s/)[0].trim() || title;
 
   let author = $('meta[name="author"]').attr('content') ||
                $('meta[property="article:author"]').attr('content') ||
@@ -463,8 +463,9 @@ async function gatherFromFeeds(feedsConfig) {
   return results.flat();
 }
 
-async function enrichItems(items, { from, to }) {
+async function enrichItems(items, { from, to, onProgress } = {}) {
   const limit = pLimit(settings.scraping.max_concurrent_requests || 4);
+  const maxEnrich = parseInt(settings.scraping.max_articles_per_scan, 10) || 1500;
 
   const seen = new Set();
   const deduped = [];
@@ -488,21 +489,58 @@ async function enrichItems(items, { from, to }) {
     const hit = database.findByNormalizedUrl(norm);
     if (hit) existing.add(norm);
   }
-  const fresh = inRange.filter(i => !existing.has(normalizeUrl(i.url)));
+  let fresh = inRange.filter(i => !existing.has(normalizeUrl(i.url)));
   if (existing.size > 0) {
     logger.info(`Anreicherung: ${fresh.length} neu, ${existing.size} schon in DB`);
   } else {
     logger.info(`Anreicherung: ${fresh.length} von ${items.length} Items im Zeitraum`);
   }
 
-  const enriched = await Promise.all(
-    fresh.map(item => limit(() => fetchArticleDetails(item)))
-  );
+  if (fresh.length > maxEnrich) {
+    fresh.sort((a, b) => (b.sourcePriority || 0) - (a.sourcePriority || 0));
+    logger.warn(`Begrenze auf ${maxEnrich} Artikel (von ${fresh.length}) - nach Quellen-Prioritaet sortiert. Einstellung: scraping.max_articles_per_scan`);
+    fresh = fresh.slice(0, maxEnrich);
+  }
+
+  const CHUNK_SIZE = 100;
+  const total = fresh.length;
+  const startTime = Date.now();
+  let done = 0;
+  let succeeded = 0;
+  let failed = 0;
+  const enriched = [];
+
+  for (let start = 0; start < total; start += CHUNK_SIZE) {
+    const chunk = fresh.slice(start, start + CHUNK_SIZE);
+    const settled = await Promise.allSettled(
+      chunk.map(item => limit(() => fetchArticleDetails(item)))
+    );
+    for (const r of settled) {
+      done++;
+      if (r.status === 'fulfilled') {
+        if (r.value) {
+          enriched.push(r.value);
+          succeeded++;
+        }
+      } else {
+        failed++;
+        logger.debug(`Anreicherung fehlgeschlagen: ${r.reason && r.reason.message ? r.reason.message : r.reason}`);
+      }
+    }
+    const elapsed = (Date.now() - startTime) / 1000;
+    const rate = done / Math.max(0.1, elapsed);
+    const etaSec = rate > 0 ? Math.round((total - done) / rate) : 0;
+    logger.info(`Anreicherung-Fortschritt: ${done}/${total} (${succeeded} OK, ${failed} Fehler, ~${Math.round(rate * 60)}/min, ETA ${etaSec}s)`);
+    if (typeof onProgress === 'function') {
+      try { onProgress({ done, total, succeeded, failed, etaSec }); } catch { /* ignore */ }
+    }
+  }
+
+  logger.info(`Anreicherung fertig: ${succeeded} OK, ${failed} Fehler in ${Math.round((Date.now() - startTime) / 1000)}s`);
 
   return enriched.filter(a => {
     if (!a) return false;
     if (!a.publishedDate) {
-      logger.warn(`Artikel ohne Datum, verwende aktuelles Datum: ${a.url}`);
       a.publishedDate = new Date();
       a.meta = { ...a.meta, date_warning: true };
     }

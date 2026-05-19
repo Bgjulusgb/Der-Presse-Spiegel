@@ -108,30 +108,42 @@ function buildArticleDataForUi(articles) {
   });
 }
 
+function safeNum(v, fallback = 0) {
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function clampPct(n) {
+  const v = safeNum(n, 0);
+  return Math.max(0, Math.min(100, v));
+}
+
 function renderSentimentChart(sentiment) {
-  if (sentiment.total === 0) return '<p class="empty">Keine Daten verfuegbar.</p>';
+  if (!sentiment || safeNum(sentiment.total) === 0) return '<p class="empty">Keine Daten verfuegbar.</p>';
+  const counts = sentiment.counts || {};
+  const pct = sentiment.percentages || {};
   const segments = [
-    { label: 'Positiv', value: sentiment.counts.positiv, percent: sentiment.percentages.positiv, color: 'var(--c-pos)' },
-    { label: 'Neutral', value: sentiment.counts.neutral, percent: sentiment.percentages.neutral, color: 'var(--c-neu)' },
-    { label: 'Negativ', value: sentiment.counts.negativ, percent: sentiment.percentages.negativ, color: 'var(--c-neg)' }
+    { label: 'Positiv', value: safeNum(counts.positiv), percent: clampPct(pct.positiv), color: 'var(--c-pos)' },
+    { label: 'Neutral', value: safeNum(counts.neutral), percent: clampPct(pct.neutral), color: 'var(--c-neu)' },
+    { label: 'Negativ', value: safeNum(counts.negativ), percent: clampPct(pct.negativ), color: 'var(--c-neg)' }
   ];
   let cumulative = 0;
   const gradientStops = segments.map(s => {
     const start = cumulative;
     cumulative += s.percent;
-    return `${s.color} ${start}% ${cumulative}%`;
+    return `${s.color} ${start.toFixed(2)}% ${clampPct(cumulative).toFixed(2)}%`;
   }).join(', ');
   return `
     <div class="chart-row">
       <div class="pie" style="background: conic-gradient(${gradientStops})">
-        <div class="pie-center"><span>${sentiment.total}</span><small>Artikel</small></div>
+        <div class="pie-center"><span>${safeNum(sentiment.total)}</span><small>Artikel</small></div>
       </div>
       <ul class="legend">
         ${segments.map(s => `
           <li>
             <span class="dot" style="background:${s.color}"></span>
             <strong>${s.label}</strong>
-            <span class="legend-value">${s.value} (${s.percent}%)</span>
+            <span class="legend-value">${s.value} (${s.percent.toFixed(0)}%)</span>
           </li>
         `).join('')}
       </ul>
@@ -140,16 +152,17 @@ function renderSentimentChart(sentiment) {
 }
 
 function renderTimeSeries(series) {
-  if (!series.length) return '<p class="empty">Keine Daten verfuegbar.</p>';
-  const max = Math.max(...series.map(s => s.count), 1);
+  if (!series || !series.length) return '<p class="empty">Keine Daten verfuegbar.</p>';
+  const max = Math.max(1, ...series.map(s => safeNum(s.count)));
   return `
     <div class="bar-chart" role="img" aria-label="Artikel pro Tag">
       ${series.map(s => {
-        const heightPct = (s.count / max) * 100;
+        const count = safeNum(s.count);
+        const heightPct = clampPct((count / max) * 100);
         return `
-          <div class="bar-col" title="${s.date}: ${s.count} Artikel">
-            <div class="bar-value">${s.count || ''}</div>
-            <div class="bar" style="height:${heightPct}%"></div>
+          <div class="bar-col" title="${s.date}: ${count} Artikel">
+            <div class="bar-value">${count || ''}</div>
+            <div class="bar" style="height:${heightPct.toFixed(2)}%"></div>
             <div class="bar-label">${s.date.slice(8)}.${s.date.slice(5, 7)}</div>
           </div>
         `;
@@ -159,19 +172,22 @@ function renderTimeSeries(series) {
 }
 
 function renderSourcesTable(rows) {
-  if (!rows.length) return '<p class="empty">Keine Daten verfuegbar.</p>';
-  const max = Math.max(...rows.map(r => r.count), 1);
+  if (!rows || !rows.length) return '<p class="empty">Keine Daten verfuegbar.</p>';
+  const max = Math.max(1, ...rows.map(r => safeNum(r.count)));
   return `
     <table class="sources-table" aria-label="Artikel pro Quelle">
       <thead><tr><th>Quelle</th><th>Artikel</th><th>Anteil</th></tr></thead>
       <tbody>
-        ${rows.map(r => `
+        ${rows.map(r => {
+          const count = safeNum(r.count);
+          const pct = clampPct((count / max) * 100);
+          return `
           <tr>
             <td>${escapeHtml(r.source)}</td>
-            <td class="num">${r.count}</td>
-            <td class="bar-cell"><span class="hbar" style="width:${(r.count / max) * 100}%"></span></td>
-          </tr>
-        `).join('')}
+            <td class="num">${count}</td>
+            <td class="bar-cell"><span class="hbar" style="width:${pct.toFixed(2)}%"></span></td>
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>
   `;

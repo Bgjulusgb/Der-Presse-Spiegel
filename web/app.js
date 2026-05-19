@@ -378,7 +378,7 @@ async function loadArticles() {
 }
 
 function renderArticleList(articles) {
-  let sorted = [...articles];
+  const sorted = [...articles];
   const sort = state.filters.sort;
   if (sort === 'score-desc') sorted.sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0));
   else if (sort === 'score-asc') sorted.sort((a, b) => (a.relevance_score || 0) - (b.relevance_score || 0));

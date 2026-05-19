@@ -107,7 +107,6 @@
     { "name": "Badische Zeitung", "url": "https://www.badische-zeitung.de/feed", "priority": 75, "type": "rss", "category": "lokal-bw" },
     { "name": "Pforzheimer Zeitung", "url": "https://www.pz-news.de/feed", "priority": 70, "type": "rss", "category": "lokal-bw" },
     { "name": "Rheinische Post", "url": "https://rp-online.de/feed.rss", "priority": 80, "type": "rss", "category": "lokal-nrw" },
-    { "name": "Koelner Stadt-Anzeiger", "url": "https://feed.ksta.de/feed/rss/index.rss", "priority": 80, "type": "rss", "category": "lokal-nrw" },
     { "name": "Aachener Zeitung", "url": "https://www.aachener-zeitung.de/feed.rss", "priority": 75, "type": "rss", "category": "lokal-nrw" },
     { "name": "Ruhr Nachrichten", "url": "https://www.ruhrnachrichten.de/feed/", "priority": 75, "type": "rss", "category": "lokal-nrw" },
     { "name": "Muenstersche Zeitung", "url": "https://www.muensterschezeitung.de/rss/feed/mz_lokales", "priority": 70, "type": "rss", "category": "lokal-nrw" },
@@ -138,8 +137,7 @@
     { "name": "n-tv", "url": "https://www.n-tv.de/rss/Politik", "priority": 80, "type": "rss", "category": "ueberregional" },
     { "name": "NZZ - Feuilleton", "url": "https://www.nzz.ch/feuilleton.rss", "priority": 85, "type": "rss", "category": "ueberregional" },
     { "name": "Der Standard - Kultur", "url": "https://www.derstandard.at/rss/kultur", "priority": 80, "type": "rss", "category": "ueberregional" },
-    { "name": "3sat - Kulturzeit", "url": "https://www.3sat.de/kultur/kulturzeit/index.rss", "priority": 80, "type": "rss", "category": "oeffentlich-rechtlich" },
-    { "name": "ARD Mediathek - Kultur", "url": "https://www.ardmediathek.de/rss/kultur", "priority": 75, "type": "rss", "category": "oeffentlich-rechtlich" }
+    { "name": "3sat - Kulturzeit", "url": "https://www.3sat.de/kultur/kulturzeit/index.rss", "priority": 80, "type": "rss", "category": "oeffentlich-rechtlich" }
   ],
   "source_priorities": {
     "nachtkritik": 100,
