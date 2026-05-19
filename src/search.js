@@ -3,9 +3,17 @@
 const Fuse = require('fuse.js');
 const natural = require('natural');
 const leven = require('js-levenshtein');
+const { LRUCache } = require('lru-cache');
 const { keywords, loadJson } = require('./config');
 const { normalize } = require('./analyzer');
 const { parseQuery, queryToBM25String, articleMatchesStructured } = require('./query-parser');
+const {
+  normalizeUmlauts,
+  germanCompoundSplit,
+  colognePhonetic,
+  extractSnippet,
+  splitSentences
+} = require('./text-utils');
 
 const GERMAN_STOPWORDS = new Set([
   'der', 'die', 'das', 'ein', 'eine', 'einen', 'einer', 'eines', 'einem',
@@ -44,14 +52,37 @@ function expandWithSynonyms(stems) {
   return [...expanded];
 }
 
-function tokenizeAndStem(text, { withSynonyms = false } = {}) {
+function tokenizeAndStem(text, { withSynonyms = false, withCompoundSplit = false } = {}) {
   if (!text) return [];
   const normalized = normalize(text);
   const tokens = tokenizer.tokenize(normalized) || [];
-  const stems = tokens
-    .filter(t => t.length >= 3 && !GERMAN_STOPWORDS.has(t))
-    .map(t => stemmer.stem(t));
+  const stems = [];
+  for (const t of tokens) {
+    if (t.length < 3 || GERMAN_STOPWORDS.has(t)) continue;
+    stems.push(stemmer.stem(t));
+    if (withCompoundSplit && t.length >= 9) {
+      const parts = germanCompoundSplit(t);
+      for (const part of parts) {
+        if (part.length >= 3 && !GERMAN_STOPWORDS.has(part)) {
+          stems.push(stemmer.stem(part));
+        }
+      }
+    }
+  }
   return withSynonyms ? expandWithSynonyms(stems) : stems;
+}
+
+function tokenizePhonetic(text) {
+  if (!text) return new Set();
+  const normalized = normalize(text);
+  const tokens = tokenizer.tokenize(normalized) || [];
+  const codes = new Set();
+  for (const t of tokens) {
+    if (t.length < 4 || GERMAN_STOPWORDS.has(t)) continue;
+    const code = colognePhonetic(t);
+    if (code) codes.add(code);
+  }
+  return codes;
 }
 
 function tokenizePositions(text) {
@@ -98,7 +129,7 @@ function proximityBoost(queryStems, doc, { maxWindow = 8 } = {}) {
 }
 
 class BM25Index {
-  constructor(articles, { k1 = 1.5, b = 0.75, titleBoost = 3, recencyHalfLife = 30, withPositions = true } = {}) {
+  constructor(articles, { k1 = 1.5, b = 0.75, titleBoost = 3, recencyHalfLife = 30, withPositions = true, withCompoundSplit = true, withPhonetic = true } = {}) {
     this.k1 = k1;
     this.b = b;
     this.titleBoost = titleBoost;
@@ -106,13 +137,14 @@ class BM25Index {
     this.docs = [];
     this.df = new Map();
     this.avgdl = 0;
+    this.withPhonetic = withPhonetic;
 
     const now = Date.now();
     let totalLen = 0;
     for (const article of articles) {
-      const titleTokens = tokenizeAndStem(article.title);
-      const summaryTokens = tokenizeAndStem(article.summary || '');
-      const bodyTokens = tokenizeAndStem(article.full_text || article.fullText || '');
+      const titleTokens = tokenizeAndStem(article.title, { withCompoundSplit });
+      const summaryTokens = tokenizeAndStem(article.summary || '', { withCompoundSplit });
+      const bodyTokens = tokenizeAndStem(article.full_text || article.fullText || '', { withCompoundSplit });
       const allTokens = [
         ...Array(this.titleBoost).fill(titleTokens).flat(),
         ...summaryTokens,
@@ -133,6 +165,10 @@ class BM25Index {
         ? tokenizePositions(`${article.title || ''} ${article.summary || ''} ${article.full_text || article.fullText || ''}`)
         : null;
 
+      const phoneticCodes = withPhonetic
+        ? tokenizePhonetic(`${article.title || ''} ${article.summary || ''}`)
+        : null;
+
       this.docs.push({
         article,
         tf,
@@ -140,7 +176,8 @@ class BM25Index {
         recency,
         sourcePriority: article.source_priority || 50,
         positions,
-        titleStems: new Set(titleTokens)
+        titleStems: new Set(titleTokens),
+        phoneticCodes
       });
       totalLen += allTokens.length;
     }
@@ -153,7 +190,7 @@ class BM25Index {
     return Math.log(1 + (this.N - n + 0.5) / (n + 0.5));
   }
 
-  score(queryStems, doc, { applyRecency = true, applyProximity = true, applyCoverage = true } = {}) {
+  score(queryStems, doc, { applyRecency = true, applyProximity = true, applyCoverage = true, phoneticCodes = null } = {}) {
     let score = 0;
     let matched = 0;
     for (const term of queryStems) {
@@ -163,6 +200,16 @@ class BM25Index {
       const idf = this.idf(term);
       const norm = 1 - this.b + this.b * (doc.len / (this.avgdl || 1));
       score += idf * ((tf * (this.k1 + 1)) / (tf + this.k1 * norm));
+    }
+    if (score === 0 && phoneticCodes && doc.phoneticCodes && phoneticCodes.size && doc.phoneticCodes.size) {
+      let phoneticHits = 0;
+      for (const code of phoneticCodes) {
+        if (doc.phoneticCodes.has(code)) phoneticHits++;
+      }
+      if (phoneticHits > 0) {
+        score = 0.3 * phoneticHits;
+        matched = phoneticHits;
+      }
     }
     if (score === 0) return 0;
     if (applyCoverage && queryStems.length > 1) {
@@ -180,13 +227,14 @@ class BM25Index {
     return score;
   }
 
-  search(query, { limit = 50, withSynonyms = true, applyRecency = true, applyProximity = true } = {}) {
+  search(query, { limit = 50, withSynonyms = true, applyRecency = true, applyProximity = true, withPhonetic = true } = {}) {
     if (!query || !query.trim()) return [];
-    const stems = tokenizeAndStem(query, { withSynonyms });
+    const stems = tokenizeAndStem(query, { withSynonyms, withCompoundSplit: true });
     if (stems.length === 0) return [];
+    const phoneticCodes = withPhonetic ? tokenizePhonetic(query) : null;
     const scored = this.docs.map(doc => ({
       article: doc.article,
-      score: this.score(stems, doc, { applyRecency, applyProximity })
+      score: this.score(stems, doc, { applyRecency, applyProximity, phoneticCodes })
     })).filter(r => r.score > 0);
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, limit);
@@ -212,17 +260,29 @@ function buildFuse(articles) {
   });
 }
 
-function hybridSearch(articles, query, { limit = 50, withSynonyms = true, applyRecency = true } = {}) {
-  if (!query || !query.trim()) {
-    return articles.slice(0, limit).map(a => ({ article: a, score: 0 }));
-  }
+const SEARCH_CACHE = new LRUCache({
+  max: 200,
+  ttl: 60_000,
+  allowStale: false,
+  updateAgeOnGet: false
+});
 
+function cacheKey(articles, query, opts) {
+  const ids = articles.length > 0 ? articles[0].id + ':' + articles[articles.length - 1].id + ':' + articles.length : 'empty';
+  return `${ids}|${query}|${JSON.stringify(opts)}`;
+}
+
+function clearSearchCache() {
+  SEARCH_CACHE.clear();
+}
+
+function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency }) {
   const parsed = parseQuery(query);
   let filteredArticles = articles;
   if (parsed && parsed.isStructured) {
     filteredArticles = articles.filter(a => articleMatchesStructured(a, parsed));
     if (filteredArticles.length === 0) {
-      return [];
+      return { results: [], filteredCount: 0 };
     }
   }
 
@@ -259,26 +319,67 @@ function hybridSearch(articles, query, { limit = 50, withSynonyms = true, applyR
     combined.push({ article, score, bm25: bm25Norm, fuzzy: fuseNorm });
   }
   combined.sort((a, b) => b.score - a.score);
-  return combined.slice(0, limit);
+  return { results: combined.slice(0, limit), filteredCount: filteredArticles.length };
 }
 
-function highlightTerms(text, query) {
-  if (!query || !text) return text;
+function hybridSearch(articles, query, opts = {}) {
+  const { limit = 50, withSynonyms = true, applyRecency = true, cache = true, didYouMeanFallback = true } = opts;
+  if (!query || !query.trim()) {
+    return articles.slice(0, limit).map(a => ({ article: a, score: 0 }));
+  }
+
+  const key = cache ? cacheKey(articles, query, { limit, withSynonyms, applyRecency }) : null;
+  if (key) {
+    const cached = SEARCH_CACHE.get(key);
+    if (cached) return cached;
+  }
+
+  let { results, filteredCount } = runHybridSearch(articles, query, { limit, withSynonyms, applyRecency });
+
+  const hasStructuredOperators = /[+\-:"]|\b(AND|OR|NOT)\b/.test(query);
+  if (didYouMeanFallback && results.length === 0 && filteredCount > 0 && !hasStructuredOperators) {
+    const suggestion = didYouMean(query, articles);
+    if (suggestion && suggestion !== query) {
+      const fallback = runHybridSearch(articles, suggestion, { limit, withSynonyms, applyRecency });
+      if (fallback.results.length > 0) {
+        results = fallback.results.map(r => ({ ...r, _viaDidYouMean: suggestion }));
+      }
+    }
+  }
+
+  if (key) SEARCH_CACHE.set(key, results);
+  return results;
+}
+
+function queryTerms(query) {
   const parsed = parseQuery(query);
   const literals = [];
   if (parsed) {
     for (const m of [...parsed.must, ...parsed.should]) {
       if (m.value && m.value.length >= 3) literals.push(m.value);
     }
-  } else {
+  } else if (query) {
     literals.push(...query.split(/\s+/).filter(t => t.length >= 3));
   }
-  const stems = [...new Set(tokenizeAndStem(query))];
-  const all = [...new Set([...literals, ...stems])];
+  const stems = [...new Set(tokenizeAndStem(query || ''))];
+  return [...new Set([...literals, ...stems])];
+}
+
+function highlightTerms(text, query) {
+  if (!query || !text) return text;
+  const all = queryTerms(query);
   if (!all.length) return text;
   const escaped = all.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const re = new RegExp(`(${escaped.join('|')})`, 'gi');
   return text.replace(re, '<mark>$1</mark>');
+}
+
+function snippetFor(article, query, { maxLen = 240 } = {}) {
+  if (!article) return '';
+  const text = article.summary || article.full_text || article.fullText || '';
+  if (!query || !text) return text.slice(0, maxLen);
+  const terms = queryTerms(query);
+  return extractSnippet(text, terms, { maxLen });
 }
 
 function suggestQueries(prefix, articles) {
@@ -370,9 +471,13 @@ module.exports = {
   buildFuse,
   hybridSearch,
   highlightTerms,
+  snippetFor,
+  queryTerms,
   suggestQueries,
   didYouMean,
   topMentions,
   trends,
-  tokenizeAndStem
+  tokenizeAndStem,
+  tokenizePhonetic,
+  clearSearchCache
 };

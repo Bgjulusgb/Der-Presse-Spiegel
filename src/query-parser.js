@@ -2,7 +2,8 @@
 
 const FIELD_NAMES = new Set([
   'title', 'source', 'author', 'text', 'category', 'sentiment', 'type',
-  'tag', 'score', 'after', 'before', 'bookmark', 'paywall'
+  'tag', 'tagnot', 'tagmode', 'score', 'after', 'before', 'bookmark', 'paywall',
+  'words', 'lang', 'image', 'reading'
 ]);
 
 const FIELD_ALIASES = {
@@ -11,7 +12,11 @@ const FIELD_ALIASES = {
   's': 'source',
   'a': 'author',
   'cat': 'category',
-  'sent': 'sentiment'
+  'sent': 'sentiment',
+  'language': 'lang',
+  'word_count': 'words',
+  'wordcount': 'words',
+  'readingtime': 'reading'
 };
 
 function tokenize(input) {
@@ -192,8 +197,69 @@ function articleMatchesStructured(article, parsed) {
       case 'type': fieldValue = (article.article_type || article.articleType || '').toLowerCase(); break;
       case 'tag': {
         const tagList = Array.isArray(article.tags) ? article.tags.map(t => String(t).toLowerCase()) : [];
-        const anyMatch = values.some(v => tagList.includes(v.toLowerCase()));
+        const modeArr = parsed.fields.tagmode;
+        const mode = modeArr && modeArr[0] ? modeArr[0].toLowerCase() : 'any';
+        const lowerVals = values.map(v => v.toLowerCase());
+        if (mode === 'all') {
+          if (!lowerVals.every(v => tagList.includes(v))) return false;
+        } else if (mode === 'none') {
+          if (lowerVals.some(v => tagList.includes(v))) return false;
+        } else {
+          if (!lowerVals.some(v => tagList.includes(v))) return false;
+        }
+        continue;
+      }
+      case 'tagnot': {
+        const tagList = Array.isArray(article.tags) ? article.tags.map(t => String(t).toLowerCase()) : [];
+        if (values.some(v => tagList.includes(v.toLowerCase()))) return false;
+        continue;
+      }
+      case 'tagmode':
+        continue;
+      case 'words': {
+        const wc = article.word_count || 0;
+        const anyMatch = values.every(v => {
+          const cond = parseScoreCondition(v);
+          if (!cond) return true;
+          switch (cond.op) {
+            case '>': return wc > cond.num;
+            case '>=': return wc >= cond.num;
+            case '<': return wc < cond.num;
+            case '<=': return wc <= cond.num;
+            case '=': return wc === cond.num;
+            default: return wc >= cond.num;
+          }
+        });
         if (!anyMatch) return false;
+        continue;
+      }
+      case 'reading': {
+        const wc = article.word_count || 0;
+        const minutes = Math.max(1, Math.round(wc / 200));
+        const anyMatch = values.every(v => {
+          const cond = parseScoreCondition(v);
+          if (!cond) return true;
+          switch (cond.op) {
+            case '>': return minutes > cond.num;
+            case '>=': return minutes >= cond.num;
+            case '<': return minutes < cond.num;
+            case '<=': return minutes <= cond.num;
+            case '=': return minutes === cond.num;
+            default: return minutes <= cond.num;
+          }
+        });
+        if (!anyMatch) return false;
+        continue;
+      }
+      case 'lang': {
+        const lang = (article.language || article.lang || '').toLowerCase();
+        if (!values.some(v => lang === v.toLowerCase())) return false;
+        continue;
+      }
+      case 'image': {
+        const want = parseBool(values[0]);
+        const has = !!article.has_image;
+        if (want !== has) return false;
         continue;
       }
       case 'score': {

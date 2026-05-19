@@ -13,6 +13,35 @@ const { runScan } = require('./pipeline');
 const { generateReport, findLatestReport, REPORTS_DIR } = require('./reporter');
 const { parseDateRange } = require('./utils');
 const { hybridSearch, suggestQueries, didYouMean, topMentions, trends } = require('./search');
+const textUtils = require('./text-utils');
+
+function computeFacets(articles) {
+  const counts = (key, getter) => {
+    const m = new Map();
+    for (const a of articles) {
+      const v = getter(a);
+      if (v === undefined || v === null || v === '') continue;
+      if (Array.isArray(v)) {
+        for (const x of v) m.set(x, (m.get(x) || 0) + 1);
+      } else {
+        m.set(v, (m.get(v) || 0) + 1);
+      }
+    }
+    return [...m.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([value, count]) => ({ value, count }));
+  };
+  return {
+    category: counts('category', a => a.category),
+    sentiment: counts('sentiment', a => a.sentiment),
+    type: counts('type', a => a.article_type),
+    source: counts('source', a => a.source).slice(0, 25),
+    tag: counts('tag', a => a.tags || []).slice(0, 25),
+    language: counts('language', a => a.language || 'de'),
+    paywall: counts('paywall', a => (a.paywall ? 'yes' : 'no')),
+    image: counts('image', a => (a.has_image ? 'yes' : 'no'))
+  };
+}
 
 const WEB_DIR = path.resolve(__dirname, '..', 'web');
 
@@ -88,14 +117,33 @@ function buildApp() {
       }
       const bookmarkIds = new Set(database.db.prepare('SELECT article_id FROM bookmarks').all().map(r => r.article_id));
 
-      articles = articles.map(a => ({
-        ...a,
-        tags: tagMap.get(a.id) || [],
-        bookmarked: bookmarkIds.has(a.id)
-      }));
+      articles = articles.map(a => {
+        const enriched = {
+          ...a,
+          tags: tagMap.get(a.id) || [],
+          bookmarked: bookmarkIds.has(a.id),
+          has_image: textUtils.hasImage(a),
+          reading_time_min: textUtils.estimateReadingMinutes((a.full_text || a.summary || '').toString())
+        };
+        if (!enriched.language) {
+          enriched.language = textUtils.detectLanguage(
+            (a.title || '') + ' ' + (a.summary || ''),
+            { minLen: 60, fallback: 'de' }
+          );
+        }
+        return enriched;
+      });
 
-      const { category, sentiment, source, tag, bookmark, q, limit, minScore, maxScore, type } = req.query;
+      const {
+        category, sentiment, source, tag, tagNot, tagMode,
+        bookmark, paywall, image,
+        q, limit, minScore, maxScore, type,
+        wordsMin, wordsMax, readingTimeMin, readingTimeMax,
+        lang, dupes, facets
+      } = req.query;
       const splitMulti = (v) => String(v).split(/[,;|]/).map(s => s.trim()).filter(Boolean);
+      const tagModeNorm = (tagMode || 'any').toLowerCase();
+
       if (category) {
         const cats = splitMulti(category);
         articles = articles.filter(a => cats.includes(a.category));
@@ -110,11 +158,25 @@ function buildApp() {
       }
       if (tag) {
         const tags = splitMulti(tag);
-        articles = articles.filter(a => tags.every(t => a.tags.includes(t)));
+        if (tagModeNorm === 'all') {
+          articles = articles.filter(a => tags.every(t => a.tags.includes(t)));
+        } else if (tagModeNorm === 'none') {
+          articles = articles.filter(a => !tags.some(t => a.tags.includes(t)));
+        } else {
+          articles = articles.filter(a => tags.some(t => a.tags.includes(t)));
+        }
+      }
+      if (tagNot) {
+        const tags = splitMulti(tagNot);
+        articles = articles.filter(a => !tags.some(t => a.tags.includes(t)));
       }
       if (type) {
         const types = splitMulti(type);
         articles = articles.filter(a => types.includes(a.article_type));
+      }
+      if (lang) {
+        const langs = splitMulti(lang).map(l => l.toLowerCase());
+        articles = articles.filter(a => langs.includes((a.language || 'de').toLowerCase()));
       }
       if (minScore !== undefined && minScore !== '') {
         const n = parseInt(minScore, 10);
@@ -124,22 +186,57 @@ function buildApp() {
         const n = parseInt(maxScore, 10);
         if (Number.isFinite(n)) articles = articles.filter(a => (a.relevance_score || 0) <= n);
       }
+      if (wordsMin !== undefined && wordsMin !== '') {
+        const n = parseInt(wordsMin, 10);
+        if (Number.isFinite(n)) articles = articles.filter(a => (a.word_count || 0) >= n);
+      }
+      if (wordsMax !== undefined && wordsMax !== '') {
+        const n = parseInt(wordsMax, 10);
+        if (Number.isFinite(n)) articles = articles.filter(a => (a.word_count || 0) <= n);
+      }
+      if (readingTimeMin !== undefined && readingTimeMin !== '') {
+        const n = parseInt(readingTimeMin, 10);
+        if (Number.isFinite(n)) articles = articles.filter(a => (a.reading_time_min || 0) >= n);
+      }
+      if (readingTimeMax !== undefined && readingTimeMax !== '') {
+        const n = parseInt(readingTimeMax, 10);
+        if (Number.isFinite(n)) articles = articles.filter(a => (a.reading_time_min || 0) <= n);
+      }
       if (bookmark === 'yes') articles = articles.filter(a => a.bookmarked);
       if (bookmark === 'no') articles = articles.filter(a => !a.bookmarked);
+      if (paywall === 'yes') articles = articles.filter(a => !!a.paywall);
+      if (paywall === 'no') articles = articles.filter(a => !a.paywall);
+      if (image === 'yes') articles = articles.filter(a => !!a.has_image);
+      if (image === 'no') articles = articles.filter(a => !a.has_image);
+      if (dupes === 'hide') articles = articles.filter(a => !a.duplicate_of);
 
       let scored = articles.map(a => ({ article: a, score: 0 }));
       if (q && q.trim()) {
         scored = hybridSearch(articles, q, { limit: 1000 });
       }
       const max = parseInt(limit, 10) || 500;
-      const results = scored.slice(0, max).map(s => ({ ...s.article, _searchScore: s.score }));
-      res.json({
+      const results = scored.slice(0, max).map(s => ({
+        ...s.article,
+        _searchScore: s.score,
+        _viaDidYouMean: s._viaDidYouMean
+      }));
+
+      const payload = {
         from: from.toISOString(),
         to: to.toISOString(),
         total: articles.length,
         returned: results.length,
         articles: results
-      });
+      };
+
+      if (facets === 'true' || facets === '1') {
+        payload.facets = computeFacets(articles);
+      }
+      if (q && q.trim() && scored.length > 0 && scored[0]._viaDidYouMean) {
+        payload.didYouMean = scored[0]._viaDidYouMean;
+      }
+
+      res.json(payload);
     } catch (err) {
       logger.error('GET /api/articles fehlgeschlagen', { error: err.message });
       res.status(500).json({ error: err.message });

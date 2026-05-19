@@ -6,6 +6,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 ## [Unreleased]
 
 ### Added
+- **`docs/ROADMAP.md`** mit priorisierter Verbesserungs-/Erweiterungsliste (P0–P3, ~80 Items).
+- **`src/text-utils.js`**: Umlaut-Normalisierung (ä↔ae), Variants-Expansion, deutsches Compound-Splitting mit Scoring-Heuristik, Kölner-Phonetik-Encoding, Spracherkennung (`franc-min`), Lesezeit-Schätzung, Keyword-Extraktion (`keyword-extractor`), Satz-Splitter, sentence-boundary Snippet-Extraktion, `hasImage`-Detector.
+- **`src/search.js`** Such-Algorithmus-Erweiterungen:
+  - BM25-Index nutzt Compound-Split bei Indexierung — `kammerspiele` findet `Kammerspielen` und `Opernpremiere`.
+  - Phonetik-Index (Kölner Phonetik) auf Titel/Summary — Suche nach `Tschaikowsky` findet `Tschaikowski`.
+  - LRU-Cache (`lru-cache`, 200 Eintraege, 60s TTL) fuer wiederholte Queries.
+  - Automatischer Did-you-mean-Fallback bei 0 Treffern und nicht-strukturierter Query.
+  - `snippetFor(article, query)` extrahiert satz-genauen Kontext-Snippet.
+- **`src/query-parser.js`** neue Feldoperatoren: `words:>500`, `words:<=100`, `reading:<=5`, `lang:de`, `image:yes`, `tagnot:spam`, `tag:a tag:b tagmode:all|any|none`. Plus Aliase `language→lang`, `wordcount→words`, `readingtime→reading`.
+- **`/api/articles`** neue Query-Parameter: `tagMode`, `tagNot`, `wordsMin`, `wordsMax`, `readingTimeMin`, `readingTimeMax`, `paywall`, `image`, `lang`, `dupes=hide`, `facets=true`.
+- **Facets-Endpoint**: `?facets=true` liefert Aggregations-Block fuer Kategorie, Sentiment, Quelle, Tag, Sprache, Paywall, Image, Type.
+- **Did-you-mean-Antwortfeld**: bei Fallback-Suggestion enthält API-Response `didYouMean`.
+- **26 neue RSS-Quellen** in 5 Kategorien (Total jetzt 104, vorher 78):
+  - **ÖR-Kultur (+9)**: DLF Buechermarkt/Fazit/Kompressor/Nova, BR Klassik/Kultur-Buehne, NDR/MDR/WDR/hr2/rbb24/SWR Kultur.
+  - **Theater-Fachpresse (+5)**: Perlentaucher, Monopol Magazin, VAN Magazin, Theaterkompass, BackstagePRO.
+  - **Ueberregional (+3)**: Cicero, Freitag, Jungle.World, Frankfurter Rundschau Kultur.
+  - **Lokal (+5)**: Berliner Zeitung Kultur, Tagesspiegel Berlin, Hamburger Abendblatt Kultur, Wiener Zeitung Kultur, kreuzer Leipzig.
+- **53 neue Tests** in `tests/text-utils.test.js`, `tests/search-extensions.test.js`, `tests/query-parser-extensions.test.js`, `tests/server-api.test.js` (Total jetzt 169, vorher 116).
 - Chunked enrichment mit Fortschrittsanzeige (alle 100 Artikel ein Log-Update mit ETA).
 - `scraping.max_articles_per_scan` (Default 1500) verhindert endlose Scans.
 - Tastenkuerzel-Overlay (Taste `?`), Quick-Filter-Pills, Active-Filter-Chips, Gespeicherte Suchen.
