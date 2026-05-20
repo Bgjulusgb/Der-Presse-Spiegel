@@ -224,6 +224,36 @@ function handleWsMessage(type, payload) {
       $('#start-scan').disabled = false;
       toast(`Scan-Fehler: ${payload.error}`, 'error');
       break;
+    case 'scan_summary':
+      showScanSummary(payload);
+      break;
+  }
+}
+
+function showScanSummary(s) {
+  const dur = s.duration_ms ? `${Math.round(s.duration_ms / 1000)}s` : '?';
+  const html = `
+    <div class="scan-summary-box">
+      <h3>Scan-Zusammenfassung</h3>
+      <div class="scan-summary-grid">
+        <div><strong>${safeNum(s.total_feeds)}</strong><small>Feeds gesamt</small></div>
+        <div class="ok"><strong>${safeNum(s.ok)}</strong><small>OK</small></div>
+        <div class="warn"><strong>${safeNum(s.blocked_403)}</strong><small>geblockt</small></div>
+        <div class="error"><strong>${safeNum(s.dead)}</strong><small>tot</small></div>
+        <div><strong>${safeNum(s.new_articles)}</strong><small>neue Artikel</small></div>
+        <div><strong>${safeNum(s.duplicates_removed)}</strong><small>Duplikate</small></div>
+        <div><strong>${dur}</strong><small>Dauer</small></div>
+      </div>
+    </div>`;
+  const target = document.getElementById('dashboard-scan-summary') || document.getElementById('scan-status');
+  if (target) {
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    if (target.id === 'dashboard-scan-summary') {
+      target.innerHTML = html;
+    } else {
+      target.insertAdjacentHTML('afterend', html);
+    }
   }
 }
 
@@ -1143,31 +1173,76 @@ function initKeywordsTab() {
 async function loadSources() {
   try {
     state.sources = await api('/api/sources');
+    state.sourcesFilter = state.sourcesFilter || null;
+    renderHealthStats();
     renderSourcesList();
   } catch (err) {
     toast(err.message, 'error');
   }
 }
 
+const HEALTH_LABELS = {
+  ok: { label: 'OK', icon: '✓', cls: 'badge-sent-positiv' },
+  degraded: { label: 'degraded', icon: '◐', cls: 'badge-warn' },
+  blocked: { label: 'geblockt', icon: '⊘', cls: 'badge-blocked' },
+  dead: { label: 'tot', icon: '✕', cls: 'badge-sent-negativ' },
+  unknown: { label: 'neu', icon: 'ø', cls: 'badge-outline' }
+};
+
+function renderHealthStats() {
+  const stats = (state.sources && state.sources.stats) || { ok: 0, degraded: 0, blocked: 0, dead: 0, unknown: 0, total: 0 };
+  const el = $('#health-stats');
+  if (!el) return;
+  const order = ['ok', 'degraded', 'blocked', 'dead', 'unknown'];
+  const pills = order.map(k => {
+    const conf = HEALTH_LABELS[k];
+    const isActive = state.sourcesFilter === k;
+    const count = stats[k] || 0;
+    return `<button type="button" class="health-pill ${conf.cls}${isActive ? ' active' : ''}" data-filter="${k}" title="Klick zum Filtern">
+      <span class="health-icon">${conf.icon}</span>
+      <strong>${count}</strong>
+      <span class="health-label">${conf.label}</span>
+    </button>`;
+  }).join('');
+  el.innerHTML = pills + `<button type="button" class="health-pill total${!state.sourcesFilter ? ' active' : ''}" data-filter="">
+    <strong>${stats.total || 0}</strong> <span class="health-label">gesamt</span>
+  </button>`;
+  el.querySelectorAll('.health-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = btn.dataset.filter;
+      state.sourcesFilter = f || null;
+      renderHealthStats();
+      renderSourcesList();
+    });
+  });
+}
+
 function renderSourcesList() {
-  const feeds = state.sources.feeds || [];
+  const allFeeds = (state.sources && state.sources.feeds) || [];
+  const filter = state.sourcesFilter;
+  const feeds = filter ? allFeeds.filter(f => f.healthStatus === filter) : allFeeds;
   const list = $('#sources-list');
-  if (feeds.length === 0) {
+  if (allFeeds.length === 0) {
     list.innerHTML = '<p class="muted">Keine Quellen konfiguriert.</p>';
     return;
   }
-  list.innerHTML = feeds.map((f, idx) => {
+  if (feeds.length === 0) {
+    list.innerHTML = `<p class="muted">Keine Quellen mit Status "${filter}".</p>`;
+    return;
+  }
+  list.innerHTML = feeds.map((f) => {
+    const idx = allFeeds.indexOf(f);
     const h = f.health || {};
     const enabled = h.enabled !== 0;
-    const statusBadge = h.consecutive_failures > 0
-      ? `<span class="badge badge-sent-negativ">Fehler: ${h.consecutive_failures}x</span>`
-      : h.last_success
-      ? `<span class="badge badge-sent-positiv">OK</span>`
-      : `<span class="badge outline">Neu</span>`;
+    const status = f.healthStatus || 'unknown';
+    const conf = HEALTH_LABELS[status];
+    const statusBadge = `<span class="badge ${conf.cls}" title="${conf.label}">${conf.icon} ${conf.label}${h.consecutive_failures ? ' ' + h.consecutive_failures + 'x' : ''}</span>`;
     const meta = [
       h.last_item_count != null ? `${h.last_item_count} Eintr.` : null,
       h.last_response_ms ? `${h.last_response_ms}ms` : null,
       h.feed_type ? h.feed_type : null,
+      h.last_via_browser ? '[Browser]' : null,
+      h.last_status_code ? `HTTP ${h.last_status_code}` : null,
       h.last_error ? `Fehler: ${h.last_error.slice(0, 80)}` : null
     ].filter(Boolean).join(' · ');
 
@@ -1227,14 +1302,26 @@ function renderSourcesList() {
           body: JSON.stringify({ url: feed.url, name: feed.name })
         });
         if (r.ok) {
+          const latest = r.latestItemDate ? fmtDate(r.latestItemDate, true) : null;
+          const httpBadge = r.statusCode ? `<span class="badge badge-outline">HTTP ${r.statusCode}</span>` : '';
+          const browserBadge = r.viaBrowser ? '<span class="badge badge-blocked">via Browser</span>' : '';
+          const parts = [
+            `<strong>${r.itemCount}</strong> Eintraege`,
+            `${r.responseTimeMs}ms`,
+            r.title ? escapeHtml(r.title) : null,
+            latest ? `letzter Eintrag: ${escapeHtml(latest)}` : null
+          ].filter(Boolean).join(' · ');
           resBox.innerHTML = `
             <span class="badge badge-sent-positiv">${escapeHtml((r.type || 'feed').toUpperCase())}</span>
-            <strong>${r.itemCount}</strong> Eintraege · ${r.responseTimeMs}ms
-            ${r.title ? ` · ${escapeHtml(r.title)}` : ''}
+            ${httpBadge}
+            ${browserBadge}
+            ${parts}
             ${r.sample && r.sample.length ? `<ul style="margin:8px 0 0 16px;font-size:12px;">${r.sample.map(s => `<li>${escapeHtml(s.title || '(ohne Titel)')}</li>`).join('')}</ul>` : ''}
           `;
         } else {
-          resBox.innerHTML = `<span class="badge badge-sent-negativ">Fehler</span> ${escapeHtml(r.error || 'unbekannt')}`;
+          const httpBadge = r.statusCode ? `<span class="badge badge-outline">HTTP ${r.statusCode}</span>` : '';
+          const clsBadge = r.errorClass ? `<span class="badge badge-warn">${escapeHtml(r.errorClass)}</span>` : '';
+          resBox.innerHTML = `<span class="badge badge-sent-negativ">Fehler</span> ${httpBadge} ${clsBadge} ${escapeHtml(r.error || 'unbekannt')}${r.puppeteerError ? ` · Browser: ${escapeHtml(r.puppeteerError)}` : ''}`;
         }
       } catch (err) {
         resBox.innerHTML = `<span class="badge badge-sent-negativ">Fehler</span> ${escapeHtml(err.message)}`;
@@ -1271,6 +1358,85 @@ function initSourcesTab() {
       toast(err.message, 'error');
     }
   });
+
+  const bulkDisable = document.getElementById('bulk-disable-dead');
+  if (bulkDisable) {
+    bulkDisable.addEventListener('click', async () => {
+      if (!confirm('Alle Feeds mit Status "tot" wirklich deaktivieren?')) return;
+      try {
+        const r = await api('/api/sources/bulk-disable-dead', { method: 'POST' });
+        toast(`${r.disabled} Feeds deaktiviert`, 'success');
+        await loadSources();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  const bulkBrowser = document.getElementById('bulk-mark-blocked-browser');
+  if (bulkBrowser) {
+    bulkBrowser.addEventListener('click', async () => {
+      if (!confirm('Alle "geblockt"-Feeds auf Browser-Modus (Puppeteer) umstellen?')) return;
+      try {
+        const r = await api('/api/sources/bulk-mark-blocked-browser', { method: 'POST' });
+        toast(`${r.updated} Feeds auf Browser-Modus umgestellt`, 'success');
+        await loadSources();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+
+  const opmlPreviewBtn = document.getElementById('opml-preview-btn');
+  const opmlImportBtn = document.getElementById('opml-import-btn');
+  const opmlInput = document.getElementById('opml-input');
+  const opmlPreview = document.getElementById('opml-preview');
+
+  if (opmlPreviewBtn) {
+    opmlPreviewBtn.addEventListener('click', async () => {
+      const opml = opmlInput.value.trim();
+      if (!opml) return toast('OPML-Inhalt einfügen', 'error');
+      opmlPreviewBtn.disabled = true;
+      opmlPreview.innerHTML = '<p class="muted">Prüfe Feeds …</p>';
+      try {
+        const r = await api('/api/sources/opml-preview', { method: 'POST', body: JSON.stringify({ opml }) });
+        const rows = (r.previews || []).map(p => {
+          const cls = p.level === 'ok' ? 'opml-row-ok' : p.level === 'warn' ? 'opml-row-warn' : 'opml-row-error';
+          const status = p.status ? `HTTP ${p.status}` : (p.errorClass || 'Fehler');
+          const dup = p.duplicate ? ' <span class="badge outline">bereits vorhanden</span>' : '';
+          return `<div class="opml-row ${cls}">
+            <span class="opml-status">${escapeHtml(status)}</span>
+            <strong>${escapeHtml(p.name)}</strong>${dup}
+            <code class="opml-url">${escapeHtml(p.url)}</code>
+            ${p.responseTimeMs ? `<small>${p.responseTimeMs}ms</small>` : ''}
+            ${p.error ? `<small class="muted">${escapeHtml(p.error.slice(0, 80))}</small>` : ''}
+          </div>`;
+        }).join('');
+        const okCount = (r.previews || []).filter(p => p.level === 'ok').length;
+        const warnCount = (r.previews || []).filter(p => p.level === 'warn').length;
+        const errCount = (r.previews || []).filter(p => p.level === 'error').length;
+        opmlPreview.innerHTML = `<div class="opml-summary">${r.count} Feeds: <span class="opml-ok">${okCount} erreichbar</span>, <span class="opml-warn">${warnCount} 403</span>, <span class="opml-err">${errCount} unerreichbar</span></div>${rows}`;
+        opmlImportBtn.disabled = false;
+      } catch (err) {
+        opmlPreview.innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+      } finally {
+        opmlPreviewBtn.disabled = false;
+      }
+    });
+  }
+
+  if (opmlImportBtn) {
+    opmlImportBtn.addEventListener('click', async () => {
+      const opml = opmlInput.value.trim();
+      if (!opml) return toast('OPML-Inhalt einfügen', 'error');
+      try {
+        const r = await api('/api/sources/opml-import', { method: 'POST', body: JSON.stringify({ opml }) });
+        toast(`${r.added} neue Feeds importiert (gesamt ${r.total})`, 'success');
+        opmlInput.value = '';
+        opmlPreview.innerHTML = '';
+        opmlImportBtn.disabled = true;
+        await loadSources();
+      } catch (err) {
+        toast(err.message, 'error');
+      }
+    });
+  }
 }
 
 async function loadSettingsTab() {

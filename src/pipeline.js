@@ -18,7 +18,18 @@ function applyTags(articleId, article, analysis) {
   return tags;
 }
 
+function summariseFeedHealth() {
+  const all = database.getSourceHealth();
+  const summary = { ok: 0, degraded: 0, blocked: 0, dead: 0, unknown: 0, total: all.length };
+  for (const h of all) {
+    const cls = database.classifyFeedHealth(h);
+    summary[cls] = (summary[cls] || 0) + 1;
+  }
+  return summary;
+}
+
 async function runScan({ from, to }) {
+  const startedAt = Date.now();
   const runId = database.startScanRun(from, to);
   const summary = {
     sourcesScanned: sources.feeds.length,
@@ -125,8 +136,21 @@ async function runScan({ from, to }) {
     }
 
     database.finishScanRun(runId, summary);
-    logger.info(`Scan abgeschlossen`, summary);
-    return summary;
+    const health = summariseFeedHealth();
+    const finalSummary = {
+      ...summary,
+      duration_ms: Date.now() - startedAt,
+      total_feeds: health.total,
+      ok: health.ok,
+      degraded: health.degraded,
+      blocked_403: health.blocked,
+      dead: health.dead,
+      new_articles: summary.articlesAdded,
+      duplicates_removed: summary.duplicatesFound,
+      runId
+    };
+    logger.info(`Scan abgeschlossen`, finalSummary);
+    return finalSummary;
   } catch (err) {
     summary.errors++;
     summary.notes = err.message;
@@ -135,4 +159,4 @@ async function runScan({ from, to }) {
   }
 }
 
-module.exports = { runScan };
+module.exports = { runScan, summariseFeedHealth };

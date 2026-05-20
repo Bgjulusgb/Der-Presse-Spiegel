@@ -113,6 +113,9 @@ function migrate() {
   ensure('content_type', 'content_type TEXT');
   ensure('feed_type', 'feed_type TEXT');
   ensure('enabled', 'enabled INTEGER DEFAULT 1');
+  ensure('last_error_class', 'last_error_class TEXT');
+  ensure('last_status_code', 'last_status_code INTEGER');
+  ensure('last_via_browser', 'last_via_browser INTEGER DEFAULT 0');
 }
 
 migrate();
@@ -205,12 +208,15 @@ const stmts = {
     WHERE id = @id
   `),
   upsertHealthSuccess: db.prepare(`
-    INSERT INTO source_health (source, last_success, consecutive_failures, etag, last_modified, last_response_ms, last_item_count, content_type, feed_type)
-    VALUES (@source, CURRENT_TIMESTAMP, 0, @etag, @last_modified, @response_ms, @item_count, @content_type, @feed_type)
+    INSERT INTO source_health (source, last_success, consecutive_failures, etag, last_modified, last_response_ms, last_item_count, content_type, feed_type, last_error_class, last_status_code, last_via_browser)
+    VALUES (@source, CURRENT_TIMESTAMP, 0, @etag, @last_modified, @response_ms, @item_count, @content_type, @feed_type, NULL, @status_code, @via_browser)
     ON CONFLICT(source) DO UPDATE SET
       last_success = CURRENT_TIMESTAMP,
       consecutive_failures = 0,
       last_error = NULL,
+      last_error_class = NULL,
+      last_status_code = excluded.last_status_code,
+      last_via_browser = excluded.last_via_browser,
       etag = COALESCE(excluded.etag, source_health.etag),
       last_modified = COALESCE(excluded.last_modified, source_health.last_modified),
       last_response_ms = excluded.last_response_ms,
@@ -219,12 +225,14 @@ const stmts = {
       feed_type = excluded.feed_type
   `),
   upsertHealthFailure: db.prepare(`
-    INSERT INTO source_health (source, last_failure, consecutive_failures, last_error, last_response_ms)
-    VALUES (@source, CURRENT_TIMESTAMP, 1, @error, @response_ms)
+    INSERT INTO source_health (source, last_failure, consecutive_failures, last_error, last_response_ms, last_error_class, last_status_code)
+    VALUES (@source, CURRENT_TIMESTAMP, 1, @error, @response_ms, @error_class, @status_code)
     ON CONFLICT(source) DO UPDATE SET
       last_failure = CURRENT_TIMESTAMP,
       consecutive_failures = consecutive_failures + 1,
       last_error = @error,
+      last_error_class = @error_class,
+      last_status_code = @status_code,
       last_response_ms = excluded.last_response_ms
   `),
   getHealth: db.prepare('SELECT * FROM source_health WHERE source = ?'),
@@ -345,7 +353,9 @@ function recordSourceSuccess(source, info = {}) {
     response_ms: info.responseTimeMs || 0,
     item_count: info.itemCount || 0,
     content_type: info.contentType || null,
-    feed_type: info.feedType || null
+    feed_type: info.feedType || null,
+    status_code: info.statusCode || null,
+    via_browser: info.viaBrowser ? 1 : 0
   });
 }
 
@@ -353,8 +363,20 @@ function recordSourceFailure(source, error, info = {}) {
   stmts.upsertHealthFailure.run({
     source,
     error: String(error).slice(0, 500),
-    response_ms: info.responseTimeMs || 0
+    response_ms: info.responseTimeMs || 0,
+    error_class: info.errorClass || null,
+    status_code: info.statusCode || null
   });
+}
+
+function classifyFeedHealth(health) {
+  if (!health) return 'unknown';
+  if (health.last_error_class === 'forbidden') return 'blocked';
+  if (health.last_error_class === 'gone' || health.last_error_class === 'notfound') return 'dead';
+  if ((health.consecutive_failures || 0) >= 4) return 'dead';
+  if ((health.consecutive_failures || 0) >= 1) return 'degraded';
+  if (health.last_success) return 'ok';
+  return 'unknown';
 }
 
 function getSourceHealth(source) {
@@ -459,6 +481,7 @@ module.exports = {
   finishScanRun,
   recordSourceSuccess,
   recordSourceFailure,
+  classifyFeedHealth,
   getSourceHealth,
   setSourceEnabled,
   addTag,

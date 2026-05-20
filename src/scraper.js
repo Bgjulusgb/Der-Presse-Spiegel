@@ -329,9 +329,10 @@ async function fetchRssFeed(feed) {
 
   if (result.status === 'error') {
     database.recordSourceFailure(feed.name, result.error, {
-      responseTimeMs: result.responseTimeMs
+      responseTimeMs: result.responseTimeMs,
+      errorClass: result.errorClass || null
     });
-    logger.error(`RSS fehlgeschlagen: ${feed.name}: ${result.error}`);
+    logger.error(`RSS fehlgeschlagen: ${feed.name} (${result.errorClass || 'unknown'}): ${result.error}`);
     return [];
   }
 
@@ -341,9 +342,11 @@ async function fetchRssFeed(feed) {
     responseTimeMs: result.responseTimeMs,
     itemCount: result.items.length,
     contentType: result.contentType,
-    feedType: 'rss/atom'
+    feedType: result.viaBrowser || result.viaAutoBrowserFallback ? 'rss/atom (browser)' : 'rss/atom',
+    viaBrowser: result.viaBrowser || result.viaAutoBrowserFallback || false
   });
-  logger.info(`RSS: ${feed.name} -> ${result.items.length} Eintraege (${result.responseTimeMs}ms)`);
+  const viaTag = result.viaAutoBrowserFallback ? ' [Auto-Browser-Fallback]' : result.viaBrowser ? ' [Browser]' : '';
+  logger.info(`RSS: ${feed.name} -> ${result.items.length} Eintraege (${result.responseTimeMs}ms)${viaTag}`);
 
   return result.items.map(item => ({
     title: item.title,
@@ -439,6 +442,21 @@ async function fetchArticleDetails(item) {
   }
 }
 
+function shouldAutoSkip(h, fallbackThreshold) {
+  if (!h) return false;
+  const failures = h.consecutive_failures || 0;
+  const cls = h.last_error_class;
+  if (cls === 'forbidden') return false;
+  if (cls === 'gone' || cls === 'notfound' || cls === 'dns') {
+    return failures >= 5;
+  }
+  if (cls === 'timeout' || cls === 'socket') {
+    return failures >= 10;
+  }
+  if (fallbackThreshold > 0 && failures >= fallbackThreshold) return true;
+  return false;
+}
+
 async function gatherFromFeeds(feedsConfig) {
   const list = feedsConfig || sources.feeds || [];
   const autoDisableAfter = settings.scraping.auto_disable_after_failures || 0;
@@ -447,8 +465,9 @@ async function gatherFromFeeds(feedsConfig) {
     const h = database.getSourceHealth(f.name);
     if (!h) return true;
     if (h.enabled === 0) return false;
-    if (autoDisableAfter > 0 && h.consecutive_failures >= autoDisableAfter) {
-      logger.warn(`Feed automatisch uebersprungen (${h.consecutive_failures}x Fehler): ${f.name}`);
+    if (shouldAutoSkip(h, autoDisableAfter)) {
+      const reason = h.last_error_class || 'wiederholte Fehler';
+      logger.warn(`Feed automatisch uebersprungen (${h.consecutive_failures}x ${reason}): ${f.name}`);
       return false;
     }
     return true;
