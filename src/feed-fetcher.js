@@ -25,36 +25,190 @@ if (process.env.HTTPS_PROXY || process.env.HTTP_PROXY) {
   catch (e) { logger.warn(`Proxy konnte nicht gesetzt werden: ${e.message}`); }
 }
 
-const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+const BROWSER_PROFILES = [
+  {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, application/json;q=0.9, text/html;q=0.8, */*;q=0.5',
+    'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Windows"',
+    'Upgrade-Insecure-Requests': '1',
+    'DNT': '1'
+  },
+  {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
+    'Accept': 'text/xml,application/xml,application/xhtml+xml,application/rss+xml,text/html;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'de-DE,de;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Upgrade-Insecure-Requests': '1'
+  },
+  {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+    'Accept': 'application/rss+xml, application/xml;q=0.9, text/html;q=0.8, */*;q=0.5',
+    'Accept-Language': 'de,en-US;q=0.7,en;q=0.3',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'DNT': '1'
+  },
+  {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
+    'Accept': 'application/rss+xml, application/xml;q=0.9, text/html;q=0.8, */*;q=0.5',
+    'Accept-Language': 'de,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1'
+  },
+  {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, */*;q=0.5',
+    'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"macOS"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Upgrade-Insecure-Requests': '1'
+  }
 ];
+
+const USER_AGENTS = BROWSER_PROFILES.map(p => p['User-Agent']);
+
+function pickProfile(attempt = 0) {
+  return BROWSER_PROFILES[attempt % BROWSER_PROFILES.length];
+}
 
 function pickUa(attempt = 0) {
   return USER_AGENTS[attempt % USER_AGENTS.length];
 }
 
-function buildHeaders({ ua, etag, lastModified, extra = {} } = {}) {
-  return {
-    'user-agent': ua || pickUa(),
-    'accept': 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, application/json;q=0.7, text/html;q=0.6, */*;q=0.5',
-    'accept-language': 'de-DE,de;q=0.9,en-US;q=0.7,en;q=0.6',
-    'accept-encoding': 'gzip, deflate, br',
-    'cache-control': 'no-cache',
-    'pragma': 'no-cache',
-    'sec-fetch-dest': 'document',
-    'sec-fetch-mode': 'navigate',
-    'sec-fetch-site': 'none',
-    'sec-fetch-user': '?1',
-    'upgrade-insecure-requests': '1',
-    'dnt': '1',
-    ...(etag && { 'if-none-match': etag }),
-    ...(lastModified && { 'if-modified-since': lastModified }),
-    ...extra
-  };
+const ARD_DOMAINS = new Map([
+  ['br.de', 'https://www.br.de/'],
+  ['br-klassik.de', 'https://www.br-klassik.de/'],
+  ['mdr.de', 'https://www.mdr.de/'],
+  ['swr.de', 'https://www.swr.de/'],
+  ['wdr.de', 'https://www1.wdr.de/'],
+  ['rbb24.de', 'https://www.rbb24.de/'],
+  ['rbb-online.de', 'https://www.rbb-online.de/'],
+  ['ndr.de', 'https://www.ndr.de/'],
+  ['sr.de', 'https://www.sr.de/'],
+  ['ardmediathek.de', 'https://www.ardmediathek.de/'],
+  ['daserste.de', 'https://www.daserste.de/'],
+  ['hr.de', 'https://www.hr.de/'],
+  ['hr2.de', 'https://www.hr2.de/'],
+  ['deutschlandfunk.de', 'https://www.deutschlandfunk.de/'],
+  ['deutschlandfunkkultur.de', 'https://www.deutschlandfunkkultur.de/'],
+  ['deutschlandfunknova.de', 'https://www.deutschlandfunknova.de/'],
+  ['3sat.de', 'https://www.3sat.de/'],
+  ['zdf.de', 'https://www.zdf.de/']
+]);
+
+function getReferer(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    for (const [domain, referer] of ARD_DOMAINS) {
+      if (host === domain || host.endsWith('.' + domain)) return referer;
+    }
+  } catch { /* invalid url */ }
+  return null;
+}
+
+function buildHeaders({ ua, etag, lastModified, profile, url, extra = {} } = {}) {
+  const p = profile || pickProfile();
+  const headers = {};
+  for (const [k, v] of Object.entries(p)) headers[k.toLowerCase()] = v;
+  if (ua) headers['user-agent'] = ua;
+  if (etag) headers['if-none-match'] = etag;
+  if (lastModified) headers['if-modified-since'] = lastModified;
+  if (url) {
+    const referer = getReferer(url);
+    if (referer) headers['referer'] = referer;
+  }
+  for (const [k, v] of Object.entries(extra)) headers[k.toLowerCase()] = v;
+  return headers;
+}
+
+const DOMAIN_FAILURE_WINDOW_MS = 60_000;
+const DOMAIN_COOLDOWN_MS = 5 * 60_000;
+const DOMAIN_403_THRESHOLD = 3;
+
+const domainFailures = new Map();
+
+function getDomain(url) {
+  try { return new URL(url).hostname.toLowerCase(); }
+  catch { return null; }
+}
+
+function isDomainInCooldown(url) {
+  const domain = getDomain(url);
+  if (!domain) return false;
+  const entry = domainFailures.get(domain);
+  if (!entry || !entry.cooldownUntil) return false;
+  if (Date.now() < entry.cooldownUntil) return true;
+  entry.cooldownUntil = 0;
+  entry.failures = [];
+  return false;
+}
+
+function recordDomain403(url) {
+  const domain = getDomain(url);
+  if (!domain) return;
+  const now = Date.now();
+  let entry = domainFailures.get(domain);
+  if (!entry) {
+    entry = { failures: [], cooldownUntil: 0 };
+    domainFailures.set(domain, entry);
+  }
+  entry.failures = entry.failures.filter(ts => now - ts < DOMAIN_FAILURE_WINDOW_MS);
+  entry.failures.push(now);
+  if (entry.failures.length >= DOMAIN_403_THRESHOLD && !entry.cooldownUntil) {
+    entry.cooldownUntil = now + DOMAIN_COOLDOWN_MS;
+    logger.warn(`Domain-Cooldown aktiviert fuer ${domain} (${entry.failures.length}x 403 in ${DOMAIN_FAILURE_WINDOW_MS / 1000}s), ` +
+      `naechster Versuch fruehestens in ${Math.round(DOMAIN_COOLDOWN_MS / 60000)} Minuten`);
+  }
+}
+
+function recordDomainSuccess(url) {
+  const domain = getDomain(url);
+  if (!domain) return;
+  const entry = domainFailures.get(domain);
+  if (entry) {
+    entry.failures = [];
+    entry.cooldownUntil = 0;
+  }
+}
+
+function getDomainFailureStats() {
+  const stats = {};
+  for (const [domain, entry] of domainFailures.entries()) {
+    stats[domain] = {
+      recentFailures: entry.failures.length,
+      cooldownUntil: entry.cooldownUntil || null,
+      inCooldown: entry.cooldownUntil > Date.now()
+    };
+  }
+  return stats;
+}
+
+function clearDomainFailures() {
+  domainFailures.clear();
 }
 
 const lastRequestByDomain = new Map();
@@ -107,7 +261,7 @@ async function decompressBody(body, contentEncoding) {
 }
 
 async function fetchRaw(url, { headers = {}, timeout, etag, lastModified, attempt = 0, maxRedirects = 6 } = {}) {
-  const reqHeaders = buildHeaders({ ua: pickUa(attempt), etag, lastModified, extra: headers });
+  const reqHeaders = buildHeaders({ profile: pickProfile(attempt), etag, lastModified, url, extra: headers });
   await throttle(url);
 
   const t = timeout || settings.scraping.request_timeout_ms || 20000;
@@ -158,28 +312,54 @@ async function fetchRaw(url, { headers = {}, timeout, etag, lastModified, attemp
   throw new Error(`Zu viele Redirects (${maxRedirects})`);
 }
 
+function classifyError(err) {
+  if (!err) return 'unknown';
+  if (err.message && /HTTP 403/.test(err.message)) return 'forbidden';
+  if (err.message && /HTTP 404/.test(err.message)) return 'notfound';
+  if (err.message && /HTTP 410/.test(err.message)) return 'gone';
+  if (err.message && /HTTP 5\d\d/.test(err.message)) return 'server';
+  if (err.message && /HTTP 429/.test(err.message)) return 'ratelimit';
+  if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') return 'dns';
+  if (err.code === 'ETIMEDOUT' || err.name === 'AbortError' || err.code === 'UND_ERR_CONNECT_TIMEOUT') return 'timeout';
+  if (err.code === 'UND_ERR_SOCKET' || err.code === 'ECONNRESET') return 'socket';
+  return 'unknown';
+}
+
 async function fetchText(url, opts = {}) {
   const maxRetries = settings.scraping.max_retries || 3;
   const backoffBase = settings.scraping.retry_backoff_ms || 2000;
   let lastErr = null;
 
+  if (isDomainInCooldown(url)) {
+    const err = new Error(`Domain im Cooldown: ${getDomain(url)}`);
+    err.code = 'DOMAIN_COOLDOWN';
+    err.errorClass = 'cooldown';
+    throw err;
+  }
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetchRaw(url, { ...opts, attempt });
-      if (res.status === 304) return { status: 304, text: null, ...res };
+      if (res.status === 304) {
+        recordDomainSuccess(url);
+        return { status: 304, text: null, ...res };
+      }
+      if (res.status === 403) throw new Error(`HTTP 403 fuer ${url}`);
       if (res.status >= 400) throw new Error(`HTTP ${res.status} fuer ${url}`);
       const encoding = detectEncoding(res.buffer, res.contentType);
       const text = decode(res.buffer, encoding);
+      recordDomainSuccess(url);
       return { ...res, text, encoding };
     } catch (err) {
       lastErr = err;
+      err.errorClass = err.errorClass || classifyError(err);
+      if (err.errorClass === 'forbidden') {
+        recordDomain403(url);
+        break;
+      }
       const isLast = attempt === maxRetries;
-      const retryable = err.code === 'UND_ERR_SOCKET' || err.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-                        err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT' ||
-                        err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN' ||
-                        err.name === 'AbortError' ||
-                        (err.message && (err.message.includes('HTTP 5') || err.message.includes('HTTP 429')));
-      logger.warn(`Fetch fehlgeschlagen (${attempt + 1}/${maxRetries + 1}): ${err.message}`, { url });
+      const retryable = ['timeout', 'socket', 'dns', 'server', 'ratelimit'].includes(err.errorClass);
+      logger.warn(`Fetch fehlgeschlagen (${attempt + 1}/${maxRetries + 1}, ${err.errorClass}): ${err.message}`, { url });
       if (isLast || !retryable) break;
       await sleep(backoffBase * Math.pow(2, attempt));
     }
@@ -315,7 +495,20 @@ function cleanUrl(url) {
   return url.trim().replace(/&amp;/g, '&');
 }
 
-async function fetchFeed(feed, { etag, lastModified } = {}) {
+async function tryPuppeteerFallback(feed, reason) {
+  try {
+    const { fetchFeedViaBrowser } = require('./puppeteer-fetcher');
+    logger.info(`Puppeteer-Fallback fuer ${feed.url} (${reason})`);
+    const res = await fetchFeedViaBrowser(feed);
+    if (res.status === 'ok') recordDomainSuccess(feed.url);
+    return res;
+  } catch (err) {
+    logger.warn(`Puppeteer-Fallback nicht verfuegbar: ${err.message}`);
+    return null;
+  }
+}
+
+async function fetchFeed(feed, { etag, lastModified, allowAutoBrowserFallback = true } = {}) {
   const start = Date.now();
   try {
     if (feed.kind === 'google-news') {
@@ -325,6 +518,11 @@ async function fetchFeed(feed, { etag, lastModified } = {}) {
     if (feed.kind === 'bing-news') {
       const { fetchBingNewsFeed } = require('./news-search');
       return await fetchBingNewsFeed(feed);
+    }
+
+    if (feed.use_browser === true) {
+      const browserRes = await tryPuppeteerFallback(feed, 'use_browser=true');
+      if (browserRes && browserRes.status === 'ok') return browserRes;
     }
 
     const res = await fetchText(feed.url, { etag, lastModified });
@@ -354,8 +552,27 @@ async function fetchFeed(feed, { etag, lastModified } = {}) {
       contentType: res.contentType
     };
   } catch (err) {
-    return { status: 'error', error: err.message, items: [], responseTimeMs: Date.now() - start };
+    const errorClass = err.errorClass || classifyError(err);
+    if (errorClass === 'forbidden' && allowAutoBrowserFallback && !feed.use_browser) {
+      const fallback = await tryPuppeteerFallback(feed, 'HTTP 403');
+      if (fallback && fallback.status === 'ok') {
+        return { ...fallback, viaAutoBrowserFallback: true };
+      }
+      if (fallback) {
+        return { ...fallback, viaAutoBrowserFallback: true, originalError: err.message };
+      }
+    }
+    return { status: 'error', error: err.message, errorClass, items: [], responseTimeMs: Date.now() - start };
   }
+}
+
+function findLatestItemDate(items) {
+  let latest = null;
+  for (const it of items || []) {
+    const d = it.publishedDate ? new Date(it.publishedDate) : null;
+    if (d && !isNaN(d.getTime()) && (!latest || d > latest)) latest = d;
+  }
+  return latest;
 }
 
 async function testFeed(feedUrl, name) {
@@ -364,34 +581,82 @@ async function testFeed(feedUrl, name) {
     if (feedUrl && feedUrl.startsWith('google-news:')) {
       const { fetchGoogleNewsFeed } = require('./news-search');
       const result = await fetchGoogleNewsFeed({ name, queries: [feedUrl.slice('google-news:'.length)], priority: 80 });
+      const latest = findLatestItemDate(result.items);
       return {
         ok: result.status === 'ok',
         type: 'google-news',
         itemCount: result.items.length,
+        latestItemDate: latest ? latest.toISOString() : null,
         sample: result.items.slice(0, 3).map(i => ({ title: i.title, url: i.url, published: i.publishedDate })),
         responseTimeMs: Date.now() - start,
         title: 'Google News',
+        viaBrowser: false,
         error: result.error
       };
     }
-    const res = await fetchText(feedUrl, { timeout: 10000 });
-    let parsed = null, feedType = 'unknown';
-    if (looksLikeJsonFeed(res.text)) { parsed = parseJsonFeed(res.text); feedType = 'json'; }
-    else if (looksLikeAtom(res.text)) { parsed = await parseFeedXml(res.text); feedType = 'atom'; }
-    else if (looksLikeRdf(res.text)) { parsed = await parseFeedXml(res.text); feedType = 'rdf'; }
-    else if (looksLikeRss(res.text)) { parsed = await parseFeedXml(res.text); feedType = 'rss'; }
-    else throw new Error('Inhalt ist kein erkennbarer Feed');
+    let res, viaBrowser = false, parsed = null, feedType = 'unknown';
+    let statusCode = null;
+    try {
+      res = await fetchText(feedUrl, { timeout: 10000 });
+      statusCode = res.status;
+      if (looksLikeJsonFeed(res.text)) { parsed = parseJsonFeed(res.text); feedType = 'json'; }
+      else if (looksLikeAtom(res.text)) { parsed = await parseFeedXml(res.text); feedType = 'atom'; }
+      else if (looksLikeRdf(res.text)) { parsed = await parseFeedXml(res.text); feedType = 'rdf'; }
+      else if (looksLikeRss(res.text)) { parsed = await parseFeedXml(res.text); feedType = 'rss'; }
+      else throw new Error('Inhalt ist kein erkennbarer Feed');
+    } catch (firstErr) {
+      const cls = firstErr.errorClass || classifyError(firstErr);
+      const m = firstErr.message && firstErr.message.match(/HTTP (\d+)/);
+      if (m) statusCode = parseInt(m[1], 10);
+      if (cls === 'forbidden') {
+        try {
+          const { fetchFeedViaBrowser } = require('./puppeteer-fetcher');
+          const browserRes = await fetchFeedViaBrowser({ name, url: feedUrl, priority: 50 });
+          if (browserRes.status === 'ok') {
+            viaBrowser = true;
+            parsed = { title: browserRes.title, items: browserRes.items };
+            feedType = 'rss/atom (browser)';
+            statusCode = 200;
+          } else {
+            throw new Error(browserRes.error || 'Browser-Fallback fehlgeschlagen');
+          }
+        } catch (puErr) {
+          return {
+            ok: false,
+            error: firstErr.message,
+            errorClass: cls,
+            statusCode,
+            viaBrowser: false,
+            puppeteerError: puErr.message,
+            responseTimeMs: Date.now() - start
+          };
+        }
+      } else {
+        return {
+          ok: false,
+          error: firstErr.message,
+          errorClass: cls,
+          statusCode,
+          viaBrowser: false,
+          responseTimeMs: Date.now() - start
+        };
+      }
+    }
 
+    const latest = findLatestItemDate(parsed.items);
     return {
       ok: true,
-      status: res.status,
+      status: statusCode,
+      statusCode,
       type: feedType,
       title: parsed.title,
       itemCount: parsed.items.length,
+      latestItemDate: latest ? latest.toISOString() : null,
       sample: parsed.items.slice(0, 3).map(i => ({ title: i.title, url: i.url, published: i.publishedDate })),
       responseTimeMs: Date.now() - start,
-      contentType: res.contentType,
-      encoding: res.encoding
+      contentType: res ? res.contentType : null,
+      encoding: res ? res.encoding : null,
+      viaBrowser
     };
   } catch (err) {
     return { ok: false, error: err.message, responseTimeMs: Date.now() - start };
@@ -407,6 +672,14 @@ module.exports = {
   parseJsonFeed,
   detectEncoding,
   decode,
+  classifyError,
   USER_AGENTS,
-  buildHeaders
+  BROWSER_PROFILES,
+  buildHeaders,
+  getReferer,
+  isDomainInCooldown,
+  recordDomain403,
+  recordDomainSuccess,
+  getDomainFailureStats,
+  clearDomainFailures
 };

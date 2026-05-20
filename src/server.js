@@ -404,11 +404,15 @@ function buildApp() {
       const sources = loadJson('sources.json');
       const health = database.getSourceHealth();
       const healthMap = new Map(health.map(h => [h.source, h]));
-      const feeds = (sources.feeds || []).map(f => ({
-        ...f,
-        health: healthMap.get(f.name) || null
-      }));
-      res.json({ ...sources, feeds });
+      const stats = { ok: 0, degraded: 0, blocked: 0, dead: 0, unknown: 0, total: 0 };
+      const feeds = (sources.feeds || []).map(f => {
+        const h = healthMap.get(f.name) || null;
+        const status = database.classifyFeedHealth(h);
+        stats[status] = (stats[status] || 0) + 1;
+        stats.total++;
+        return { ...f, health: h, healthStatus: status };
+      });
+      res.json({ ...sources, feeds, stats });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -433,6 +437,40 @@ function buildApp() {
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.post('/api/sources/bulk-disable-dead', (req, res) => {
+    try {
+      const health = database.getSourceHealth();
+      let count = 0;
+      for (const h of health) {
+        if (database.classifyFeedHealth(h) === 'dead' && h.enabled !== 0) {
+          database.setSourceEnabled(h.source, false);
+          count++;
+        }
+      }
+      res.json({ ok: true, disabled: count });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/sources/bulk-mark-blocked-browser', (req, res) => {
+    try {
+      const sources = loadJson('sources.json');
+      const health = database.getSourceHealth();
+      const blockedNames = new Set(
+        health.filter(h => database.classifyFeedHealth(h) === 'blocked').map(h => h.source)
+      );
+      let count = 0;
+      const feeds = (sources.feeds || []).map(f => {
+        if (blockedNames.has(f.name) && !f.use_browser) {
+          count++;
+          return { ...f, use_browser: true, retry_delay: f.retry_delay || 3000 };
+        }
+        return f;
+      });
+      saveJson('sources.json', { ...sources, feeds });
+      res.json({ ok: true, updated: count });
+    } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
   app.get('/api/sources/opml', (req, res) => {
@@ -460,6 +498,51 @@ function buildApp() {
       res.setHeader('Content-Disposition', `attachment; filename="pressespiegel-feeds.opml"`);
       res.send(opml);
     } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/sources/opml-preview', async (req, res) => {
+    try {
+      const xml = req.body && req.body.opml;
+      if (!xml) return res.status(400).json({ error: 'opml erforderlich' });
+      const xml2js = require('xml2js');
+      const parsed = await new xml2js.Parser({ explicitArray: false, mergeAttrs: true }).parseStringPromise(xml);
+      const outlines = [];
+      const walk = (node) => {
+        if (!node) return;
+        const items = Array.isArray(node) ? node : [node];
+        for (const it of items) {
+          if (it.xmlUrl) outlines.push(it);
+          if (it.outline) walk(it.outline);
+        }
+      };
+      walk(parsed.opml && parsed.opml.body && parsed.opml.body.outline);
+      const current = loadJson('sources.json');
+      const existing = new Set((current.feeds || []).map(f => f.url));
+      const { fetchRaw, classifyError } = require('./feed-fetcher');
+      const pLimit = require('p-limit');
+      const limit = pLimit(4);
+      const previews = await Promise.all(outlines.map(o => limit(async () => {
+        const name = o.title || o.text || (() => { try { return new URL(o.xmlUrl).hostname; } catch { return o.xmlUrl; } })();
+        const url = o.xmlUrl;
+        const isDuplicate = existing.has(url);
+        const start = Date.now();
+        try {
+          const r = await fetchRaw(url, { timeout: 5000, maxRedirects: 2 });
+          const ms = Date.now() - start;
+          let level = 'ok';
+          if (r.status === 403) level = 'warn';
+          else if (r.status >= 400) level = 'error';
+          return { name, url, status: r.status, responseTimeMs: ms, level, duplicate: isDuplicate };
+        } catch (err) {
+          const cls = classifyError(err);
+          const level = cls === 'forbidden' ? 'warn' : 'error';
+          return { name, url, status: null, level, error: err.message, errorClass: cls, duplicate: isDuplicate };
+        }
+      })));
+      res.json({ ok: true, count: previews.length, previews });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.post('/api/sources/opml-import', async (req, res) => {
@@ -563,6 +646,18 @@ function buildApp() {
         broadcast('scan-start', { scanId, from: from.toISOString(), to: to.toISOString() });
         const summary = await runScan({ from, to });
         broadcast('scan-complete', { scanId, summary });
+        broadcast('scan_summary', {
+          scanId,
+          type: 'scan_summary',
+          total_feeds: summary.total_feeds,
+          ok: summary.ok,
+          degraded: summary.degraded,
+          blocked_403: summary.blocked_403,
+          dead: summary.dead,
+          new_articles: summary.new_articles,
+          duplicates_removed: summary.duplicates_removed,
+          duration_ms: summary.duration_ms
+        });
       } catch (err) {
         broadcast('scan-error', { scanId, error: err.message });
       } finally {

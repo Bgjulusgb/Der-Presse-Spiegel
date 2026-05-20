@@ -89,3 +89,53 @@ test('GET /api/articles?lang=de filtert konsistent', async () => {
     assert.equal(a.language, 'de', `${a.title}: language=${a.language}`);
   }
 });
+
+test('GET /api/sources liefert stats und healthStatus pro Feed', async () => {
+  const { status, json } = await get('/api/sources');
+  assert.equal(status, 200);
+  assert.ok(json.stats);
+  assert.ok(typeof json.stats.ok === 'number');
+  assert.ok(typeof json.stats.degraded === 'number');
+  assert.ok(typeof json.stats.blocked === 'number');
+  assert.ok(typeof json.stats.dead === 'number');
+  assert.ok(typeof json.stats.total === 'number');
+  if (json.feeds.length > 0) {
+    assert.ok(json.feeds[0].healthStatus);
+  }
+});
+
+async function post(url, body = {}) {
+  const res = await fetch(baseUrl() + url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return { status: res.status, json: await res.json() };
+}
+
+test('POST /api/sources/bulk-disable-dead antwortet ok', async () => {
+  const { status, json } = await post('/api/sources/bulk-disable-dead');
+  assert.equal(status, 200);
+  assert.ok(json.ok);
+  assert.ok(typeof json.disabled === 'number');
+});
+
+test('POST /api/sources/bulk-mark-blocked-browser antwortet ok', async () => {
+  const { status, json } = await post('/api/sources/bulk-mark-blocked-browser');
+  assert.equal(status, 200);
+  assert.ok(json.ok);
+  assert.ok(typeof json.updated === 'number');
+});
+
+test('POST /api/sources/opml-preview ohne opml liefert 400', async () => {
+  const { status, json } = await post('/api/sources/opml-preview', {});
+  assert.equal(status, 400);
+  assert.ok(json.error);
+});
+
+test('POST /api/sources/opml-preview mit invaliderem XML antwortet trotzdem strukturiert', async () => {
+  const { status, json } = await post('/api/sources/opml-preview', { opml: '<opml><body></body></opml>' });
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(json.previews));
+  assert.equal(json.count, 0);
+});

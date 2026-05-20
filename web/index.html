@@ -275,6 +275,14 @@
       </div>
     </header>
 
+    <div class="card" id="sources-health-card">
+      <div class="health-stats" id="health-stats" role="toolbar" aria-label="Feed-Health-Filter"></div>
+      <div class="bulk-actions">
+        <button class="btn btn-secondary" id="bulk-disable-dead">Alle toten Feeds deaktivieren</button>
+        <button class="btn btn-secondary" id="bulk-mark-blocked-browser">Alle geblockt auf Browser-Modus</button>
+      </div>
+    </div>
+
     <div class="card">
       <h2>Neue Quelle hinzufügen</h2>
       <div class="form-row">
@@ -283,6 +291,17 @@
         <input type="number" id="new-source-priority" placeholder="Prio (1-100)" min="1" max="100" value="50">
         <button class="btn" id="add-source">Hinzufügen</button>
       </div>
+    </div>
+
+    <div class="card" id="opml-card">
+      <h2>OPML-Import</h2>
+      <p class="muted">OPML-Datei (z. B. Export aus Feedly/Inoreader) hier einfügen. Eine Vorschau prüft jeden Feed per HEAD-Request.</p>
+      <textarea id="opml-input" placeholder="OPML-XML einfügen…" rows="6" style="width:100%; font-family: monospace; font-size: 12px;"></textarea>
+      <div class="form-row" style="margin-top:8px;">
+        <button class="btn" id="opml-preview-btn">Vorschau prüfen</button>
+        <button class="btn btn-primary" id="opml-import-btn" disabled>Importieren</button>
+      </div>
+      <div id="opml-preview" style="margin-top:8px;"></div>
     </div>
 
     <div id="sources-list" class="sources-list"></div>
