@@ -52,6 +52,14 @@ async function runScan({ from, to }) {
     const enriched = await enrichItems(rssItems, { from, to });
     logger.info(`Angereichert: ${enriched.length} Artikel im Zeitraum`);
 
+    // Sort enriched articles by date (newest first) so dedup processes recent items first.
+    // This ensures the freshest version of a duplicated story wins by default.
+    enriched.sort((a, b) => {
+      const ta = a.publishedDate ? new Date(a.publishedDate).getTime() : 0;
+      const tb = b.publishedDate ? new Date(b.publishedDate).getTime() : 0;
+      return tb - ta;
+    });
+
     const lookbackFrom = new Date(from);
     lookbackFrom.setDate(lookbackFrom.getDate() - 30);
     const existing = database.getRecentForDedup(lookbackFrom);

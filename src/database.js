@@ -3,56 +3,20 @@
 const fs = require('fs');
 const path = require('path');
 
-let Database;
-try {
-  Database = require('better-sqlite3');
-} catch (err) {
-  const msg = String((err && err.message) || err);
-  const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
-  const isWin = process.platform === 'win32';
-  if (/bindings|better_sqlite3\.node|NODE_MODULE_VERSION/i.test(msg)) {
-    const bar = '═'.repeat(70);
-    console.error(`\n${bar}`);
-    console.error('  Native Module "better-sqlite3" konnte nicht geladen werden.');
-    console.error(bar);
-    console.error(
-      `  Plattform: ${process.platform}-${process.arch}, Node v${process.versions.node} (ABI ${process.versions.modules})\n`
-    );
-    console.error('  Loesung 1 — Neuinstallation (am schnellsten):');
-    if (isWin) {
-      console.error('     rmdir /s /q node_modules');
-      console.error('     del package-lock.json');
-      console.error('     npm install');
-    } else {
-      console.error('     rm -rf node_modules package-lock.json');
-      console.error('     npm install');
-    }
-    console.error('     oder einfach:  npm run fix-sqlite:clean\n');
-    console.error('  Loesung 2 — Aus Quellcode bauen (braucht Build-Tools):');
-    console.error('     npm run fix-sqlite');
-    if (isWin) {
-      console.error('     Windows: Visual Studio Build Tools 2022 + Python 3.x installieren');
-      console.error('     https://visualstudio.microsoft.com/visual-cpp-build-tools/\n');
-    } else {
-      console.error('');
-    }
-    console.error('  Loesung 3 — Node-Version pruefen:');
-    if (nodeMajor < 24) {
-      console.error(
-        `     Node v${process.versions.node} ist zu alt — Node 24 LTS oder neuer noetig.`
-      );
-    } else if (nodeMajor > 26) {
-      console.error(`     Node v${process.versions.node} ist sehr neu. Auf Node 24 LTS wechseln.`);
-    } else {
-      console.error(`     Node v${process.versions.node} sollte funktionieren.`);
-    }
-    console.error('     Download: https://nodejs.org/de/download/\n');
-    console.error('  Vollstaendige Diagnose:  npm run doctor');
-    console.error(`${bar}\n`);
-    process.exit(1);
-  }
-  throw err;
-}
+// Suppress the experimental warning for node:sqlite on Node 22 (stable in Node 24+).
+const origEmitWarning = process.emitWarning;
+process.emitWarning = function (warning, ...rest) {
+  const msg = typeof warning === 'string' ? warning : warning && warning.message;
+  if (msg && /SQLite is an experimental feature/i.test(msg)) return;
+  return origEmitWarning.call(process, warning, ...rest);
+};
+
+// node:sqlite is built into Node.js 22.5+ (stable and unflagged in Node 24+).
+// No native compilation required — works on all platforms without build tools.
+const { DatabaseSync } = require('node:sqlite');
+
+// Restore process.emitWarning so other modules' warnings still surface.
+process.emitWarning = origEmitWarning;
 
 const logger = require('./logger');
 const { settings } = require('./config');
@@ -64,9 +28,9 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const db = new DatabaseSync(dbPath);
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA foreign_keys = ON');
 
 function migrate() {
   db.exec(`
@@ -321,7 +285,7 @@ function insertArticle(article) {
     const result = stmts.insertArticle.run(row);
     return { id: result.lastInsertRowid, inserted: true };
   } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (err.code === 'ERR_SQLITE_ERROR' && err.message.includes('UNIQUE constraint failed')) {
       const existing = stmts.findByNormalizedUrl.get(article.urlNormalized);
       return { id: existing.id, inserted: false };
     }
@@ -462,7 +426,8 @@ function addTag(articleId, tag) {
       tag.trim().toLowerCase()
     );
   } catch (err) {
-    if (err.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw err;
+    if (!(err.code === 'ERR_SQLITE_ERROR' && err.message.includes('UNIQUE constraint failed')))
+      throw err;
   }
 }
 
@@ -539,7 +504,21 @@ function deleteSavedSearch(name) {
 }
 
 function transaction(fn) {
-  return db.transaction(fn);
+  return (...args) => {
+    db.exec('BEGIN');
+    try {
+      const result = fn(...args);
+      db.exec('COMMIT');
+      return result;
+    } catch (err) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        /* ignore rollback error */
+      }
+      throw err;
+    }
+  };
 }
 
 function close() {
