@@ -28,15 +28,65 @@ npm install
 npm run ui          # oeffnet http://localhost:4711 im Browser
 ```
 
+### Diagnose
+
+Bei Problemen zuerst die Diagnose laufen lassen — sie prueft Node-Version,
+JSON-Configs und native Module:
+
+```
+npm run doctor
+```
+
 ### Troubleshooting: `Could not locate the bindings file` / better-sqlite3
 
-Wenn beim Start ein Fehler wie _"Could not locate the bindings file"_ auftritt
-(typisch nach dem Wechsel auf Node 24), gibt es zwei Loesungen:
+Tritt der Fehler _"Could not locate the bindings file"_ oder
+_"better_sqlite3.node"_ auf (haeufig nach Download als ZIP oder bei
+Versions-Wechsel), gibt es drei Loesungen:
 
-1. **Empfohlen:** Node 22 LTS installieren von https://nodejs.org, dann
-   `node_modules` und `package-lock.json` loeschen und `npm install` erneut.
-2. **Build aus Source** (erfordert Visual Studio Build Tools + Python auf
-   Windows): `npm run fix-sqlite`
+**Loesung 1 — Neuinstallation (am schnellsten):**
+
+```
+npm run fix-sqlite:clean
+```
+
+Dieser Befehl loescht `node_modules` + `package-lock.json` und installiert
+alles frisch. Funktioniert, sobald die Node-Version stimmt und Netzwerk-
+Zugriff fuer den Prebuild-Download da ist.
+
+Manuell:
+
+```
+# Windows (cmd):
+rmdir /s /q node_modules
+del package-lock.json
+npm install
+
+# macOS / Linux:
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**Loesung 2 — Build aus Quellcode:**
+
+```
+npm run fix-sqlite
+```
+
+Voraussetzungen:
+
+- **Windows:** [Visual Studio Build Tools 2022](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+  mit Workload _"Desktop development with C++"_ und [Python 3.x](https://www.python.org/downloads/).
+  Danach: `npm config set msvs_version 2022`
+- **macOS:** `xcode-select --install`
+- **Linux:** `sudo apt install build-essential python3` (oder Aequivalent)
+
+**Loesung 3 — Node-Version pruefen:**
+
+`better-sqlite3` liefert vorgebaute Binaries fuer Node 20, 22 und 24 (x64).
+Sehr neue Node-Versionen (26+) oder ARM-Windows haben evtl. keine Prebuilds.
+Empfehlung: **Node 22 LTS** von https://nodejs.org/de/download/.
+
+Nach Behebung: `npm run doctor` sollte alle Pruefungen gruen anzeigen.
 
 Desktop-App:
 

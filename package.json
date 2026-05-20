@@ -27,7 +27,10 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{js,json,md,yml,yaml}\"",
-    "fix-sqlite": "npm rebuild better-sqlite3 --build-from-source"
+    "doctor": "node scripts/doctor.js",
+    "postinstall": "node scripts/check-native.js",
+    "fix-sqlite": "npm rebuild better-sqlite3 --build-from-source",
+    "fix-sqlite:clean": "node -e \"require('fs').rmSync('node_modules',{recursive:true,force:true});require('fs').rmSync('package-lock.json',{force:true});\" && npm install"
   },
   "engines": {
     "node": ">=20.0.0"
