@@ -20,12 +20,14 @@ const FIELD_NAMES = new Set([
   'lang',
   'image',
   'reading',
+  'has',
 ]);
 
 const FIELD_ALIASES = {
   t: 'title',
   src: 'source',
   s: 'source',
+  site: 'source',
   a: 'author',
   cat: 'category',
   sent: 'sentiment',
@@ -33,6 +35,17 @@ const FIELD_ALIASES = {
   word_count: 'words',
   wordcount: 'words',
   readingtime: 'reading',
+  datum: 'after',
+  bis: 'before',
+};
+
+// `has:image` → image:yes, `has:paywall` → paywall:yes, `has:bookmark` → bookmark:yes
+const HAS_SHORTCUTS = {
+  image: ['image', 'yes'],
+  bild: ['image', 'yes'],
+  paywall: ['paywall', 'yes'],
+  bookmark: ['bookmark', 'yes'],
+  lesezeichen: ['bookmark', 'yes'],
 };
 
 function tokenize(input) {
@@ -45,6 +58,7 @@ function tokenize(input) {
       i++;
       continue;
     }
+    // Quoted phrase
     if (c === '"') {
       let j = i + 1;
       while (j < s.length && s[j] !== '"') j++;
@@ -52,6 +66,7 @@ function tokenize(input) {
       i = j + 1;
       continue;
     }
+    // -term or -"phrase" (NOT)
     if (c === '-' && s[i + 1] && s[i + 1] !== ' ') {
       let j = i + 1;
       if (s[j] === '"') {
@@ -66,26 +81,62 @@ function tokenize(input) {
       }
       continue;
     }
+    // +term or +"phrase" (force-must)
+    if (c === '+' && s[i + 1] && s[i + 1] !== ' ') {
+      let j = i + 1;
+      if (s[j] === '"') {
+        let k = j + 1;
+        while (k < s.length && s[k] !== '"') k++;
+        tokens.push({ type: 'must', value: s.slice(j + 1, k) });
+        i = k + 1;
+      } else {
+        while (j < s.length && s[j] !== ' ') j++;
+        tokens.push({ type: 'must', value: s.slice(i + 1, j) });
+        i = j;
+      }
+      continue;
+    }
     let j = i;
     while (j < s.length && s[j] !== ' ' && s[j] !== '"') j++;
     const word = s.slice(i, j);
     const upper = word.toUpperCase();
-    if (upper === 'AND' || upper === 'OR' || upper === 'NOT') {
-      tokens.push({ type: 'op', value: upper });
+    if (upper === 'AND' || upper === 'UND') {
+      tokens.push({ type: 'op', value: 'AND' });
+    } else if (upper === 'OR' || upper === 'ODER') {
+      tokens.push({ type: 'op', value: 'OR' });
+    } else if (upper === 'NOT' || upper === 'NICHT') {
+      tokens.push({ type: 'op', value: 'NOT' });
     } else if (word.includes(':')) {
-      const [rawField, ...rest] = word.split(':');
+      const colonIdx = word.indexOf(':');
+      const rawField = word.slice(0, colonIdx);
+      const rawValue = word.slice(colonIdx + 1);
       const fieldLower = rawField.toLowerCase();
       const field = FIELD_ALIASES[fieldLower] || fieldLower;
-      if (FIELD_NAMES.has(field)) {
-        const value = rest.join(':');
-        if (value.startsWith('"')) {
-          let k = j;
-          while (k < s.length && s[k] !== '"') k++;
-          tokens.push({ type: 'field', field, value: value.slice(1) + ' ' + s.slice(j + 1, k) });
-          i = k + 1;
+      if (field === 'has') {
+        const shortcut = HAS_SHORTCUTS[rawValue.toLowerCase()];
+        if (shortcut) {
+          tokens.push({ type: 'field', field: shortcut[0], value: shortcut[1] });
+        }
+      } else if (FIELD_NAMES.has(field)) {
+        // field:"quoted value" — rawValue is '' because the word scan stopped at the opening "
+        if ((rawValue === '' || rawValue === '"') && j < s.length && s[j] === '"') {
+          const openPos = j + 1;
+          let closePos = openPos;
+          while (closePos < s.length && s[closePos] !== '"') closePos++;
+          tokens.push({ type: 'field', field, value: s.slice(openPos, closePos) });
+          i = closePos + 1;
           continue;
         }
-        tokens.push({ type: 'field', field, value });
+        // field:"value" where the quote was captured inside rawValue
+        if (rawValue.startsWith('"')) {
+          const openPos = i + colonIdx + 2;
+          let closePos = openPos;
+          while (closePos < s.length && s[closePos] !== '"') closePos++;
+          tokens.push({ type: 'field', field, value: s.slice(openPos, closePos) });
+          i = closePos + 1;
+          continue;
+        }
+        tokens.push({ type: 'field', field, value: rawValue });
       } else {
         tokens.push({ type: 'term', value: word });
       }
@@ -103,6 +154,23 @@ function parseScoreCondition(value) {
   const op = m[1] || '>=';
   const num = parseInt(m[2], 10);
   return { op, num };
+}
+
+function compareNumeric(actual, cond) {
+  switch (cond.op) {
+    case '>':
+      return actual > cond.num;
+    case '>=':
+      return actual >= cond.num;
+    case '<':
+      return actual < cond.num;
+    case '<=':
+      return actual <= cond.num;
+    case '=':
+      return actual === cond.num;
+    default:
+      return actual >= cond.num;
+  }
 }
 
 function parseDate(value) {
@@ -140,10 +208,16 @@ function parseQuery(input) {
         i++;
         if (i < tokens.length) mustNot.push(tokens[i]);
       }
+      // AND is the default, resets OR mode
+      else if (t.value === 'AND') nextIsOr = false;
       continue;
     }
     if (t.type === 'not') {
       mustNot.push(t);
+      continue;
+    }
+    if (t.type === 'must') {
+      must.push({ type: 'phrase', value: t.value });
       continue;
     }
     if (t.type === 'field') {
@@ -154,14 +228,16 @@ function parseQuery(input) {
     if (nextIsOr) {
       should.push(t);
       nextIsOr = false;
-    } else must.push(t);
+    } else {
+      must.push(t);
+    }
   }
 
   const isStructured =
     mustNot.length > 0 ||
     should.length > 0 ||
     Object.keys(fields).length > 0 ||
-    tokens.some((t) => t.type === 'phrase');
+    tokens.some((t) => t.type === 'phrase' || t.type === 'must');
 
   return { raw: trimmed, must, should, mustNot, fields, isStructured };
 }
@@ -262,49 +338,35 @@ function articleMatchesStructured(article, parsed) {
         continue;
       case 'words': {
         const wc = article.word_count || 0;
-        const anyMatch = values.every((v) => {
-          const cond = parseScoreCondition(v);
-          if (!cond) return true;
-          switch (cond.op) {
-            case '>':
-              return wc > cond.num;
-            case '>=':
-              return wc >= cond.num;
-            case '<':
-              return wc < cond.num;
-            case '<=':
-              return wc <= cond.num;
-            case '=':
-              return wc === cond.num;
-            default:
-              return wc >= cond.num;
-          }
-        });
-        if (!anyMatch) return false;
+        if (
+          !values.every((v) => {
+            const c = parseScoreCondition(v);
+            return !c || compareNumeric(wc, c);
+          })
+        )
+          return false;
         continue;
       }
       case 'reading': {
-        const wc = article.word_count || 0;
-        const minutes = Math.max(1, Math.round(wc / 200));
-        const anyMatch = values.every((v) => {
-          const cond = parseScoreCondition(v);
-          if (!cond) return true;
-          switch (cond.op) {
-            case '>':
-              return minutes > cond.num;
-            case '>=':
-              return minutes >= cond.num;
-            case '<':
-              return minutes < cond.num;
-            case '<=':
-              return minutes <= cond.num;
-            case '=':
-              return minutes === cond.num;
-            default:
-              return minutes <= cond.num;
-          }
-        });
-        if (!anyMatch) return false;
+        const minutes = Math.max(1, Math.round((article.word_count || 0) / 200));
+        if (
+          !values.every((v) => {
+            const c = parseScoreCondition(v);
+            return !c || compareNumeric(minutes, c);
+          })
+        )
+          return false;
+        continue;
+      }
+      case 'score': {
+        const scoreVal = article.relevance_score || 0;
+        if (
+          !values.every((v) => {
+            const c = parseScoreCondition(v);
+            return !c || compareNumeric(scoreVal, c);
+          })
+        )
+          return false;
         continue;
       }
       case 'lang': {
@@ -314,31 +376,7 @@ function articleMatchesStructured(article, parsed) {
       }
       case 'image': {
         const want = parseBool(values[0]);
-        const has = !!article.has_image;
-        if (want !== has) return false;
-        continue;
-      }
-      case 'score': {
-        const scoreVal = article.relevance_score || 0;
-        const anyMatch = values.every((v) => {
-          const cond = parseScoreCondition(v);
-          if (!cond) return true;
-          switch (cond.op) {
-            case '>':
-              return scoreVal > cond.num;
-            case '>=':
-              return scoreVal >= cond.num;
-            case '<':
-              return scoreVal < cond.num;
-            case '<=':
-              return scoreVal <= cond.num;
-            case '=':
-              return scoreVal === cond.num;
-            default:
-              return scoreVal >= cond.num;
-          }
-        });
-        if (!anyMatch) return false;
+        if (want !== !!article.has_image) return false;
         continue;
       }
       case 'after': {
@@ -355,14 +393,12 @@ function articleMatchesStructured(article, parsed) {
       }
       case 'bookmark': {
         const want = parseBool(values[0]);
-        if (want && !article.bookmarked) return false;
-        if (!want && article.bookmarked) return false;
+        if (want !== !!article.bookmarked) return false;
         continue;
       }
       case 'paywall': {
         const want = parseBool(values[0]);
-        if (want && !article.paywall) return false;
-        if (!want && article.paywall) return false;
+        if (want !== !!article.paywall) return false;
         continue;
       }
       default:
@@ -382,6 +418,8 @@ module.exports = {
   articleMatchesStructured,
   parseScoreCondition,
   parseDate,
+  parseBool,
   FIELD_NAMES,
   FIELD_ALIASES,
+  HAS_SHORTCUTS,
 };

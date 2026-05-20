@@ -2,7 +2,13 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { parseQuery, articleMatchesStructured } = require('../src/query-parser');
+const {
+  parseQuery,
+  articleMatchesStructured,
+  tokenize,
+  FIELD_ALIASES,
+  HAS_SHORTCUTS,
+} = require('../src/query-parser');
 
 function makeArticle(props = {}) {
   return {
@@ -84,4 +90,73 @@ test('FIELD_ALIASES: language -> lang', () => {
 test('FIELD_ALIASES: wordcount -> words', () => {
   const q = parseQuery('wordcount:>=100');
   assert.equal(articleMatchesStructured(makeArticle({ word_count: 200 }), q), true);
+});
+
+test('+term wird als must behandelt', () => {
+  const q = parseQuery('+Premiere');
+  assert.ok(q.must.length === 1);
+  assert.equal(q.must[0].value, 'Premiere');
+  assert.equal(articleMatchesStructured(makeArticle({ title: 'Premiere München' }), q), true);
+  assert.equal(articleMatchesStructured(makeArticle({ title: 'Keine Vorstellung' }), q), false);
+});
+
+test('+Phrase wird als must-phrase behandelt', () => {
+  const tokens = tokenize('+"Münchner Kammerspiele"');
+  assert.equal(tokens[0].type, 'must');
+  assert.equal(tokens[0].value, 'Münchner Kammerspiele');
+});
+
+test('site: Alias fuer source:', () => {
+  assert.equal(FIELD_ALIASES['site'], 'source');
+  const q = parseQuery('site:nachtkritik');
+  assert.equal(articleMatchesStructured(makeArticle({ source: 'nachtkritik.de' }), q), true);
+  assert.equal(articleMatchesStructured(makeArticle({ source: 'SZ' }), q), false);
+});
+
+test('ODER als deutsche Alternative zu OR', () => {
+  const tokens = tokenize('Hamlet ODER Faust');
+  assert.equal(tokens[1].type, 'op');
+  assert.equal(tokens[1].value, 'OR');
+});
+
+test('NICHT als deutsche Alternative zu NOT', () => {
+  const tokens = tokenize('Hamlet NICHT Hamburger');
+  assert.equal(tokens[1].type, 'op');
+  assert.equal(tokens[1].value, 'NOT');
+});
+
+test('has:image Shortcut fuer image:yes', () => {
+  assert.ok(HAS_SHORTCUTS['image']);
+  const q = parseQuery('has:image');
+  assert.equal(articleMatchesStructured(makeArticle({ has_image: true }), q), true);
+  assert.equal(articleMatchesStructured(makeArticle({ has_image: false }), q), false);
+});
+
+test('has:paywall Shortcut fuer paywall:yes', () => {
+  const q = parseQuery('has:paywall');
+  assert.equal(articleMatchesStructured(makeArticle({ paywall: true }), q), true);
+  assert.equal(articleMatchesStructured(makeArticle({ paywall: false }), q), false);
+});
+
+test('has:bookmark Shortcut fuer bookmark:yes', () => {
+  const q = parseQuery('has:bookmark');
+  assert.equal(articleMatchesStructured(makeArticle({ bookmarked: true }), q), true);
+  assert.equal(articleMatchesStructured(makeArticle({ bookmarked: false }), q), false);
+});
+
+test('field:"quoted value" mit Leerzeichen', () => {
+  const tokens = tokenize('title:"Münchner Kammerspiele"');
+  assert.equal(tokens[0].type, 'field');
+  assert.equal(tokens[0].field, 'title');
+  assert.equal(tokens[0].value, 'Münchner Kammerspiele');
+});
+
+test('Kombination: site: und +term', () => {
+  const q = parseQuery('+Premiere site:nachtkritik');
+  assert.equal(q.must.length, 1);
+  assert.ok(q.fields.source);
+  const a = makeArticle({ title: 'Premiere', source: 'nachtkritik.de' });
+  const b = makeArticle({ title: 'Premiere', source: 'SZ' });
+  assert.equal(articleMatchesStructured(a, q), true);
+  assert.equal(articleMatchesStructured(b, q), false);
 });
