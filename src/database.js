@@ -2,7 +2,32 @@
 
 const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
+
+let Database;
+try {
+  Database = require('better-sqlite3');
+} catch (err) {
+  const msg = String(err && err.message || err);
+  const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+  if (/bindings|better_sqlite3\.node|NODE_MODULE_VERSION/i.test(msg)) {
+    console.error('\n  Native Module "better-sqlite3" konnte nicht geladen werden.');
+    console.error(`  Du verwendest Node.js v${process.versions.node} (NODE_MODULE_VERSION ${process.versions.modules}).`);
+    console.error('  Vermutlich gibt es kein vorgebautes Binary fuer Deine Node-Version.\n');
+    console.error('  Loesung A (schnell, empfohlen):');
+    console.error('    1) Installiere Node 22 LTS von https://nodejs.org (Node 24 wird nicht');
+    console.error('       von allen native-Modules unterstuetzt).');
+    console.error('    2) Loesche node_modules und package-lock.json, dann: npm install\n');
+    console.error('  Loesung B (Build aus Source, braucht Visual Studio Build Tools + Python):');
+    console.error('    npm rebuild better-sqlite3 --build-from-source');
+    console.error('    oder: npm run fix-sqlite\n');
+    if (nodeMajor >= 24) {
+      console.error('  Hinweis: Node 24 ist sehr neu. Wenn moeglich auf Node 22 LTS wechseln.\n');
+    }
+    process.exit(1);
+  }
+  throw err;
+}
+
 const logger = require('./logger');
 const { settings } = require('./config');
 const { safeJsonParse } = require('./utils');
