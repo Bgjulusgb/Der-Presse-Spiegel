@@ -5,6 +5,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 
 ## [Unreleased]
 
+### Breaking — `better-sqlite3` durch `node:sqlite` ersetzt
+
+- **Native Modul-Abhaengigkeit entfernt**: `better-sqlite3` wurde durch
+  das eingebaute `node:sqlite` ersetzt (stabil ab Node 24, experimentell ab
+  Node 22.5). Keine Build-Tools (Python, MSVC, gcc) mehr noetig — der
+  fruehere "Could not locate the bindings file"-Fehler auf Windows/Node-
+  Upgrades ist damit Geschichte.
+- API-Migration in `src/database.js`:
+  - `new Database(path)` → `new DatabaseSync(path)`
+  - `db.pragma('journal_mode = WAL')` → `db.exec('PRAGMA journal_mode = WAL')`
+  - `db.transaction(fn)` → manuelles `BEGIN`/`COMMIT`/`ROLLBACK`-Wrapper
+  - `err.code === 'SQLITE_CONSTRAINT_UNIQUE'` →
+    `err.code === 'ERR_SQLITE_ERROR' && /UNIQUE constraint failed/.test(err.message)`
+- ExperimentalWarning fuer Node 22 wird in `database.js` einmalig unterdrueckt
+  (in Node 24 nicht mehr relevant).
+- `scripts/check-native.js` + `scripts/doctor.js` pruefen jetzt `node:sqlite`
+  statt `better-sqlite3`.
+- `package.json`: `better-sqlite3` aus `dependencies` und `build.asarUnpack`
+  entfernt, `fix-sqlite`/`fix-sqlite:clean`/`postinstall`-Skripte ebenfalls
+  entfernt.
+
+### Improved — Feed-Fetching & Pipeline
+
+- **`Retry-After`-Header bei HTTP 429** wird jetzt respektiert. Bisheriger
+  exponentieller Backoff galt auch bei 429; jetzt gewinnt der Server-Wunsch.
+- Status-Codes werden zusaetzlich als `err.statusCode` an die Error-Objekte
+  gehaengt (vorher nur im Message-Regex zu finden).
+- **Pipeline sortiert angereicherte Artikel nach Datum (neueste zuerst)**, bevor
+  die Dedup-Schleife laeuft — so gewinnt bei einem Duplikat-Paar die
+  juengere Version per Default, statt einer zufaelligen Reihenfolge der
+  RSS-Feeds zu folgen.
+- **Artikel-Truncation in `enrichItems`**: bei mehr als `max_articles_per_scan`
+  Items wird jetzt erst nach Datum (neueste zuerst) und dann nach Quellen-
+  Prioritaet sortiert — verhindert, dass aktuelle Meldungen niedriger
+  priorisierter Quellen verloren gehen.
+
 ### Breaking — Node.js 24 LTS als Mindestanforderung
 
 - `engines.node` jetzt `>=24.0.0`. Aeltere Versionen (Node 20/22) werden

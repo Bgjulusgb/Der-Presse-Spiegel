@@ -27,10 +27,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{js,json,md,yml,yaml}\"",
-    "doctor": "node scripts/doctor.js",
-    "postinstall": "node scripts/check-native.js",
-    "fix-sqlite": "npm rebuild better-sqlite3 --build-from-source",
-    "fix-sqlite:clean": "node -e \"require('fs').rmSync('node_modules',{recursive:true,force:true});require('fs').rmSync('package-lock.json',{force:true});\" && npm install"
+    "doctor": "node scripts/doctor.js"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -50,7 +47,6 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "axios": "^1.16.1",
-    "better-sqlite3": "^12.10.0",
     "chalk": "^4.1.2",
     "cheerio": "^1.2.0",
     "commander": "^14.0.3",
@@ -110,7 +106,6 @@
       }
     ],
     "asarUnpack": [
-      "node_modules/better-sqlite3/**/*",
       "node_modules/puppeteer/**/*"
     ],
     "win": {

@@ -108,28 +108,37 @@ function checkConfigJson() {
 }
 
 function checkNativeModules() {
-  head('Native Modules');
-  const mods = ['better-sqlite3'];
-  for (const m of mods) {
-    try {
-      require(m);
-      ok(`${m} laedt korrekt.`);
-    } catch (e) {
-      err(`${m} kann nicht geladen werden: ${e.message.split('\n')[0]}`);
-      if (m === 'better-sqlite3') {
-        tip('Loesung 1: rm -rf node_modules package-lock.json && npm install');
-        tip('Loesung 2: npm run fix-sqlite  (braucht Build-Tools)');
-        if (process.platform === 'win32') {
-          tip('Windows: Visual Studio Build Tools 2022 + Python 3.x installieren');
-        }
-      }
+  head('Built-in SQLite (node:sqlite)');
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(':memory:');
+    db.exec('CREATE TABLE _t (id INTEGER PRIMARY KEY)');
+    db.close();
+    const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+    if (nodeMajor >= 24) {
+      ok('node:sqlite laedt korrekt (Node 24+, stabil, keine Build-Tools noetig).');
+    } else {
+      ok('node:sqlite laedt korrekt (experimentell in Node 22, stabil ab Node 24).');
     }
+  } catch (e) {
+    err(`node:sqlite kann nicht geladen werden: ${e.message.split('\n')[0]}`);
+    tip('Loesung: Node 24 LTS installieren — https://nodejs.org/de/download/');
   }
 }
 
 function checkOptionalModules() {
   head('Dependencies (geladen)');
-  const deps = ['axios', 'cheerio', 'commander', 'express', 'rss-parser', 'winston', 'natural'];
+  const deps = [
+    'axios',
+    'cheerio',
+    'commander',
+    'express',
+    'rss-parser',
+    'winston',
+    'natural',
+    'fuse.js',
+    'lru-cache',
+  ];
   for (const d of deps) {
     try {
       require(d);

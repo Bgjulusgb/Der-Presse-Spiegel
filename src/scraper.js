@@ -657,9 +657,15 @@ async function enrichItems(items, { from, to, onProgress } = {}) {
   }
 
   if (fresh.length > maxEnrich) {
-    fresh.sort((a, b) => (b.sourcePriority || 0) - (a.sourcePriority || 0));
+    // Sort newest first, then by source priority so we keep the most recent relevant articles
+    fresh.sort((a, b) => {
+      const ta = a.publishedDate ? new Date(a.publishedDate).getTime() : 0;
+      const tb = b.publishedDate ? new Date(b.publishedDate).getTime() : 0;
+      if (tb !== ta) return tb - ta;
+      return (b.sourcePriority || 0) - (a.sourcePriority || 0);
+    });
     logger.warn(
-      `Begrenze auf ${maxEnrich} Artikel (von ${fresh.length}) - nach Quellen-Prioritaet sortiert. Einstellung: scraping.max_articles_per_scan`
+      `Begrenze auf ${maxEnrich} Artikel (von ${fresh.length}) — neueste zuerst, dann nach Quellen-Prioritaet. Einstellung: scraping.max_articles_per_scan`
     );
     fresh = fresh.slice(0, maxEnrich);
   }

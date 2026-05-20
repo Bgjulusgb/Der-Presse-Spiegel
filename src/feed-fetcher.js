@@ -375,8 +375,31 @@ async function fetchText(url, opts = {}) {
         recordDomainSuccess(url);
         return { status: 304, text: null, ...res };
       }
-      if (res.status === 403) throw new Error(`HTTP 403 fuer ${url}`);
-      if (res.status >= 400) throw new Error(`HTTP ${res.status} fuer ${url}`);
+      if (res.status === 429) {
+        const retryAfterSec = parseInt(res.headers['retry-after'] || '0', 10);
+        const waitMs =
+          retryAfterSec > 0 ? retryAfterSec * 1000 : backoffBase * Math.pow(2, attempt);
+        const e = new Error(`HTTP 429 fuer ${url}`);
+        e.statusCode = 429;
+        e.errorClass = 'ratelimit';
+        lastErr = e;
+        if (attempt < maxRetries) {
+          logger.warn(`HTTP 429, warte ${Math.round(waitMs / 1000)}s vor Retry: ${url}`);
+          await sleep(waitMs);
+          continue;
+        }
+        break;
+      }
+      if (res.status === 403) {
+        const e = new Error(`HTTP 403 fuer ${url}`);
+        e.statusCode = 403;
+        throw e;
+      }
+      if (res.status >= 400) {
+        const e = new Error(`HTTP ${res.status} fuer ${url}`);
+        e.statusCode = res.status;
+        throw e;
+      }
       const encoding = detectEncoding(res.buffer, res.contentType);
       const text = decode(res.buffer, encoding);
       recordDomainSuccess(url);
