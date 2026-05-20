@@ -1,6 +1,15 @@
 'use strict';
 
-const { franc } = require('franc-min');
+let franc;
+
+async function initializeFranc() {
+  if (!franc) {
+    const module = await import('franc-min');
+    franc = module.franc;
+  }
+  return franc;
+}
+
 const keywordExtractor = require('keyword-extractor');
 
 const UMLAUT_MAP = { ä: 'ae', ö: 'oe', ü: 'ue', Ä: 'ae', Ö: 'oe', Ü: 'ue', ß: 'ss' };
@@ -285,12 +294,13 @@ const LANG_MAP = {
   hrv: 'hr',
 };
 
-function detectLanguage(text, { minLen = 80, fallback = 'de' } = {}) {
+async function detectLanguage(text, { minLen = 80, fallback = 'de' } = {}) {
   if (!text) return fallback;
   const s = String(text).trim();
   if (s.length < minLen) return fallback;
   const sample = s.length > 4000 ? s.slice(0, 4000) : s;
-  const code = franc(sample, { minLength: minLen });
+  const francFunc = await initializeFranc();
+  const code = francFunc(sample, { minLength: minLen });
   if (!code || code === 'und') return fallback;
   return LANG_MAP[code] || code.slice(0, 2);
 }
