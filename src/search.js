@@ -19,14 +19,22 @@ const SUGGEST_CFG = SC.suggestions || {};
 const DYM_CFG = SC.did_you_mean || {};
 const TOK_CFG = SC.tokenizer || {};
 
+const STOP_CFG = SC.stopwords || {};
+
 const CFG = {
   bm25K1: BM25_CFG.k1 ?? 1.5,
   bm25B: BM25_CFG.b ?? 0.75,
   titleBoost: BM25_CFG.title_boost ?? 4,
+  summaryBoost: BM25_CFG.summary_boost ?? 1,
+  bodyBoost: BM25_CFG.body_boost ?? 1,
   recencyHalfLife: BM25_CFG.recency_half_life_days ?? 30,
+  recencyMode: BM25_CFG.recency_mode ?? 'exponential', // exponential | linear | none
   withCompoundSplit: BM25_CFG.with_compound_split ?? true,
   withPhonetic: BM25_CFG.with_phonetic ?? true,
   withPositions: BM25_CFG.with_positions ?? true,
+  withBigrams: BM25_CFG.with_bigrams ?? true,
+  bigramBoost: BM25_CFG.bigram_boost ?? 0.5,
+  phraseTitleBonus: BM25_CFG.phrase_title_bonus ?? 0.3,
   fuseThreshold: FUSE_CFG.threshold ?? 0.45,
   fuseDistance: FUSE_CFG.distance ?? 200,
   fuseMinMatch: FUSE_CFG.min_match_chars ?? 3,
@@ -39,6 +47,7 @@ const CFG = {
   sourceBoostMid: HYBRID_CFG.source_boost_mid ?? 1.05,
   cacheMax: CACHE_CFG.max_entries ?? 200,
   cacheTtl: CACHE_CFG.ttl_ms ?? 60_000,
+  tokenizeCacheMax: CACHE_CFG.tokenize_cache_max ?? 5000,
   suggestMax: SUGGEST_CFG.max_results ?? 10,
   suggestMinPrefix: SUGGEST_CFG.min_prefix_length ?? 2,
   dymMinLength: DYM_CFG.min_query_length ?? 4,
@@ -46,9 +55,11 @@ const CFG = {
   minTokenLength: TOK_CFG.min_token_length ?? 3,
   minPhoneticLength: TOK_CFG.min_phonetic_length ?? 4,
   proximityMaxWindow: TOK_CFG.proximity_max_window ?? 8,
+  stopwordsDisableDefaults: STOP_CFG.disable_defaults ?? false,
+  stopwordsCustom: STOP_CFG.custom ?? [],
 };
 
-const GERMAN_STOPWORDS = new Set([
+const DEFAULT_GERMAN_STOPWORDS = [
   'der',
   'die',
   'das',
@@ -147,7 +158,13 @@ const GERMAN_STOPWORDS = new Set([
   'noch',
   'mal',
   'am',
-]);
+];
+
+const GERMAN_STOPWORDS = new Set(
+  CFG.stopwordsDisableDefaults
+    ? CFG.stopwordsCustom
+    : [...DEFAULT_GERMAN_STOPWORDS, ...CFG.stopwordsCustom]
+);
 
 const tokenizer = new natural.AggressiveTokenizerDe();
 const stemmer = natural.PorterStemmerDe;
@@ -174,8 +191,14 @@ function expandWithSynonyms(stems) {
   return [...expanded];
 }
 
+const TOKENIZE_CACHE = new LRUCache({ max: CFG.tokenizeCacheMax });
+
 function tokenizeAndStem(text, { withSynonyms = false, withCompoundSplit = false } = {}) {
   if (!text) return [];
+  const cacheKey = `${withSynonyms ? 's' : ''}${withCompoundSplit ? 'c' : ''}::${text.length}::${text.slice(0, 200)}`;
+  const cached = TOKENIZE_CACHE.get(cacheKey);
+  if (cached) return cached;
+
   const normalized = normalize(text);
   const tokens = tokenizer.tokenize(normalized) || [];
   const minLen = CFG.minTokenLength;
@@ -192,7 +215,23 @@ function tokenizeAndStem(text, { withSynonyms = false, withCompoundSplit = false
       }
     }
   }
-  return withSynonyms ? expandWithSynonyms(stems) : stems;
+  const result = withSynonyms ? expandWithSynonyms(stems) : stems;
+  TOKENIZE_CACHE.set(cacheKey, result);
+  return result;
+}
+
+function tokenizeBigrams(text) {
+  if (!text) return new Set();
+  const normalized = normalize(text);
+  const tokens = (tokenizer.tokenize(normalized) || []).filter(
+    (t) => t.length >= CFG.minTokenLength && !GERMAN_STOPWORDS.has(t)
+  );
+  const stems = tokens.map((t) => stemmer.stem(t));
+  const bigrams = new Set();
+  for (let i = 0; i + 1 < stems.length; i++) {
+    bigrams.add(`${stems[i]}~${stems[i + 1]}`);
+  }
+  return bigrams;
 }
 
 function tokenizePhonetic(text) {
@@ -252,6 +291,17 @@ function proximityBoost(queryStems, doc, { maxWindow = CFG.proximityMaxWindow } 
   return 0.1 * (1 - Math.min(1, bestSpan / (maxWindow * 4)));
 }
 
+function computeRecency(article, halfLife, mode, now = Date.now()) {
+  if (mode === 'none' || !article.published_date) return 1;
+  const ageDays = (now - new Date(article.published_date).getTime()) / 86400000;
+  const t = Math.max(0, ageDays);
+  if (mode === 'linear') {
+    const lifespan = halfLife * 4;
+    return Math.max(0, 1 - t / lifespan);
+  }
+  return Math.pow(0.5, t / halfLife);
+}
+
 class BM25Index {
   constructor(
     articles,
@@ -259,20 +309,28 @@ class BM25Index {
       k1 = CFG.bm25K1,
       b = CFG.bm25B,
       titleBoost = CFG.titleBoost,
+      summaryBoost = CFG.summaryBoost,
+      bodyBoost = CFG.bodyBoost,
       recencyHalfLife = CFG.recencyHalfLife,
+      recencyMode = CFG.recencyMode,
       withPositions = CFG.withPositions,
       withCompoundSplit = CFG.withCompoundSplit,
       withPhonetic = CFG.withPhonetic,
+      withBigrams = CFG.withBigrams,
     } = {}
   ) {
     this.k1 = k1;
     this.b = b;
     this.titleBoost = titleBoost;
+    this.summaryBoost = summaryBoost;
+    this.bodyBoost = bodyBoost;
     this.recencyHalfLife = recencyHalfLife;
+    this.recencyMode = recencyMode;
     this.docs = [];
     this.df = new Map();
     this.avgdl = 0;
     this.withPhonetic = withPhonetic;
+    this.withBigrams = withBigrams;
 
     const now = Date.now();
     let totalLen = 0;
@@ -284,19 +342,15 @@ class BM25Index {
       });
       const allTokens = [
         ...Array(this.titleBoost).fill(titleTokens).flat(),
-        ...summaryTokens,
-        ...bodyTokens,
+        ...Array(this.summaryBoost).fill(summaryTokens).flat(),
+        ...Array(this.bodyBoost).fill(bodyTokens).flat(),
       ];
       const tf = new Map();
       for (const t of allTokens) tf.set(t, (tf.get(t) || 0) + 1);
       const seen = new Set(allTokens);
       for (const t of seen) this.df.set(t, (this.df.get(t) || 0) + 1);
 
-      let recency = 1;
-      if (article.published_date) {
-        const ageDays = (now - new Date(article.published_date).getTime()) / 86400000;
-        recency = Math.pow(0.5, Math.max(0, ageDays) / this.recencyHalfLife);
-      }
+      const recency = computeRecency(article, this.recencyHalfLife, this.recencyMode, now);
 
       const positions = withPositions
         ? tokenizePositions(
@@ -308,6 +362,12 @@ class BM25Index {
         ? tokenizePhonetic(`${article.title || ''} ${article.summary || ''}`)
         : null;
 
+      const bigrams = withBigrams
+        ? tokenizeBigrams(
+            `${article.title || ''} ${article.summary || ''} ${article.full_text || article.fullText || ''}`
+          )
+        : null;
+
       this.docs.push({
         article,
         tf,
@@ -317,6 +377,7 @@ class BM25Index {
         positions,
         titleStems: new Set(titleTokens),
         phoneticCodes,
+        bigrams,
       });
       totalLen += allTokens.length;
     }
@@ -332,7 +393,13 @@ class BM25Index {
   score(
     queryStems,
     doc,
-    { applyRecency = true, applyProximity = true, applyCoverage = true, phoneticCodes = null } = {}
+    {
+      applyRecency = true,
+      applyProximity = true,
+      applyCoverage = true,
+      phoneticCodes = null,
+      queryBigrams = null,
+    } = {}
   ) {
     let score = 0;
     let matched = 0;
@@ -368,6 +435,14 @@ class BM25Index {
     if (applyProximity && doc.positions && queryStems.length >= 2) {
       score *= 1 + proximityBoost(queryStems, doc);
     }
+    // Bigram bonus: if query has adjacent stems that also appear adjacent in the doc
+    if (queryBigrams && doc.bigrams && queryBigrams.size && doc.bigrams.size) {
+      let bigramHits = 0;
+      for (const bg of queryBigrams) {
+        if (doc.bigrams.has(bg)) bigramHits++;
+      }
+      if (bigramHits > 0) score *= 1 + CFG.bigramBoost * bigramHits;
+    }
     if (doc.titleStems && doc.titleStems.size) {
       const titleHits = queryStems.filter((t) => doc.titleStems.has(t)).length;
       if (titleHits > 0) score *= 1 + 0.15 * titleHits;
@@ -379,7 +454,7 @@ class BM25Index {
   search(
     query,
     {
-      limit = 50,
+      limit = CFG.defaultLimit,
       withSynonyms = true,
       applyRecency = true,
       applyProximity = true,
@@ -390,10 +465,16 @@ class BM25Index {
     const stems = tokenizeAndStem(query, { withSynonyms, withCompoundSplit: true });
     if (stems.length === 0) return [];
     const phoneticCodes = withPhonetic ? tokenizePhonetic(query) : null;
+    const queryBigrams = this.withBigrams ? tokenizeBigrams(query) : null;
     const scored = this.docs
       .map((doc) => ({
         article: doc.article,
-        score: this.score(stems, doc, { applyRecency, applyProximity, phoneticCodes }),
+        score: this.score(stems, doc, {
+          applyRecency,
+          applyProximity,
+          phoneticCodes,
+          queryBigrams,
+        }),
       }))
       .filter((r) => r.score > 0);
     scored.sort((a, b) => b.score - a.score);
@@ -438,6 +519,7 @@ function cacheKey(articles, query, opts) {
 
 function clearSearchCache() {
   SEARCH_CACHE.clear();
+  TOKENIZE_CACHE.clear();
 }
 
 function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency }) {
@@ -475,7 +557,7 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
     if (parsed && parsed.must.some((t) => t.type === 'phrase')) {
       const titleLower = (article.title || '').toLowerCase();
       for (const phrase of parsed.must.filter((t) => t.type === 'phrase')) {
-        if (titleLower.includes(phrase.value.toLowerCase())) score += 0.3;
+        if (titleLower.includes(phrase.value.toLowerCase())) score += CFG.phraseTitleBonus;
       }
     }
 
@@ -558,6 +640,41 @@ function snippetFor(article, query, { maxLen = 240 } = {}) {
   if (!query || !text) return text.slice(0, maxLen);
   const terms = queryTerms(query);
   return extractSnippet(text, terms, { maxLen });
+}
+
+function multiSnippetsFor(article, query, { maxLen = 200, count = 3 } = {}) {
+  if (!article) return [];
+  const text = article.full_text || article.fullText || article.summary || '';
+  if (!query || !text) return [text.slice(0, maxLen)].filter(Boolean);
+  const terms = queryTerms(query).map((t) => t.toLowerCase());
+  if (!terms.length) return [text.slice(0, maxLen)];
+  const lower = text.toLowerCase();
+  const hits = [];
+  for (const term of terms) {
+    let from = 0;
+    while (from < lower.length) {
+      const idx = lower.indexOf(term, from);
+      if (idx === -1) break;
+      hits.push(idx);
+      from = idx + term.length;
+    }
+  }
+  if (!hits.length) return [text.slice(0, maxLen)];
+  hits.sort((a, b) => a - b);
+  // Cluster nearby hits so we don't emit overlapping snippets
+  const snippets = [];
+  let lastEnd = -1;
+  for (const idx of hits) {
+    if (idx < lastEnd) continue;
+    const start = Math.max(0, idx - Math.floor(maxLen / 3));
+    const end = Math.min(text.length, start + maxLen);
+    snippets.push(
+      (start > 0 ? '… ' : '') + text.slice(start, end).trim() + (end < text.length ? ' …' : '')
+    );
+    lastEnd = end;
+    if (snippets.length >= count) break;
+  }
+  return snippets;
 }
 
 function suggestQueries(prefix, articles) {
@@ -666,12 +783,17 @@ module.exports = {
   hybridSearch,
   highlightTerms,
   snippetFor,
+  multiSnippetsFor,
   queryTerms,
   suggestQueries,
   didYouMean,
   topMentions,
   trends,
   tokenizeAndStem,
+  tokenizeBigrams,
   tokenizePhonetic,
   clearSearchCache,
+  computeRecency,
+  GERMAN_STOPWORDS,
+  CFG: { ...CFG },
 };

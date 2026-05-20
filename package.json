@@ -33,7 +33,7 @@
     "fix-sqlite:clean": "node -e \"require('fs').rmSync('node_modules',{recursive:true,force:true});require('fs').rmSync('package-lock.json',{force:true});\" && npm install"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "keywords": [
     "pressespiegel",
@@ -55,7 +55,7 @@
     "cheerio": "^1.2.0",
     "commander": "^14.0.3",
     "date-fns": "^4.2.1",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "franc-min": "^6.2.0",
     "fuse.js": "^7.3.0",
@@ -64,7 +64,7 @@
     "js-levenshtein": "^1.1.6",
     "jsdom": "^29.1.1",
     "keyword-extractor": "^0.0.28",
-    "lru-cache": "^11.4.0",
+    "lru-cache": "^11.5.0",
     "natural": "^8.1.1",
     "node-cron": "^4.2.1",
     "p-limit": "^3.1.0",
@@ -76,11 +76,11 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "electron": "^42.1.0",
+    "@eslint/js": "^10.0.1",
+    "electron": "^42.2.0",
     "electron-builder": "^26.8.1",
-    "eslint": "^9.39.4",
-    "globals": "^15.15.0",
+    "eslint": "^10.4.0",
+    "globals": "^17.6.0",
     "prettier": "^3.8.3"
   },
   "build": {

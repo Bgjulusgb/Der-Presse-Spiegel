@@ -701,7 +701,9 @@ async function testFeed(feedUrl, name) {
             feedType = 'rss/atom (browser)';
             statusCode = 200;
           } else {
-            throw new Error(browserRes.error || 'Browser-Fallback fehlgeschlagen');
+            throw new Error(browserRes.error || 'Browser-Fallback fehlgeschlagen', {
+              cause: firstErr,
+            });
           }
         } catch (puErr) {
           return {

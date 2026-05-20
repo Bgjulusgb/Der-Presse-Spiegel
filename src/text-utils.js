@@ -177,7 +177,7 @@ function colognePhonetic(input) {
     const c = s[i];
     const prev = i > 0 ? s[i - 1] : '';
     const next = i + 1 < s.length ? s[i + 1] : '';
-    let code = '';
+    let code;
 
     switch (c) {
       case 'a':
