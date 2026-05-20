@@ -18,8 +18,8 @@ bleiben auf dem eigenen Rechner.
 
 ## Schnellstart
 
-**Voraussetzung: Node.js 20 oder 22 LTS** (Node 24 wird nicht von allen
-nativen Modulen wie `better-sqlite3` unterstuetzt; siehe Troubleshooting unten).
+**Voraussetzung: Node.js 24 LTS** (oder neuer). Aeltere Versionen werden
+nicht mehr unterstuetzt. Download: https://nodejs.org/de/download/
 
 ```
 git clone <repo>
@@ -121,24 +121,45 @@ Die Web-/Desktop-UI hat zwoelf Tabs:
 Die Suche kombiniert mehrere Stufen:
 
 1. **Strukturierte Filter**: Phrasen, Bool-Operatoren, Feldsuche
-2. **BM25** (Term-Frequency, IDF, Stemmer, Stopwortfilter, Titel-Boost,
-   Time-Decay mit Halbwertszeit 30 Tage)
-3. **Fuse.js** mit Bitap/Levenshtein-Distance fuer Tippfehler
-4. **Synonym-Expansion** ueber `config/synonyms.json`
-5. **Did-you-mean** mit Levenshtein-Distanz 3
+2. **BM25** (Term-Frequency, IDF, Stemmer, Stopwortfilter, Field-Boosts,
+   Time-Decay, **Bigram-Bonus** fuer adjacente Term-Reihenfolge)
+3. **Phonetik** (Koelner Verfahren) als Fallback fuer fehlende Treffer
+4. **Fuse.js** mit Bitap/Levenshtein-Distance fuer Tippfehler
+5. **Synonym-Expansion** ueber `config/synonyms.json`
+6. **Did-you-mean** mit Levenshtein-Distanz 3
+7. **Proximity-Boost** wenn Query-Terme nah beieinander stehen
 
-Die finale Reihenfolge ergibt sich aus 65 Prozent BM25 + 35 Prozent Fuzzy,
-plus Boni fuer Phrasen-Treffer im Titel und hochpriorisierte Quellen.
+Die finale Reihenfolge ergibt sich aus BM25 + Fuzzy (konfigurierbare
+Gewichtung), plus Boni fuer Phrasen-Treffer im Titel und hochpriorisierte
+Quellen.
+
+### Konfiguration
+
+Alle Parameter sind in `config/settings.json` unter `"search"` konfigurierbar:
+
+- `bm25`: k1, b, title_boost, summary_boost, body_boost,
+  recency_half_life_days, recency_mode (exponential|linear|none),
+  with_compound_split, with_phonetic, with_positions, with_bigrams,
+  bigram_boost, phrase_title_bonus
+- `fuse`: threshold, distance, min_match_chars, weights (title/summary/source/…)
+- `hybrid`: bm25*weight, fuse_weight, default_limit, source_boost*\*
+- `cache`: max_entries, ttl_ms, tokenize_cache_max
+- `suggestions`: max_results, min_prefix_length
+- `did_you_mean`: min_query_length, max_distance
+- `tokenizer`: min_token_length, min_phonetic_length, proximity_max_window
+- `stopwords`: disable_defaults, custom (eigene Stopwords-Liste)
 
 ### Suchsyntax
 
 ```
 Kammerspiele                       Standardsuche (BM25 + Fuzzy + Synonyme)
 "Wokey Wokey"                      exakte Phrase
-Hamlet -Hamburger                  NICHT-Operator (auch: NOT Hamburger)
-Wallenstein OR Mephisto            ODER
++Premiere                          erzwungenes muss vorkommen
+Hamlet -Hamburger                  NICHT-Operator (auch: NOT/NICHT)
+Wallenstein OR Mephisto            ODER (auch: ODER)
 title:Premiere                     Feldsuche (Alias: t:)
-source:nachtkritik                 Quelle (Alias: src: oder s:)
+title:"Münchner Kammerspiele"      Feld mit Phrase
+source:nachtkritik                 Quelle (Alias: src:, s:, site:)
 author:Tholl                       Autor (Alias: a:)
 text:dramaturgisch                 Volltext
 category:sehr_relevant             Relevanzkategorie (Alias: cat:)
@@ -146,17 +167,25 @@ sentiment:negativ                  Stimmung (Alias: sent:)
 type:review                        Artikeltyp
 tag:produktion:wallenstein         Tag-Filter
 score:>=80                         Relevanz-Score-Bedingung (>=, >, <=, <, =)
-after:2026-01-01                   Veroeffentlichungsdatum ab
-before:2026-12-31                  bis
-bookmark:yes                       nur Lesezeichen (bookmark:no fuer ohne)
-paywall:no                         Paywall-Filter
+words:>500                         Wortanzahl
+reading:<=5                        Lesezeit in Minuten
+lang:de                            Sprache (Alias: language:)
+image:yes                          Mit Bild (auch: has:image)
+after:2026-01-01                   Veroeffentlichungsdatum ab (Alias: datum:)
+before:2026-12-31                  bis (Alias: bis:)
+bookmark:yes                       nur Lesezeichen (auch: has:bookmark)
+paywall:no                         Paywall-Filter (has:paywall = nur mit)
+has:image                          Shortcut fuer image:yes
+has:paywall                        Shortcut fuer paywall:yes
+has:bookmark                       Shortcut fuer bookmark:yes
 ```
 
 Beliebig kombinierbar, zum Beispiel:
 
 ```
 "Wokey Wokey" sentiment:positiv after:2026-01-01 source:nachtkritik
-Premiere -Hamburger tag:produktion:wallenstein score:>50
++Premiere -Hamburger tag:produktion:wallenstein score:>50
+has:image lang:de site:nachtkritik words:>=400
 ```
 
 ## Quellen-Inventar

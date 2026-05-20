@@ -37,16 +37,14 @@ try {
       console.error('');
     }
     console.error('  Loesung 3 — Node-Version pruefen:');
-    if (nodeMajor < 20) {
+    if (nodeMajor < 24) {
       console.error(
-        `     Node v${process.versions.node} ist zu alt — Node 20 LTS oder neuer noetig.`
+        `     Node v${process.versions.node} ist zu alt — Node 24 LTS oder neuer noetig.`
       );
-    } else if (nodeMajor >= 26) {
-      console.error(`     Node v${process.versions.node} ist sehr neu. Auf Node 22 LTS wechseln.`);
+    } else if (nodeMajor > 26) {
+      console.error(`     Node v${process.versions.node} ist sehr neu. Auf Node 24 LTS wechseln.`);
     } else {
-      console.error(
-        `     Node v${process.versions.node} sollte funktionieren. Falls nicht, Node 22 LTS verwenden.`
-      );
+      console.error(`     Node v${process.versions.node} sollte funktionieren.`);
     }
     console.error('     Download: https://nodejs.org/de/download/\n');
     console.error('  Vollstaendige Diagnose:  npm run doctor');

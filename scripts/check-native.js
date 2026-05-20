@@ -92,13 +92,14 @@ function printRecoveryInstructions() {
   process.stdout.write('\n');
 
   process.stdout.write(`${bold('Option 3 — Node-Version pruefen:')}\n`);
-  if (nodeMajor < 20) {
+  if (nodeMajor < 24) {
     process.stdout.write(
-      `   Node v${process.versions.node} ist zu alt. Mindestens Node 20 LTS noetig.\n`
+      `   Node v${process.versions.node} ist zu alt. Node 24 LTS oder neuer erforderlich.\n`
     );
-  } else if (nodeMajor >= 26) {
+    process.stdout.write('   Download: https://nodejs.org/de/download/\n');
+  } else if (nodeMajor > 26) {
     process.stdout.write(
-      `   Node v${process.versions.node} ist sehr neu. Falls native Modules fehlen, auf Node 22 LTS wechseln.\n`
+      `   Node v${process.versions.node} ist sehr neu. Falls native Modules fehlen, auf Node 24 LTS wechseln.\n`
     );
   } else {
     process.stdout.write(`   Node v${process.versions.node} ist unterstuetzt.\n`);

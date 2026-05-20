@@ -5,6 +5,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 
 ## [Unreleased]
 
+### Breaking — Node.js 24 LTS als Mindestanforderung
+
+- `engines.node` jetzt `>=24.0.0`. Aeltere Versionen (Node 20/22) werden
+  nicht mehr unterstuetzt.
+- CI testet ausschliesslich auf Node 24. Release-Build (Win/Mac/Linux)
+  laeuft ebenfalls auf Node 24.
+- GitHub Actions auf v5 aktualisiert (`actions/checkout@v5`, `actions/setup-node@v5`).
+- ESLint 10, @eslint/js 10, globals 17, dotenv 17 als Upgrade. Neue
+  strengere Regeln (`preserve-caught-error`, `no-useless-assignment`)
+  fuehrten zu zwei kleinen Korrekturen in `feed-fetcher.js` und
+  `text-utils.js`.
+
+### Added — Erweiterte Suche und Customization
+
+- **Bigram-Bonus** (BM25): Artikel, in denen Query-Terme in genau dieser
+  Reihenfolge stehen, erhalten einen konfigurierbaren Boost. Verbessert
+  Phrasen-Treffer wie "Münchner Kammerspiele".
+- **Konfigurierbarer Recency-Decay**: exponential (Default), linear oder
+  none — ueber `settings.search.bm25.recency_mode`.
+- **Feld-spezifische Boosts**: `title_boost`, `summary_boost`, `body_boost`
+  einzeln konfigurierbar.
+- **Tokenize-Cache** (LRU, default 5000 Eintraege): vermeidet wiederholte
+  Tokenisierung beim Aufbau des BM25-Index.
+- **Custom Stopwords**: `settings.search.stopwords.custom` zum Erweitern,
+  `disable_defaults: true` zum Ersetzen der Default-Liste.
+- **multiSnippetsFor()**: liefert mehrere Snippets bei Mehrfach-Treffer
+  statt nur eines.
+- **Phrase-Title-Bonus** konfigurierbar (vorher hardcoded 0.3).
+- **Fuse-Feld-Gewichte** in `settings.search.fuse.weights` einstellbar.
+
 ### Added — Feed-Robustheit & Operations (4 Bereiche)
 
 **Bereich 1: sources.json bereinigt**

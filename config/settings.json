@@ -50,15 +50,28 @@
       "k1": 1.5,
       "b": 0.75,
       "title_boost": 4,
+      "summary_boost": 1,
+      "body_boost": 1,
       "recency_half_life_days": 30,
+      "recency_mode": "exponential",
       "with_compound_split": true,
       "with_phonetic": true,
-      "with_positions": true
+      "with_positions": true,
+      "with_bigrams": true,
+      "bigram_boost": 0.5,
+      "phrase_title_bonus": 0.3
     },
     "fuse": {
       "threshold": 0.45,
       "distance": 200,
-      "min_match_chars": 3
+      "min_match_chars": 3,
+      "weights": {
+        "title": 0.5,
+        "summary": 0.3,
+        "source": 0.1,
+        "author": 0.05,
+        "full_text": 0.05
+      }
     },
     "hybrid": {
       "bm25_weight": 0.65,
@@ -71,7 +84,8 @@
     },
     "cache": {
       "max_entries": 200,
-      "ttl_ms": 60000
+      "ttl_ms": 60000,
+      "tokenize_cache_max": 5000
     },
     "suggestions": {
       "max_results": 10,
@@ -85,6 +99,10 @@
       "min_token_length": 3,
       "min_phonetic_length": 4,
       "proximity_max_window": 8
+    },
+    "stopwords": {
+      "disable_defaults": false,
+      "custom": []
     }
   }
 }

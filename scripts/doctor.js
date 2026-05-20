@@ -49,19 +49,15 @@ function checkNode() {
   console.log(`  Version: v${v} (${process.arch}, ${process.platform})`);
   console.log(`  ABI:     NODE_MODULE_VERSION ${process.versions.modules}`);
 
-  if (major < 20) {
-    err(`Node v${v} ist zu alt. Mindestens Node 20 LTS noetig.`);
+  if (major < 24) {
+    err(`Node v${v} ist zu alt. Mindestens Node 24 LTS erforderlich.`);
     tip('https://nodejs.org/de/download/');
-  } else if (major === 20 || major === 22) {
-    ok(`Node v${v} ist eine LTS-Version.`);
   } else if (major === 24) {
-    ok(`Node v${v} wird unterstuetzt.`);
-  } else if (major > 24) {
-    warn(
-      `Node v${v} ist sehr neu. Native Modules koennten fehlen — bei Problemen auf Node 22 LTS wechseln.`
-    );
+    ok(`Node v${v} ist die empfohlene LTS-Version.`);
+  } else if (major > 26) {
+    warn(`Node v${v} ist sehr neu. Bei Problemen mit nativen Modulen auf Node 24 LTS wechseln.`);
   } else {
-    warn(`Node v${v} ist eine ungerade Version. Empfehlung: Node 22 LTS.`);
+    ok(`Node v${v} wird unterstuetzt.`);
   }
 }
 
