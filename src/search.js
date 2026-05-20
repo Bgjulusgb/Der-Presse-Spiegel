@@ -129,7 +129,7 @@ function proximityBoost(queryStems, doc, { maxWindow = 8 } = {}) {
 }
 
 class BM25Index {
-  constructor(articles, { k1 = 1.5, b = 0.75, titleBoost = 3, recencyHalfLife = 30, withPositions = true, withCompoundSplit = true, withPhonetic = true } = {}) {
+  constructor(articles, { k1 = 1.5, b = 0.75, titleBoost = 4, recencyHalfLife = 30, withPositions = true, withCompoundSplit = true, withPhonetic = true } = {}) {
     this.k1 = k1;
     this.b = b;
     this.titleBoost = titleBoost;
@@ -214,7 +214,7 @@ class BM25Index {
     if (score === 0) return 0;
     if (applyCoverage && queryStems.length > 1) {
       const coverage = matched / queryStems.length;
-      score *= (0.4 + 0.6 * coverage);
+      score *= (0.3 + 0.7 * coverage);
     }
     if (applyProximity && doc.positions && queryStems.length >= 2) {
       score *= (1 + proximityBoost(queryStems, doc));

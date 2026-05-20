@@ -18,12 +18,25 @@ bleiben auf dem eigenen Rechner.
 
 ## Schnellstart
 
+**Voraussetzung: Node.js 20 oder 22 LTS** (Node 24 wird nicht von allen
+nativen Modulen wie `better-sqlite3` unterstuetzt; siehe Troubleshooting unten).
+
 ```
 git clone <repo>
 cd Der-Presse-Spiegel
 npm install
 npm run ui          # oeffnet http://localhost:4711 im Browser
 ```
+
+### Troubleshooting: `Could not locate the bindings file` / better-sqlite3
+
+Wenn beim Start ein Fehler wie *"Could not locate the bindings file"* auftritt
+(typisch nach dem Wechsel auf Node 24), gibt es zwei Loesungen:
+
+1. **Empfohlen:** Node 22 LTS installieren von https://nodejs.org, dann
+   `node_modules` und `package-lock.json` loeschen und `npm install` erneut.
+2. **Build aus Source** (erfordert Visual Studio Build Tools + Python auf
+   Windows): `npm run fix-sqlite`
 
 Desktop-App:
 

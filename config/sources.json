@@ -112,7 +112,7 @@
     },
     {
       "name": "ZEIT ONLINE",
-      "url": "http://newsfeed.zeit.de/index",
+      "url": "https://newsfeed.zeit.de/index",
       "priority": 100,
       "type": "rss",
       "category": "ueberregional",
