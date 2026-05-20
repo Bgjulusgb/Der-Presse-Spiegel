@@ -2,7 +2,7 @@
   "_comment": "Bidirektionale Synonyme - alle Begriffe in einer Gruppe werden bei der Suche austauschbar behandelt",
   "groups": [
     ["kritik", "rezension", "besprechung", "review"],
-    ["premiere", "erstauffuehrung", "uraufführung", "uraufführung", "ua"],
+    ["premiere", "erstauffuehrung", "uraufführung", "urauffuehrung", "ua"],
     ["inszenierung", "auffuehrung", "aufführung", "vorstellung", "abend"],
     ["regie", "regisseur", "regisseurin"],
     ["intendantin", "intendant", "intendanz", "hausherrin", "hausherr"],

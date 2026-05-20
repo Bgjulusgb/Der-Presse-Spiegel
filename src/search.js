@@ -4,10 +4,49 @@ const Fuse = require('fuse.js');
 const natural = require('natural');
 const leven = require('js-levenshtein');
 const { LRUCache } = require('lru-cache');
-const { keywords, loadJson } = require('./config');
+const { keywords, settings, loadJson } = require('./config');
 const { normalize } = require('./analyzer');
 const { parseQuery, queryToBM25String, articleMatchesStructured } = require('./query-parser');
 const { germanCompoundSplit, colognePhonetic, extractSnippet } = require('./text-utils');
+
+// Configurable defaults — override via config/settings.json "search" section
+const SC = settings.search || {};
+const BM25_CFG = SC.bm25 || {};
+const FUSE_CFG = SC.fuse || {};
+const HYBRID_CFG = SC.hybrid || {};
+const CACHE_CFG = SC.cache || {};
+const SUGGEST_CFG = SC.suggestions || {};
+const DYM_CFG = SC.did_you_mean || {};
+const TOK_CFG = SC.tokenizer || {};
+
+const CFG = {
+  bm25K1: BM25_CFG.k1 ?? 1.5,
+  bm25B: BM25_CFG.b ?? 0.75,
+  titleBoost: BM25_CFG.title_boost ?? 4,
+  recencyHalfLife: BM25_CFG.recency_half_life_days ?? 30,
+  withCompoundSplit: BM25_CFG.with_compound_split ?? true,
+  withPhonetic: BM25_CFG.with_phonetic ?? true,
+  withPositions: BM25_CFG.with_positions ?? true,
+  fuseThreshold: FUSE_CFG.threshold ?? 0.45,
+  fuseDistance: FUSE_CFG.distance ?? 200,
+  fuseMinMatch: FUSE_CFG.min_match_chars ?? 3,
+  hybridBm25Weight: HYBRID_CFG.bm25_weight ?? 0.65,
+  hybridFuseWeight: HYBRID_CFG.fuse_weight ?? 0.35,
+  defaultLimit: HYBRID_CFG.default_limit ?? 50,
+  sourceBoostHighThreshold: HYBRID_CFG.source_boost_high_threshold ?? 95,
+  sourceBoostHigh: HYBRID_CFG.source_boost_high ?? 1.1,
+  sourceBoostMidThreshold: HYBRID_CFG.source_boost_mid_threshold ?? 80,
+  sourceBoostMid: HYBRID_CFG.source_boost_mid ?? 1.05,
+  cacheMax: CACHE_CFG.max_entries ?? 200,
+  cacheTtl: CACHE_CFG.ttl_ms ?? 60_000,
+  suggestMax: SUGGEST_CFG.max_results ?? 10,
+  suggestMinPrefix: SUGGEST_CFG.min_prefix_length ?? 2,
+  dymMinLength: DYM_CFG.min_query_length ?? 4,
+  dymMaxDistance: DYM_CFG.max_distance ?? 3,
+  minTokenLength: TOK_CFG.min_token_length ?? 3,
+  minPhoneticLength: TOK_CFG.min_phonetic_length ?? 4,
+  proximityMaxWindow: TOK_CFG.proximity_max_window ?? 8,
+};
 
 const GERMAN_STOPWORDS = new Set([
   'der',
@@ -139,9 +178,10 @@ function tokenizeAndStem(text, { withSynonyms = false, withCompoundSplit = false
   if (!text) return [];
   const normalized = normalize(text);
   const tokens = tokenizer.tokenize(normalized) || [];
+  const minLen = CFG.minTokenLength;
   const stems = [];
   for (const t of tokens) {
-    if (t.length < 3 || GERMAN_STOPWORDS.has(t)) continue;
+    if (t.length < minLen || GERMAN_STOPWORDS.has(t)) continue;
     stems.push(stemmer.stem(t));
     if (withCompoundSplit && t.length >= 9) {
       const parts = germanCompoundSplit(t);
@@ -159,9 +199,10 @@ function tokenizePhonetic(text) {
   if (!text) return new Set();
   const normalized = normalize(text);
   const tokens = tokenizer.tokenize(normalized) || [];
+  const minLen = CFG.minPhoneticLength;
   const codes = new Set();
   for (const t of tokens) {
-    if (t.length < 4 || GERMAN_STOPWORDS.has(t)) continue;
+    if (t.length < minLen || GERMAN_STOPWORDS.has(t)) continue;
     const code = colognePhonetic(t);
     if (code) codes.add(code);
   }
@@ -181,7 +222,7 @@ function tokenizePositions(text) {
   return positions;
 }
 
-function proximityBoost(queryStems, doc, { maxWindow = 8 } = {}) {
+function proximityBoost(queryStems, doc, { maxWindow = CFG.proximityMaxWindow } = {}) {
   if (!doc.positions || queryStems.length < 2) return 0;
   const uniqQuery = [...new Set(queryStems)];
   const indexByStem = new Map();
@@ -215,13 +256,13 @@ class BM25Index {
   constructor(
     articles,
     {
-      k1 = 1.5,
-      b = 0.75,
-      titleBoost = 4,
-      recencyHalfLife = 30,
-      withPositions = true,
-      withCompoundSplit = true,
-      withPhonetic = true,
+      k1 = CFG.bm25K1,
+      b = CFG.bm25B,
+      titleBoost = CFG.titleBoost,
+      recencyHalfLife = CFG.recencyHalfLife,
+      withPositions = CFG.withPositions,
+      withCompoundSplit = CFG.withCompoundSplit,
+      withPhonetic = CFG.withPhonetic,
     } = {}
   ) {
     this.k1 = k1;
@@ -361,18 +402,19 @@ class BM25Index {
 }
 
 function buildFuse(articles) {
+  const weights = (SC.fuse && SC.fuse.weights) || {};
   return new Fuse(articles, {
     keys: [
-      { name: 'title', weight: 0.5 },
-      { name: 'summary', weight: 0.3 },
-      { name: 'source', weight: 0.1 },
-      { name: 'author', weight: 0.05 },
-      { name: 'full_text', weight: 0.05 },
+      { name: 'title', weight: weights.title ?? 0.5 },
+      { name: 'summary', weight: weights.summary ?? 0.3 },
+      { name: 'source', weight: weights.source ?? 0.1 },
+      { name: 'author', weight: weights.author ?? 0.05 },
+      { name: 'full_text', weight: weights.full_text ?? 0.05 },
     ],
-    threshold: 0.45,
-    distance: 200,
+    threshold: CFG.fuseThreshold,
+    distance: CFG.fuseDistance,
     ignoreLocation: true,
-    minMatchCharLength: 3,
+    minMatchCharLength: CFG.fuseMinMatch,
     includeScore: true,
     useExtendedSearch: true,
     findAllMatches: false,
@@ -380,8 +422,8 @@ function buildFuse(articles) {
 }
 
 const SEARCH_CACHE = new LRUCache({
-  max: 200,
-  ttl: 60_000,
+  max: CFG.cacheMax,
+  ttl: CFG.cacheTtl,
   allowStale: false,
   updateAgeOnGet: false,
 });
@@ -419,6 +461,8 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
 
   const allIds = new Set([...bm25Map.keys(), ...fuseMap.keys()]);
   const maxBm25 = Math.max(...bm25Results.map((r) => r.score), 1);
+  const w1 = CFG.hybridBm25Weight;
+  const w2 = CFG.hybridFuseWeight;
 
   const combined = [];
   for (const id of allIds) {
@@ -426,7 +470,7 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
     if (!article) continue;
     const bm25Norm = (bm25Map.get(id) || 0) / maxBm25;
     const fuseNorm = fuseMap.get(id) || 0;
-    let score = bm25Norm * 0.65 + fuseNorm * 0.35;
+    let score = bm25Norm * w1 + fuseNorm * w2;
 
     if (parsed && parsed.must.some((t) => t.type === 'phrase')) {
       const titleLower = (article.title || '').toLowerCase();
@@ -435,8 +479,9 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
       }
     }
 
-    if (article.source_priority >= 95) score *= 1.1;
-    else if (article.source_priority >= 80) score *= 1.05;
+    const sp = article.source_priority || 0;
+    if (sp >= CFG.sourceBoostHighThreshold) score *= CFG.sourceBoostHigh;
+    else if (sp >= CFG.sourceBoostMidThreshold) score *= CFG.sourceBoostMid;
 
     combined.push({ article, score, bm25: bm25Norm, fuzzy: fuseNorm });
   }
@@ -446,7 +491,7 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
 
 function hybridSearch(articles, query, opts = {}) {
   const {
-    limit = 50,
+    limit = CFG.defaultLimit,
     withSynonyms = true,
     applyRecency = true,
     cache = true,
@@ -516,7 +561,7 @@ function snippetFor(article, query, { maxLen = 240 } = {}) {
 }
 
 function suggestQueries(prefix, articles) {
-  if (!prefix || prefix.length < 2) return [];
+  if (!prefix || prefix.length < CFG.suggestMinPrefix) return [];
   const lower = normalize(prefix);
   const candidates = new Map();
 
@@ -542,12 +587,12 @@ function suggestQueries(prefix, articles) {
 
   return [...candidates.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
+    .slice(0, CFG.suggestMax)
     .map(([term]) => term);
 }
 
-function didYouMean(query, articles, { threshold = 3 } = {}) {
-  if (!query || query.length < 4) return null;
+function didYouMean(query, articles, { threshold = CFG.dymMaxDistance } = {}) {
+  if (!query || query.length < CFG.dymMinLength) return null;
   const allTerms = new Set();
   for (const a of articles) {
     for (const w of normalize(a.title || '').split(/\s+/)) {

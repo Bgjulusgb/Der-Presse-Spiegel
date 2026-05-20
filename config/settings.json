@@ -44,5 +44,47 @@
     "max_file_size_mb": 10,
     "max_files": 14,
     "console": true
+  },
+  "search": {
+    "bm25": {
+      "k1": 1.5,
+      "b": 0.75,
+      "title_boost": 4,
+      "recency_half_life_days": 30,
+      "with_compound_split": true,
+      "with_phonetic": true,
+      "with_positions": true
+    },
+    "fuse": {
+      "threshold": 0.45,
+      "distance": 200,
+      "min_match_chars": 3
+    },
+    "hybrid": {
+      "bm25_weight": 0.65,
+      "fuse_weight": 0.35,
+      "default_limit": 50,
+      "source_boost_high_threshold": 95,
+      "source_boost_high": 1.1,
+      "source_boost_mid_threshold": 80,
+      "source_boost_mid": 1.05
+    },
+    "cache": {
+      "max_entries": 200,
+      "ttl_ms": 60000
+    },
+    "suggestions": {
+      "max_results": 10,
+      "min_prefix_length": 2
+    },
+    "did_you_mean": {
+      "min_query_length": 4,
+      "max_distance": 3
+    },
+    "tokenizer": {
+      "min_token_length": 3,
+      "min_phonetic_length": 4,
+      "proximity_max_window": 8
+    }
   }
 }
