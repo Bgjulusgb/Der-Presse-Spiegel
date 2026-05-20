@@ -59,7 +59,8 @@ test('colognePhonetic: leerer/null Input liefert leeren String', () => {
 });
 
 test('detectLanguage: deutscher Text', () => {
-  const text = 'Die Premiere am Münchner Theater war ein voller Erfolg gestern Abend mit großer Resonanz.';
+  const text =
+    'Die Premiere am Münchner Theater war ein voller Erfolg gestern Abend mit großer Resonanz.';
   assert.equal(T.detectLanguage(text), 'de');
 });
 
@@ -69,12 +70,13 @@ test('detectLanguage: kurzer Text fällt auf Fallback', () => {
 });
 
 test('detectLanguage: franzoesischer Text', () => {
-  const text = 'La première au théâtre était un grand succès ce soir avec un public enthousiaste et nombreux.';
+  const text =
+    'La première au théâtre était un grand succès ce soir avec un public enthousiaste et nombreux.';
   assert.equal(T.detectLanguage(text), 'fr');
 });
 
 test('estimateReadingMinutes: 200 Worte = 1 Minute', () => {
-  const text = ('wort '.repeat(200)).trim();
+  const text = 'wort '.repeat(200).trim();
   assert.equal(T.estimateReadingMinutes(text), 1);
 });
 
@@ -83,7 +85,8 @@ test('estimateReadingMinutes: leerer Text = 1 Minute (min)', () => {
 });
 
 test('extractTopKeywords: liefert relevante Begriffe', () => {
-  const text = 'Die Inszenierung von Hamlet an den Kammerspielen war herausragend. Die Regie hat brilliante Arbeit geleistet. Hamlet als Figur stand im Mittelpunkt.';
+  const text =
+    'Die Inszenierung von Hamlet an den Kammerspielen war herausragend. Die Regie hat brilliante Arbeit geleistet. Hamlet als Figur stand im Mittelpunkt.';
   const kws = T.extractTopKeywords(text, { limit: 5 });
   assert.ok(kws.includes('hamlet') || kws.includes('inszenierung'));
 });

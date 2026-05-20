@@ -3,7 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { parseQuery, tokenize, articleMatchesStructured, queryToBM25String } = require('../src/query-parser');
+const {
+  parseQuery,
+  tokenize,
+  articleMatchesStructured,
+  queryToBM25String,
+} = require('../src/query-parser');
 
 test('tokenize splittet einfache Worte', () => {
   const t = tokenize('hello welt');

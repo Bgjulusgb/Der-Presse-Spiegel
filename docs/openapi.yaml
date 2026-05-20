@@ -33,7 +33,7 @@ paths:
           schema: { type: string, example: 30d }
         - in: query
           name: category
-          schema: { type: string, description: "kommasepariert: sehr_relevant,relevant,..." }
+          schema: { type: string, description: 'kommasepariert: sehr_relevant,relevant,...' }
         - in: query
           name: sentiment
           schema: { type: string }
@@ -42,7 +42,7 @@ paths:
           schema: { type: string }
         - in: query
           name: tag
-          schema: { type: string, description: "kommasepariert (AND-Verknuepfung)" }
+          schema: { type: string, description: 'kommasepariert (AND-Verknuepfung)' }
         - in: query
           name: type
           schema: { type: string }

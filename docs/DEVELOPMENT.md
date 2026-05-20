@@ -104,11 +104,11 @@ Output: `dist/`.
 
 ## Troubleshooting
 
-| Symptom | Loesung |
-|---|---|
-| `JSON.parse` Fehler beim Start | `config/sources.json` validieren mit `node -e "JSON.parse(require('fs').readFileSync('config/sources.json','utf8'))"` |
-| Scan haengt bei "Anreicherung ..." | `scraping.max_articles_per_scan` reduzieren oder Concurrency erhoehen |
-| `ECONNREFUSED` bei einer Quelle | Quelle deaktivieren oder `use_browser: true` setzen |
-| Encoding-Probleme | `iconv-lite`-Detection in `feed-fetcher.js` pruefen |
-| Tests schlagen mit DB-Sperre fehl | `rm -rf data/test-*.db` |
-| Electron startet nicht nach Update | `npm rebuild` |
+| Symptom                            | Loesung                                                                                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `JSON.parse` Fehler beim Start     | `config/sources.json` validieren mit `node -e "JSON.parse(require('fs').readFileSync('config/sources.json','utf8'))"` |
+| Scan haengt bei "Anreicherung ..." | `scraping.max_articles_per_scan` reduzieren oder Concurrency erhoehen                                                 |
+| `ECONNREFUSED` bei einer Quelle    | Quelle deaktivieren oder `use_browser: true` setzen                                                                   |
+| Encoding-Probleme                  | `iconv-lite`-Detection in `feed-fetcher.js` pruefen                                                                   |
+| Tests schlagen mit DB-Sperre fehl  | `rm -rf data/test-*.db`                                                                                               |
+| Electron startet nicht nach Update | `npm rebuild`                                                                                                         |

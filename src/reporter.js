@@ -18,13 +18,13 @@ const CATEGORY_LABELS = {
   sehr_relevant: { label: 'Sehr relevant', stars: '', color: '#16a34a', sort: 3 },
   relevant: { label: 'Relevant', stars: '', color: '#2563eb', sort: 2 },
   moeglich_relevant: { label: 'Moeglich relevant', stars: '', color: '#a16207', sort: 1 },
-  irrelevant: { label: 'Niedrige Relevanz', stars: '', color: '#64748b', sort: 0 }
+  irrelevant: { label: 'Niedrige Relevanz', stars: '', color: '#64748b', sort: 0 },
 };
 
 const SENTIMENT_BADGE = {
   positiv: { label: 'positiv', color: '#16a34a', emoji: '' },
   negativ: { label: 'negativ', color: '#dc2626', emoji: '' },
-  neutral: { label: 'neutral', color: '#475569', emoji: '' }
+  neutral: { label: 'neutral', color: '#475569', emoji: '' },
 };
 
 function fmtDate(date, withTime = false) {
@@ -51,8 +51,8 @@ function sentimentSummary(articles) {
     percentages: {
       positiv: Math.round((counts.positiv / total) * 100),
       negativ: Math.round((counts.negativ / total) * 100),
-      neutral: Math.round((counts.neutral / total) * 100)
-    }
+      neutral: Math.round((counts.neutral / total) * 100),
+    },
   };
 }
 
@@ -85,9 +85,13 @@ function bySourceCounts(articles) {
 }
 
 function buildArticleDataForUi(articles) {
-  return articles.map(a => {
-    const meta = typeof a.meta === 'string' ? safeJsonParse(a.meta, {}) : (a.meta || {});
-    const alsoOn = Array.isArray(a.also_on) ? a.also_on : (typeof a.also_on === 'string' ? safeJsonParse(a.also_on, []) : []);
+  return articles.map((a) => {
+    const meta = typeof a.meta === 'string' ? safeJsonParse(a.meta, {}) : a.meta || {};
+    const alsoOn = Array.isArray(a.also_on)
+      ? a.also_on
+      : typeof a.also_on === 'string'
+        ? safeJsonParse(a.also_on, [])
+        : [];
     return {
       id: a.id,
       title: a.title || '',
@@ -103,7 +107,7 @@ function buildArticleDataForUi(articles) {
       paywall: !!a.paywall,
       word_count: a.word_count || 0,
       also_on: alsoOn || [],
-      reasons: (meta && meta.reasons) || []
+      reasons: (meta && meta.reasons) || [],
     };
   });
 }
@@ -119,33 +123,55 @@ function clampPct(n) {
 }
 
 function renderSentimentChart(sentiment) {
-  if (!sentiment || safeNum(sentiment.total) === 0) return '<p class="empty">Keine Daten verfuegbar.</p>';
+  if (!sentiment || safeNum(sentiment.total) === 0)
+    return '<p class="empty">Keine Daten verfuegbar.</p>';
   const counts = sentiment.counts || {};
   const pct = sentiment.percentages || {};
   const segments = [
-    { label: 'Positiv', value: safeNum(counts.positiv), percent: clampPct(pct.positiv), color: 'var(--c-pos)' },
-    { label: 'Neutral', value: safeNum(counts.neutral), percent: clampPct(pct.neutral), color: 'var(--c-neu)' },
-    { label: 'Negativ', value: safeNum(counts.negativ), percent: clampPct(pct.negativ), color: 'var(--c-neg)' }
+    {
+      label: 'Positiv',
+      value: safeNum(counts.positiv),
+      percent: clampPct(pct.positiv),
+      color: 'var(--c-pos)',
+    },
+    {
+      label: 'Neutral',
+      value: safeNum(counts.neutral),
+      percent: clampPct(pct.neutral),
+      color: 'var(--c-neu)',
+    },
+    {
+      label: 'Negativ',
+      value: safeNum(counts.negativ),
+      percent: clampPct(pct.negativ),
+      color: 'var(--c-neg)',
+    },
   ];
   let cumulative = 0;
-  const gradientStops = segments.map(s => {
-    const start = cumulative;
-    cumulative += s.percent;
-    return `${s.color} ${start.toFixed(2)}% ${clampPct(cumulative).toFixed(2)}%`;
-  }).join(', ');
+  const gradientStops = segments
+    .map((s) => {
+      const start = cumulative;
+      cumulative += s.percent;
+      return `${s.color} ${start.toFixed(2)}% ${clampPct(cumulative).toFixed(2)}%`;
+    })
+    .join(', ');
   return `
     <div class="chart-row">
       <div class="pie" style="background: conic-gradient(${gradientStops})">
         <div class="pie-center"><span>${safeNum(sentiment.total)}</span><small>Artikel</small></div>
       </div>
       <ul class="legend">
-        ${segments.map(s => `
+        ${segments
+          .map(
+            (s) => `
           <li>
             <span class="dot" style="background:${s.color}"></span>
             <strong>${s.label}</strong>
             <span class="legend-value">${s.value} (${s.percent.toFixed(0)}%)</span>
           </li>
-        `).join('')}
+        `
+          )
+          .join('')}
       </ul>
     </div>
   `;
@@ -153,41 +179,45 @@ function renderSentimentChart(sentiment) {
 
 function renderTimeSeries(series) {
   if (!series || !series.length) return '<p class="empty">Keine Daten verfuegbar.</p>';
-  const max = Math.max(1, ...series.map(s => safeNum(s.count)));
+  const max = Math.max(1, ...series.map((s) => safeNum(s.count)));
   return `
     <div class="bar-chart" role="img" aria-label="Artikel pro Tag">
-      ${series.map(s => {
-        const count = safeNum(s.count);
-        const heightPct = clampPct((count / max) * 100);
-        return `
+      ${series
+        .map((s) => {
+          const count = safeNum(s.count);
+          const heightPct = clampPct((count / max) * 100);
+          return `
           <div class="bar-col" title="${s.date}: ${count} Artikel">
             <div class="bar-value">${count || ''}</div>
             <div class="bar" style="height:${heightPct.toFixed(2)}%"></div>
             <div class="bar-label">${s.date.slice(8)}.${s.date.slice(5, 7)}</div>
           </div>
         `;
-      }).join('')}
+        })
+        .join('')}
     </div>
   `;
 }
 
 function renderSourcesTable(rows) {
   if (!rows || !rows.length) return '<p class="empty">Keine Daten verfuegbar.</p>';
-  const max = Math.max(1, ...rows.map(r => safeNum(r.count)));
+  const max = Math.max(1, ...rows.map((r) => safeNum(r.count)));
   return `
     <table class="sources-table" aria-label="Artikel pro Quelle">
       <thead><tr><th>Quelle</th><th>Artikel</th><th>Anteil</th></tr></thead>
       <tbody>
-        ${rows.map(r => {
-          const count = safeNum(r.count);
-          const pct = clampPct((count / max) * 100);
-          return `
+        ${rows
+          .map((r) => {
+            const count = safeNum(r.count);
+            const pct = clampPct((count / max) * 100);
+            return `
           <tr>
             <td>${escapeHtml(r.source)}</td>
             <td class="num">${count}</td>
             <td class="bar-cell"><span class="hbar" style="width:${pct.toFixed(2)}%"></span></td>
           </tr>`;
-        }).join('')}
+          })
+          .join('')}
       </tbody>
     </table>
   `;
@@ -598,13 +628,17 @@ function renderArticleCard(article) {
         ${article.word_count ? `<span class="sep">·</span>${article.word_count} Worte` : ''}
       </div>
       ${summary ? `<p class="article-summary">${summary}</p>` : ''}
-      ${reasons.length ? `<div class="article-reasons">${reasons.map(r => `<code>${escapeHtml(r)}</code>`).join('')}</div>` : ''}
-      ${alsoOn.length > 0 ? `
+      ${reasons.length ? `<div class="article-reasons">${reasons.map((r) => `<code>${escapeHtml(r)}</code>`).join('')}</div>` : ''}
+      ${
+        alsoOn.length > 0
+          ? `
         <details class="article-also">
           <summary>Auch erschienen in ${alsoOn.length} weiteren Quelle${alsoOn.length === 1 ? '' : 'n'}</summary>
-          <ul>${alsoOn.map(u => `<li><a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a></li>`).join('')}</ul>
+          <ul>${alsoOn.map((u) => `<li><a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a></li>`).join('')}</ul>
         </details>
-      ` : ''}
+      `
+          : ''
+      }
     </article>
   `;
 }
@@ -612,23 +646,28 @@ function renderArticleCard(article) {
 function buildHtmlReport({ from, to, articles: rawArticles, title }) {
   const articles = buildArticleDataForUi(rawArticles);
   articles.sort((a, b) => {
-    const catDiff = (CATEGORY_LABELS[b.category]?.sort || 0) - (CATEGORY_LABELS[a.category]?.sort || 0);
+    const catDiff =
+      (CATEGORY_LABELS[b.category]?.sort || 0) - (CATEGORY_LABELS[a.category]?.sort || 0);
     if (catDiff !== 0) return catDiff;
     return b.relevance_score - a.relevance_score;
   });
 
   const groups = {
-    sehr_relevant: articles.filter(a => a.category === 'sehr_relevant'),
-    relevant: articles.filter(a => a.category === 'relevant'),
-    moeglich_relevant: articles.filter(a => a.category === 'moeglich_relevant'),
-    irrelevant: articles.filter(a => a.category === 'irrelevant')
+    sehr_relevant: articles.filter((a) => a.category === 'sehr_relevant'),
+    relevant: articles.filter((a) => a.category === 'relevant'),
+    moeglich_relevant: articles.filter((a) => a.category === 'moeglich_relevant'),
+    irrelevant: articles.filter((a) => a.category === 'irrelevant'),
   };
   const sentiment = sentimentSummary(articles);
   const series = timeSeries(articles, from, to);
   const sourceRows = bySourceCounts(articles);
   const top5 = [...articles].sort((a, b) => b.relevance_score - a.relevance_score).slice(0, 5);
   const reportTitle = title || 'Pressespiegel Muenchner Kammerspiele';
-  const sourceOptions = sourceRows.map(r => `<option value="${escapeHtml(r.source)}">${escapeHtml(r.source)} (${r.count})</option>`).join('');
+  const sourceOptions = sourceRows
+    .map(
+      (r) => `<option value="${escapeHtml(r.source)}">${escapeHtml(r.source)} (${r.count})</option>`
+    )
+    .join('');
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -685,7 +724,12 @@ function buildHtmlReport({ from, to, articles: rawArticles, title }) {
     <section class="card">
       <h2>Top 5 nach Relevanz</h2>
       <ol class="top5">
-        ${top5.length === 0 ? '<li style="grid-template-columns:1fr">Keine Artikel im Zeitraum.</li>' : top5.map(a => `
+        ${
+          top5.length === 0
+            ? '<li style="grid-template-columns:1fr">Keine Artikel im Zeitraum.</li>'
+            : top5
+                .map(
+                  (a) => `
           <li>
             <div>
               <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.title)}</a>
@@ -693,7 +737,10 @@ function buildHtmlReport({ from, to, articles: rawArticles, title }) {
             </div>
             <span class="score-pill">${a.relevance_score}</span>
           </li>
-        `).join('')}
+        `
+                )
+                .join('')
+        }
       </ol>
     </section>
   </div>
@@ -740,7 +787,7 @@ async function writePdf(reportHtml, filename) {
     const puppeteer = require('puppeteer');
     browser = await puppeteer.launch({
       headless: settings.scraping.puppeteer.headless,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
     await page.setContent(reportHtml, { waitUntil: 'networkidle0' });
@@ -749,7 +796,7 @@ async function writePdf(reportHtml, filename) {
       path: filepath,
       format: 'A4',
       printBackground: true,
-      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
+      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
     });
     logger.info(`PDF-Report geschrieben: ${filepath}`);
     return filepath;
@@ -779,9 +826,14 @@ async function generateReport({ from, to, articles, format: outFormat = 'html', 
 
 function findLatestReport() {
   if (!fs.existsSync(REPORTS_DIR)) return null;
-  const files = fs.readdirSync(REPORTS_DIR)
-    .filter(f => f.endsWith('.html') && f.startsWith('pressespiegel_'))
-    .map(f => ({ name: f, path: path.join(REPORTS_DIR, f), mtime: fs.statSync(path.join(REPORTS_DIR, f)).mtime }))
+  const files = fs
+    .readdirSync(REPORTS_DIR)
+    .filter((f) => f.endsWith('.html') && f.startsWith('pressespiegel_'))
+    .map((f) => ({
+      name: f,
+      path: path.join(REPORTS_DIR, f),
+      mtime: fs.statSync(path.join(REPORTS_DIR, f)).mtime,
+    }))
     .sort((a, b) => b.mtime - a.mtime);
   return files[0] || null;
 }
@@ -792,5 +844,5 @@ module.exports = {
   writeHtml,
   writePdf,
   findLatestReport,
-  REPORTS_DIR
+  REPORTS_DIR,
 };

@@ -6,7 +6,16 @@
     ["inszenierung", "auffuehrung", "aufführung", "vorstellung", "abend"],
     ["regie", "regisseur", "regisseurin"],
     ["intendantin", "intendant", "intendanz", "hausherrin", "hausherr"],
-    ["schauspielerin", "schauspieler", "akteur", "akteurin", "darsteller", "darstellerin", "mime", "mimin"],
+    [
+      "schauspielerin",
+      "schauspieler",
+      "akteur",
+      "akteurin",
+      "darsteller",
+      "darstellerin",
+      "mime",
+      "mimin"
+    ],
     ["ensemble", "truppe", "company"],
     ["buehne", "bühne", "stage", "spielort"],
     ["stueck", "stück", "drama", "schauspiel", "produktion", "werk"],

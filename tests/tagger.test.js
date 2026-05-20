@@ -6,34 +6,46 @@ const assert = require('node:assert/strict');
 const { autoTag, tagCategoryColor, getCategories } = require('../src/tagger');
 
 test('autoTag erkennt Produktion (Wallenstein + Kammerspiele)', () => {
-  const tags = autoTag({
-    title: 'Wallenstein an den Kammerspielen',
-    fullText: 'Schillers Wallenstein in einer Inszenierung an den Muenchner Kammerspielen.'
-  }, { sentiment: 'positiv', category: 'sehr_relevant' });
+  const tags = autoTag(
+    {
+      title: 'Wallenstein an den Kammerspielen',
+      fullText: 'Schillers Wallenstein in einer Inszenierung an den Muenchner Kammerspielen.',
+    },
+    { sentiment: 'positiv', category: 'sehr_relevant' }
+  );
   assert.ok(tags.includes('produktion:wallenstein'));
 });
 
 test('autoTag erkennt nicht Wallenstein wenn Kammerspiele fehlt', () => {
-  const tags = autoTag({
-    title: 'Wallenstein in Stuttgart',
-    fullText: 'Eine Inszenierung von Wallenstein am Schauspiel Stuttgart.'
-  }, { sentiment: 'positiv', category: 'irrelevant' });
+  const tags = autoTag(
+    {
+      title: 'Wallenstein in Stuttgart',
+      fullText: 'Eine Inszenierung von Wallenstein am Schauspiel Stuttgart.',
+    },
+    { sentiment: 'positiv', category: 'irrelevant' }
+  );
   assert.ok(!tags.includes('produktion:wallenstein'));
 });
 
 test('autoTag erkennt Person', () => {
-  const tags = autoTag({
-    title: 'Premiere',
-    fullText: 'Barbara Mundel sagt im Gespraech...'
-  }, {});
+  const tags = autoTag(
+    {
+      title: 'Premiere',
+      fullText: 'Barbara Mundel sagt im Gespraech...',
+    },
+    {}
+  );
   assert.ok(tags.includes('person:mundel'));
 });
 
 test('autoTag erkennt Premiere als Ereignis', () => {
-  const tags = autoTag({
-    title: 'Premiere am Freitag',
-    fullText: 'Die Erstauffuehrung findet statt.'
-  }, {});
+  const tags = autoTag(
+    {
+      title: 'Premiere am Freitag',
+      fullText: 'Die Erstauffuehrung findet statt.',
+    },
+    {}
+  );
   assert.ok(tags.includes('ereignis:premiere'));
 });
 
@@ -48,17 +60,25 @@ test('autoTag setzt Relevanz', () => {
 });
 
 test('autoTag erkennt Form: Interview', () => {
-  const tags = autoTag({
-    title: 'Im Gespraech mit Mundel',
-    fullText: 'Frage: Wie war es? Antwort: Gut.'
-  }, {});
+  const tags = autoTag(
+    {
+      title: 'Im Gespraech mit Mundel',
+      fullText: 'Frage: Wie war es? Antwort: Gut.',
+    },
+    {}
+  );
   assert.ok(tags.includes('form:interview'));
 });
 
 test('autoTag erkennt Paywall-Tag', () => {
-  const tags = autoTag({
-    title: 'X', fullText: 'Y', paywall: true
-  }, {});
+  const tags = autoTag(
+    {
+      title: 'X',
+      fullText: 'Y',
+      paywall: true,
+    },
+    {}
+  );
   assert.ok(tags.includes('qualitaet:paywall'));
 });
 

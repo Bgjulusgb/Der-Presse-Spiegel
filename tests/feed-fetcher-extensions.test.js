@@ -33,7 +33,10 @@ test('buildHeaders fuer Subdomains von ARD-Sendern setzt Referer', () => {
 test('buildHeaders fuer mdr.de, swr.de, deutschlandfunkkultur.de setzt Referer', () => {
   assert.equal(F.buildHeaders({ url: 'https://www.mdr.de/x.rss' }).referer, 'https://www.mdr.de/');
   assert.equal(F.buildHeaders({ url: 'https://www.swr.de/x' }).referer, 'https://www.swr.de/');
-  assert.equal(F.buildHeaders({ url: 'https://www.deutschlandfunkkultur.de/x.rss' }).referer, 'https://www.deutschlandfunkkultur.de/');
+  assert.equal(
+    F.buildHeaders({ url: 'https://www.deutschlandfunkkultur.de/x.rss' }).referer,
+    'https://www.deutschlandfunkkultur.de/'
+  );
 });
 
 test('buildHeaders fuer Nicht-ARD setzt KEINEN Referer', () => {
@@ -140,7 +143,7 @@ test('buildHeaders: profile-Auswahl rotiert mit attempt', () => {
 });
 
 test('buildHeaders: extra headers ueberschreiben', () => {
-  const h = F.buildHeaders({ extra: { 'X-Custom': 'yes', 'accept': 'override/*' } });
+  const h = F.buildHeaders({ extra: { 'X-Custom': 'yes', accept: 'override/*' } });
   assert.equal(h['x-custom'], 'yes');
   assert.equal(h['accept'], 'override/*');
 });

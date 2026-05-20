@@ -28,7 +28,7 @@ function extractArticleDate(html, url) {
     'meta[itemprop="datePublished"]',
     'meta[name="DC.date.issued"]',
     'meta[name="parsely-pub-date"]',
-    'meta[name="sailthru.date"]'
+    'meta[name="sailthru.date"]',
   ];
   for (const sel of metaSelectors) {
     const content = $(sel).attr('content');
@@ -44,10 +44,15 @@ function extractArticleDate(html, url) {
       const raw = $(jsonLdNodes[i]).html();
       if (!raw) continue;
       const data = JSON.parse(raw);
-      const items = Array.isArray(data) ? data : (data['@graph'] ? data['@graph'] : [data]);
+      const items = Array.isArray(data) ? data : data['@graph'] ? data['@graph'] : [data];
       for (const item of items) {
         if (!item) continue;
-        const candidates = [item.datePublished, item.dateCreated, item.uploadDate, item.dateModified];
+        const candidates = [
+          item.datePublished,
+          item.dateCreated,
+          item.uploadDate,
+          item.dateModified,
+        ];
         for (const c of candidates) {
           if (c) {
             const parsed = new Date(c);
@@ -60,9 +65,10 @@ function extractArticleDate(html, url) {
     }
   }
 
-  const timeAttr = $('time[datetime]').first().attr('datetime') ||
-                   $('[itemprop="datePublished"]').first().attr('datetime') ||
-                   $('[itemprop="datePublished"]').first().attr('content');
+  const timeAttr =
+    $('time[datetime]').first().attr('datetime') ||
+    $('[itemprop="datePublished"]').first().attr('datetime') ||
+    $('[itemprop="datePublished"]').first().attr('content');
   if (timeAttr) {
     const parsed = new Date(timeAttr);
     if (!isNaN(parsed.getTime())) return parsed;
@@ -93,23 +99,40 @@ function tryUrlDate(url) {
 }
 
 const MONTHS = {
-  januar: 0, jan: 0,
-  februar: 1, feb: 1,
-  maerz: 2, märz: 2, mar: 2,
-  april: 3, apr: 3,
+  januar: 0,
+  jan: 0,
+  februar: 1,
+  feb: 1,
+  maerz: 2,
+  märz: 2,
+  mar: 2,
+  april: 3,
+  apr: 3,
   mai: 4,
-  juni: 5, jun: 5,
-  juli: 6, jul: 6,
-  august: 7, aug: 7,
-  september: 8, sep: 8, sept: 8,
-  oktober: 9, okt: 9, oct: 9,
-  november: 10, nov: 10,
-  dezember: 11, dez: 11, dec: 11
+  juni: 5,
+  jun: 5,
+  juli: 6,
+  jul: 6,
+  august: 7,
+  aug: 7,
+  september: 8,
+  sep: 8,
+  sept: 8,
+  oktober: 9,
+  okt: 9,
+  oct: 9,
+  november: 10,
+  nov: 10,
+  dezember: 11,
+  dez: 11,
+  dec: 11,
 };
 
 function tryTextDate(text) {
   if (!text) return null;
-  const m = text.match(/(\d{1,2})\.\s*(Januar|Februar|M[aä]rz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|Jan|Feb|M[aä]r|Apr|Mai|Jun|Jul|Aug|Sep|Sept|Okt|Nov|Dez)\.?\s*(\d{4})/i);
+  const m = text.match(
+    /(\d{1,2})\.\s*(Januar|Februar|M[aä]rz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|Jan|Feb|M[aä]r|Apr|Mai|Jun|Jul|Aug|Sep|Sept|Okt|Nov|Dez)\.?\s*(\d{4})/i
+  );
   if (m) {
     const day = parseInt(m[1], 10);
     const monthKey = m[2].toLowerCase().replace('.', '');
@@ -141,25 +164,62 @@ const ARTICLE_SELECTORS = [
   'div.text-block',
   'main article',
   'article',
-  'main'
+  'main',
 ];
 
 const REMOVE_SELECTORS = [
-  'script', 'style', 'noscript', 'iframe', 'embed', 'object',
-  'nav', 'header', 'footer', 'aside', 'form',
-  '.ad', '.ads', '.advertisement', '.advertising', '.banner',
-  '.newsletter', '.newsletter-signup', '.subscribe',
-  '.related', '.related-articles', '.recommendations', '.read-more',
-  '.share', '.social', '.social-share', '.sharing',
-  '.comments', '.comment-section', '.disqus',
-  '.cookie', '.cookie-banner', '.gdpr',
-  '.popup', '.modal', '.overlay',
-  '.breadcrumb', '.breadcrumbs', '.tags', '.taglist',
-  '.author-box', '.author-info',
-  '[role="banner"]', '[role="navigation"]', '[role="contentinfo"]',
-  '[aria-label*="cookie" i]', '[aria-label*="werbung" i]',
-  'figure figcaption', '.image-credit', '.photo-credit',
-  '.amp-ad', 'amp-ad'
+  'script',
+  'style',
+  'noscript',
+  'iframe',
+  'embed',
+  'object',
+  'nav',
+  'header',
+  'footer',
+  'aside',
+  'form',
+  '.ad',
+  '.ads',
+  '.advertisement',
+  '.advertising',
+  '.banner',
+  '.newsletter',
+  '.newsletter-signup',
+  '.subscribe',
+  '.related',
+  '.related-articles',
+  '.recommendations',
+  '.read-more',
+  '.share',
+  '.social',
+  '.social-share',
+  '.sharing',
+  '.comments',
+  '.comment-section',
+  '.disqus',
+  '.cookie',
+  '.cookie-banner',
+  '.gdpr',
+  '.popup',
+  '.modal',
+  '.overlay',
+  '.breadcrumb',
+  '.breadcrumbs',
+  '.tags',
+  '.taglist',
+  '.author-box',
+  '.author-info',
+  '[role="banner"]',
+  '[role="navigation"]',
+  '[role="contentinfo"]',
+  '[aria-label*="cookie" i]',
+  '[aria-label*="werbung" i]',
+  'figure figcaption',
+  '.image-credit',
+  '.photo-credit',
+  '.amp-ad',
+  'amp-ad',
 ];
 
 function tryReadability(html, url) {
@@ -175,9 +235,9 @@ function tryReadability(html, url) {
       author: article.byline || null,
       text: article.textContent.replace(/\s+/g, ' ').trim(),
       excerpt: article.excerpt || '',
-      siteName: article.siteName || ''
+      siteName: article.siteName || '',
     };
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -187,32 +247,43 @@ function extractArticleContent(html, url) {
 
   const $ = cheerio.load(html);
 
-  REMOVE_SELECTORS.forEach(sel => { try { $(sel).remove(); } catch {} });
+  REMOVE_SELECTORS.forEach((sel) => {
+    try {
+      $(sel).remove();
+    } catch {}
+  });
 
-  let title = $('meta[property="og:title"]').attr('content') ||
-              $('meta[name="twitter:title"]').attr('content') ||
-              $('meta[itemprop="headline"]').attr('content') ||
-              $('h1[itemprop="headline"]').first().text().trim() ||
-              $('h1').first().text().trim() ||
-              $('title').first().text().trim();
+  let title =
+    $('meta[property="og:title"]').attr('content') ||
+    $('meta[name="twitter:title"]').attr('content') ||
+    $('meta[itemprop="headline"]').attr('content') ||
+    $('h1[itemprop="headline"]').first().text().trim() ||
+    $('h1').first().text().trim() ||
+    $('title').first().text().trim();
   title = (title || '').replace(/\s+/g, ' ').trim();
   title = title.split(/\s[-–|·]\s/)[0].trim() || title;
 
-  let author = $('meta[name="author"]').attr('content') ||
-               $('meta[property="article:author"]').attr('content') ||
-               $('[itemprop="author"] [itemprop="name"]').first().text() ||
-               $('[itemprop="author"]').first().text() ||
-               $('[rel="author"]').first().text().trim() ||
-               $('.author').first().text().trim() ||
-               $('.byline').first().text().trim() ||
-               null;
-  if (author) author = author.replace(/\s+/g, ' ').replace(/^(von|by)\s+/i, '').trim();
+  let author =
+    $('meta[name="author"]').attr('content') ||
+    $('meta[property="article:author"]').attr('content') ||
+    $('[itemprop="author"] [itemprop="name"]').first().text() ||
+    $('[itemprop="author"]').first().text() ||
+    $('[rel="author"]').first().text().trim() ||
+    $('.author').first().text().trim() ||
+    $('.byline').first().text().trim() ||
+    null;
+  if (author)
+    author = author
+      .replace(/\s+/g, ' ')
+      .replace(/^(von|by)\s+/i, '')
+      .trim();
   if (author && author.length > 80) author = null;
 
-  let description = $('meta[property="og:description"]').attr('content') ||
-                    $('meta[name="description"]').attr('content') ||
-                    $('meta[name="twitter:description"]').attr('content') ||
-                    '';
+  let description =
+    $('meta[property="og:description"]').attr('content') ||
+    $('meta[name="description"]').attr('content') ||
+    $('meta[name="twitter:description"]').attr('content') ||
+    '';
   description = description.replace(/\s+/g, ' ').trim();
 
   let bestContainer = null;
@@ -248,29 +319,74 @@ function extractArticleContent(html, url) {
     if (fallback) paragraphs.push(fallback);
   }
   const text = paragraphs.join('\n\n');
-  const firstParagraph = extractFirstParagraph(text);
 
   const paywallSignals = [
-    'paywall', 'sz-plus', 'sueddeutsche-plus', 'spplus', 'subscriber-only',
-    'plus-artikel', 'nur-fuer-abonnenten', 'abo-artikel', 'premium-content',
-    '"isaccessibleforfree":false', '"isaccessibleforfree": false', 'data-paywall', 'class="paywall',
-    'm-paywall', 'paid-content', 'metered-content', 'piano-paywall',
-    'fazplus', 'faz-plus', 'taz-plus', 'tazplus', 'welt-plus', 'weltplus',
-    'zeit-plus', 'zeitplus', 'plus.zeit.de', 'spiegel-plus', 'spplus',
-    'handelsblatt-plus', 'nzz-plus', 'standard-plus',
-    'jetzt-abonnent-werden', 'jetzt-abonnieren', 'abonnement-abschliessen',
-    'noch-nicht-abonnent', 'plus-inhalt', 'bezahlinhalt', 'piano-id',
-    'access-paywall', 'register-wall', 'soft-paywall', 'hard-paywall',
-    'als-abonnent-anmelden', 'unbegrenzt-lesen', 'zum-vollen-artikel',
-    'artikel-weiterlesen', 'jetzt-testen', 'kostenfrei-testen',
-    '"hasPaywall":true', '"paywall":true', 'cleeng-paywall',
-    'tinypass', 'pagewall', 'gating-element', 'leaky-paywall',
-    'abo-jetzt-starten', 'kostenlose-leseproben', 'mit-abo-weiterlesen',
-    'sie-haben-noch-keinen-zugang', 'sie-sind-nicht-angemeldet',
-    'weiterlesen-mit-plus', 'plus-abonnement', 'digital-abo'
+    'paywall',
+    'sz-plus',
+    'sueddeutsche-plus',
+    'spplus',
+    'subscriber-only',
+    'plus-artikel',
+    'nur-fuer-abonnenten',
+    'abo-artikel',
+    'premium-content',
+    '"isaccessibleforfree":false',
+    '"isaccessibleforfree": false',
+    'data-paywall',
+    'class="paywall',
+    'm-paywall',
+    'paid-content',
+    'metered-content',
+    'piano-paywall',
+    'fazplus',
+    'faz-plus',
+    'taz-plus',
+    'tazplus',
+    'welt-plus',
+    'weltplus',
+    'zeit-plus',
+    'zeitplus',
+    'plus.zeit.de',
+    'spiegel-plus',
+    'spplus',
+    'handelsblatt-plus',
+    'nzz-plus',
+    'standard-plus',
+    'jetzt-abonnent-werden',
+    'jetzt-abonnieren',
+    'abonnement-abschliessen',
+    'noch-nicht-abonnent',
+    'plus-inhalt',
+    'bezahlinhalt',
+    'piano-id',
+    'access-paywall',
+    'register-wall',
+    'soft-paywall',
+    'hard-paywall',
+    'als-abonnent-anmelden',
+    'unbegrenzt-lesen',
+    'zum-vollen-artikel',
+    'artikel-weiterlesen',
+    'jetzt-testen',
+    'kostenfrei-testen',
+    '"hasPaywall":true',
+    '"paywall":true',
+    'cleeng-paywall',
+    'tinypass',
+    'pagewall',
+    'gating-element',
+    'leaky-paywall',
+    'abo-jetzt-starten',
+    'kostenlose-leseproben',
+    'mit-abo-weiterlesen',
+    'sie-haben-noch-keinen-zugang',
+    'sie-sind-nicht-angemeldet',
+    'weiterlesen-mit-plus',
+    'plus-abonnement',
+    'digital-abo',
   ];
   const htmlLower = html.toLowerCase();
-  const paywall = paywallSignals.some(s => htmlLower.includes(s));
+  const paywall = paywallSignals.some((s) => htmlLower.includes(s));
 
   let finalText = text;
   let finalTitle = title;
@@ -278,7 +394,8 @@ function extractArticleContent(html, url) {
   const readabilityResult = tryReadability(html, url);
   if (readabilityResult && readabilityResult.text.length > finalText.length * 0.8) {
     finalText = readabilityResult.text;
-    if (readabilityResult.title && readabilityResult.title.length > 5) finalTitle = readabilityResult.title;
+    if (readabilityResult.title && readabilityResult.title.length > 5)
+      finalTitle = readabilityResult.title;
     if (readabilityResult.author && !finalAuthor) finalAuthor = readabilityResult.author;
   }
   const finalFirstParagraph = extractFirstParagraph(finalText);
@@ -289,15 +406,13 @@ function extractArticleContent(html, url) {
     description,
     text: finalText,
     firstParagraph: finalFirstParagraph,
-    paywall
+    paywall,
   };
 }
 
 async function fetchRssFeed(feed) {
   const health = database.getSourceHealth(feed.name);
-  const conditional = health
-    ? { etag: health.etag, lastModified: health.last_modified }
-    : {};
+  const conditional = health ? { etag: health.etag, lastModified: health.last_modified } : {};
 
   let result;
   if (feed.use_browser === true) {
@@ -309,7 +424,9 @@ async function fetchRssFeed(feed) {
     const shouldRetryWithBrowser =
       result.status === 'error' &&
       typeof result.error === 'string' &&
-      (result.error.includes('HTTP 403') || result.error.includes('HTTP 429') || result.error.includes('challenge')) &&
+      (result.error.includes('HTTP 403') ||
+        result.error.includes('HTTP 429') ||
+        result.error.includes('challenge')) &&
       feed.use_browser !== false &&
       settings.scraping.puppeteer_fallback !== false;
 
@@ -329,7 +446,7 @@ async function fetchRssFeed(feed) {
       lastModified: health.last_modified,
       responseTimeMs: result.responseTimeMs,
       itemCount: 0,
-      feedType: 'unchanged'
+      feedType: 'unchanged',
     });
     logger.info(`RSS: ${feed.name} - 304 Not Modified (${result.responseTimeMs}ms)`);
     return [];
@@ -338,9 +455,11 @@ async function fetchRssFeed(feed) {
   if (result.status === 'error') {
     database.recordSourceFailure(feed.name, result.error, {
       responseTimeMs: result.responseTimeMs,
-      errorClass: result.errorClass || null
+      errorClass: result.errorClass || null,
     });
-    logger.error(`RSS fehlgeschlagen: ${feed.name} (${result.errorClass || 'unknown'}): ${result.error}`);
+    logger.error(
+      `RSS fehlgeschlagen: ${feed.name} (${result.errorClass || 'unknown'}): ${result.error}`
+    );
     return [];
   }
 
@@ -350,22 +469,31 @@ async function fetchRssFeed(feed) {
     responseTimeMs: result.responseTimeMs,
     itemCount: result.items.length,
     contentType: result.contentType,
-    feedType: result.viaBrowser || result.viaAutoBrowserFallback ? 'rss/atom (browser)' : 'rss/atom',
-    viaBrowser: result.viaBrowser || result.viaAutoBrowserFallback || false
+    feedType:
+      result.viaBrowser || result.viaAutoBrowserFallback ? 'rss/atom (browser)' : 'rss/atom',
+    viaBrowser: result.viaBrowser || result.viaAutoBrowserFallback || false,
   });
-  const viaTag = result.viaAutoBrowserFallback ? ' [Auto-Browser-Fallback]' : result.viaBrowser ? ' [Browser]' : '';
-  logger.info(`RSS: ${feed.name} -> ${result.items.length} Eintraege (${result.responseTimeMs}ms)${viaTag}`);
+  const viaTag = result.viaAutoBrowserFallback
+    ? ' [Auto-Browser-Fallback]'
+    : result.viaBrowser
+      ? ' [Browser]'
+      : '';
+  logger.info(
+    `RSS: ${feed.name} -> ${result.items.length} Eintraege (${result.responseTimeMs}ms)${viaTag}`
+  );
 
-  return result.items.map(item => ({
-    title: item.title,
-    url: item.url,
-    publishedDate: item.publishedDate,
-    summary: item.summary,
-    content: item.content,
-    author: item.author,
-    source: feed.name,
-    sourcePriority: feed.priority || 50
-  })).filter(it => it.url);
+  return result.items
+    .map((item) => ({
+      title: item.title,
+      url: item.url,
+      publishedDate: item.publishedDate,
+      summary: item.summary,
+      content: item.content,
+      author: item.author,
+      source: feed.name,
+      sourcePriority: feed.priority || 50,
+    }))
+    .filter((it) => it.url);
 }
 
 function buildFromRss(item, originalUrl) {
@@ -385,14 +513,15 @@ function buildFromRss(item, originalUrl) {
     meta: {
       fallback: 'rss-only',
       original_url: originalUrl || item.url,
-      fetched_at: new Date().toISOString()
-    }
+      fetched_at: new Date().toISOString(),
+    },
   };
 }
 
 async function fetchArticleDetails(item) {
-  const isGoogleNews = item.googleNewsRedirect || (item.url && item.url.includes('news.google.com'));
-  const fetchTimeout = isGoogleNews ? 10000 : (settings.scraping.request_timeout_ms || 20000);
+  const isGoogleNews =
+    item.googleNewsRedirect || (item.url && item.url.includes('news.google.com'));
+  const fetchTimeout = isGoogleNews ? 10000 : settings.scraping.request_timeout_ms || 20000;
 
   try {
     let targetUrl = item.url;
@@ -400,8 +529,8 @@ async function fetchArticleDetails(item) {
       try {
         const { resolveGoogleNewsUrl } = require('./news-search');
         const resolved = await Promise.race([
-          require('./news-search').resolveGoogleNewsUrl(targetUrl),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Redirect-Timeout')), 8000))
+          resolveGoogleNewsUrl(targetUrl),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Redirect-Timeout')), 8000)),
         ]);
         if (resolved && resolved !== targetUrl && !resolved.includes('news.google.com')) {
           targetUrl = resolved;
@@ -415,7 +544,9 @@ async function fetchArticleDetails(item) {
 
     const res = await Promise.race([
       fetchText(targetUrl, { timeout: fetchTimeout }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch-Timeout')), fetchTimeout + 2000))
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Fetch-Timeout')), fetchTimeout + 2000)
+      ),
     ]);
     if (res.status === 304) return null;
     const html = res.text;
@@ -440,7 +571,7 @@ async function fetchArticleDetails(item) {
       firstParagraph: content.firstParagraph || extractFirstParagraph(fullText),
       paywall: content.paywall,
       wordCount,
-      meta: { fetched_at: new Date().toISOString(), description: content.description }
+      meta: { fetched_at: new Date().toISOString(), description: content.description },
     };
   } catch (err) {
     logger.debug(`Artikel-Details fehlgeschlagen: ${item.url} (${err.message})`);
@@ -468,25 +599,27 @@ function shouldAutoSkip(h, fallbackThreshold) {
 async function gatherFromFeeds(feedsConfig) {
   const list = feedsConfig || sources.feeds || [];
   const autoDisableAfter = settings.scraping.auto_disable_after_failures || 0;
-  const enabledFeeds = list.filter(f => {
+  const enabledFeeds = list.filter((f) => {
     if (f.disabled === true) return false;
     const h = database.getSourceHealth(f.name);
     if (!h) return true;
     if (h.enabled === 0) return false;
     if (shouldAutoSkip(h, autoDisableAfter)) {
       const reason = h.last_error_class || 'wiederholte Fehler';
-      logger.warn(`Feed automatisch uebersprungen (${h.consecutive_failures}x ${reason}): ${f.name}`);
+      logger.warn(
+        `Feed automatisch uebersprungen (${h.consecutive_failures}x ${reason}): ${f.name}`
+      );
       return false;
     }
     return true;
   });
   if (enabledFeeds.length < list.length) {
-    logger.info(`${list.length - enabledFeeds.length} Feeds uebersprungen, ${enabledFeeds.length} aktiv`);
+    logger.info(
+      `${list.length - enabledFeeds.length} Feeds uebersprungen, ${enabledFeeds.length} aktiv`
+    );
   }
   const limit = pLimit(settings.scraping.max_concurrent_requests || 4);
-  const results = await Promise.all(
-    enabledFeeds.map(feed => limit(() => fetchRssFeed(feed)))
-  );
+  const results = await Promise.all(enabledFeeds.map((feed) => limit(() => fetchRssFeed(feed))));
   return results.flat();
 }
 
@@ -503,7 +636,7 @@ async function enrichItems(items, { from, to, onProgress } = {}) {
     deduped.push(item);
   }
 
-  const inRange = deduped.filter(item => {
+  const inRange = deduped.filter((item) => {
     if (!item.publishedDate) return true;
     if (from && item.publishedDate < from) return false;
     if (to && item.publishedDate > to) return false;
@@ -516,7 +649,7 @@ async function enrichItems(items, { from, to, onProgress } = {}) {
     const hit = database.findByNormalizedUrl(norm);
     if (hit) existing.add(norm);
   }
-  let fresh = inRange.filter(i => !existing.has(normalizeUrl(i.url)));
+  let fresh = inRange.filter((i) => !existing.has(normalizeUrl(i.url)));
   if (existing.size > 0) {
     logger.info(`Anreicherung: ${fresh.length} neu, ${existing.size} schon in DB`);
   } else {
@@ -525,7 +658,9 @@ async function enrichItems(items, { from, to, onProgress } = {}) {
 
   if (fresh.length > maxEnrich) {
     fresh.sort((a, b) => (b.sourcePriority || 0) - (a.sourcePriority || 0));
-    logger.warn(`Begrenze auf ${maxEnrich} Artikel (von ${fresh.length}) - nach Quellen-Prioritaet sortiert. Einstellung: scraping.max_articles_per_scan`);
+    logger.warn(
+      `Begrenze auf ${maxEnrich} Artikel (von ${fresh.length}) - nach Quellen-Prioritaet sortiert. Einstellung: scraping.max_articles_per_scan`
+    );
     fresh = fresh.slice(0, maxEnrich);
   }
 
@@ -540,7 +675,7 @@ async function enrichItems(items, { from, to, onProgress } = {}) {
   for (let start = 0; start < total; start += CHUNK_SIZE) {
     const chunk = fresh.slice(start, start + CHUNK_SIZE);
     const settled = await Promise.allSettled(
-      chunk.map(item => limit(() => fetchArticleDetails(item)))
+      chunk.map((item) => limit(() => fetchArticleDetails(item)))
     );
     for (const r of settled) {
       done++;
@@ -551,21 +686,31 @@ async function enrichItems(items, { from, to, onProgress } = {}) {
         }
       } else {
         failed++;
-        logger.debug(`Anreicherung fehlgeschlagen: ${r.reason && r.reason.message ? r.reason.message : r.reason}`);
+        logger.debug(
+          `Anreicherung fehlgeschlagen: ${r.reason && r.reason.message ? r.reason.message : r.reason}`
+        );
       }
     }
     const elapsed = (Date.now() - startTime) / 1000;
     const rate = done / Math.max(0.1, elapsed);
     const etaSec = rate > 0 ? Math.round((total - done) / rate) : 0;
-    logger.info(`Anreicherung-Fortschritt: ${done}/${total} (${succeeded} OK, ${failed} Fehler, ~${Math.round(rate * 60)}/min, ETA ${etaSec}s)`);
+    logger.info(
+      `Anreicherung-Fortschritt: ${done}/${total} (${succeeded} OK, ${failed} Fehler, ~${Math.round(rate * 60)}/min, ETA ${etaSec}s)`
+    );
     if (typeof onProgress === 'function') {
-      try { onProgress({ done, total, succeeded, failed, etaSec }); } catch { /* ignore */ }
+      try {
+        onProgress({ done, total, succeeded, failed, etaSec });
+      } catch {
+        /* ignore */
+      }
     }
   }
 
-  logger.info(`Anreicherung fertig: ${succeeded} OK, ${failed} Fehler in ${Math.round((Date.now() - startTime) / 1000)}s`);
+  logger.info(
+    `Anreicherung fertig: ${succeeded} OK, ${failed} Fehler in ${Math.round((Date.now() - startTime) / 1000)}s`
+  );
 
-  return enriched.filter(a => {
+  return enriched.filter((a) => {
     if (!a) return false;
     if (!a.publishedDate) {
       a.publishedDate = new Date();
@@ -585,5 +730,5 @@ module.exports = {
   extractArticleDate,
   extractArticleContent,
   gatherFromFeeds,
-  enrichItems
+  enrichItems,
 };

@@ -5,7 +5,7 @@ const { normalizeUrl, levenshteinSimilarity, cosineSimilarity } = require('./uti
 const logger = require('./logger');
 
 const TITLE_THRESHOLD = settings.deduplication.title_similarity_threshold || 0.85;
-const TEXT_THRESHOLD = settings.deduplication.text_similarity_threshold || 0.80;
+const TEXT_THRESHOLD = settings.deduplication.text_similarity_threshold || 0.8;
 const FIRST_PARA_CHARS = settings.deduplication.first_paragraph_chars || 800;
 
 function getSourcePriority(sourceName) {
@@ -35,18 +35,11 @@ function findDuplicate(candidate, candidates) {
     if (!existing || !existing.id) continue;
     if (candidate.id && existing.id === candidate.id) continue;
 
-    if (
-      existing.url_normalized &&
-      candidateUrl &&
-      existing.url_normalized === candidateUrl
-    ) {
+    if (existing.url_normalized && candidateUrl && existing.url_normalized === candidateUrl) {
       return { duplicate: existing, reason: 'url-match' };
     }
 
-    const titleSim = levenshteinSimilarity(
-      candidateTitle,
-      existing.title || ''
-    );
+    const titleSim = levenshteinSimilarity(candidateTitle, existing.title || '');
     if (titleSim >= TITLE_THRESHOLD) {
       return { duplicate: existing, reason: `title-sim:${titleSim.toFixed(2)}` };
     }
@@ -79,20 +72,20 @@ function deduplicateBatch(articles) {
   const uniques = [];
   const duplicates = [];
   for (const article of articles) {
-    const candidates = uniques.map(u => ({
+    const candidates = uniques.map((u) => ({
       id: u.tempId,
       title: u.title,
       url_normalized: normalizeUrl(u.url),
       first_paragraph: u.firstParagraph,
       source: u.source,
-      published_date: u.publishedDate
+      published_date: u.publishedDate,
     }));
     const hit = findDuplicate(
       {
         title: article.title,
         url: article.url,
         firstParagraph: article.firstParagraph,
-        source: article.source
+        source: article.source,
       },
       candidates
     );
@@ -106,7 +99,7 @@ function deduplicateBatch(articles) {
   logger.debug('Batch-Dedup abgeschlossen', {
     eingang: articles.length,
     unique: uniques.length,
-    duplicate: duplicates.length
+    duplicate: duplicates.length,
   });
   return { uniques, duplicates };
 }
@@ -116,5 +109,5 @@ module.exports = {
   chooseWinner,
   deduplicateBatch,
   extractFirstParagraph,
-  getSourcePriority
+  getSourcePriority,
 };

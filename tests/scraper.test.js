@@ -3,10 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-  extractArticleDate,
-  extractArticleContent
-} = require('../src/scraper');
+const { extractArticleDate, extractArticleContent } = require('../src/scraper');
 
 test('extractArticleDate findet meta article:published_time', () => {
   const html = `

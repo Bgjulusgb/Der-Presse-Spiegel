@@ -3,9 +3,24 @@
 const { parse, isValid, subDays, subMonths, startOfDay, endOfDay } = require('date-fns');
 
 const TRACKING_PARAMS = new Set([
-  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-  'gclid', 'fbclid', 'ref', 'referrer', 'cmpid', 'mc_cid', 'mc_eid',
-  'wt_mc', 'wt_zmc', '_ga', 's_cid', 'icmp', 'spm'
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'gclid',
+  'fbclid',
+  'ref',
+  'referrer',
+  'cmpid',
+  'mc_cid',
+  'mc_eid',
+  'wt_mc',
+  'wt_zmc',
+  '_ga',
+  's_cid',
+  'icmp',
+  'spm',
 ]);
 
 function normalizeUrl(url) {
@@ -92,11 +107,7 @@ function levenshteinSimilarity(a, b) {
     curr[0] = i;
     for (let j = 1; j <= len2; j++) {
       const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
-      curr[j] = Math.min(
-        curr[j - 1] + 1,
-        prev[j] + 1,
-        prev[j - 1] + cost
-      );
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
     }
     [prev, curr] = [curr, prev];
   }
@@ -115,7 +126,9 @@ function cosineSimilarity(textA, textB) {
   for (const t of tokensB) freqB.set(t, (freqB.get(t) || 0) + 1);
 
   const allTokens = new Set([...freqA.keys(), ...freqB.keys()]);
-  let dot = 0, magA = 0, magB = 0;
+  let dot = 0,
+    magA = 0,
+    magB = 0;
   for (const t of allTokens) {
     const a = freqA.get(t) || 0;
     const b = freqB.get(t) || 0;
@@ -132,11 +145,11 @@ function tokenize(text) {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)
-    .filter(t => t.length >= 3);
+    .filter((t) => t.length >= 3);
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function chunk(array, size) {
@@ -182,5 +195,5 @@ module.exports = {
   chunk,
   truncate,
   escapeHtml,
-  safeJsonParse
+  safeJsonParse,
 };

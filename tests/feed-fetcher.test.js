@@ -3,12 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-  parseFeedXml,
-  parseJsonFeed,
-  detectEncoding,
-  decode
-} = require('../src/feed-fetcher');
+const { parseFeedXml, parseJsonFeed, detectEncoding, decode } = require('../src/feed-fetcher');
 
 const RSS_SAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
@@ -79,9 +74,9 @@ const JSON_FEED_SAMPLE = JSON.stringify({
       title: 'JSON Artikel',
       date_published: '2026-05-15T10:00:00Z',
       content_text: 'Volltext.',
-      author: { name: 'JS Autor' }
-    }
-  ]
+      author: { name: 'JS Autor' },
+    },
+  ],
 });
 
 test('parseFeedXml parst RSS 2.0 inkl. dc:creator und content:encoded', async () => {
@@ -126,7 +121,7 @@ test('parseJsonFeed parst JSON Feed', () => {
 });
 
 test('detectEncoding erkennt UTF-8 BOM', () => {
-  const buf = Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from('<?xml?>')]);
+  const buf = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('<?xml?>')]);
   assert.equal(detectEncoding(buf, ''), 'utf-8');
 });
 

@@ -1,22 +1,38 @@
 'use strict';
 
 const FIELD_NAMES = new Set([
-  'title', 'source', 'author', 'text', 'category', 'sentiment', 'type',
-  'tag', 'tagnot', 'tagmode', 'score', 'after', 'before', 'bookmark', 'paywall',
-  'words', 'lang', 'image', 'reading'
+  'title',
+  'source',
+  'author',
+  'text',
+  'category',
+  'sentiment',
+  'type',
+  'tag',
+  'tagnot',
+  'tagmode',
+  'score',
+  'after',
+  'before',
+  'bookmark',
+  'paywall',
+  'words',
+  'lang',
+  'image',
+  'reading',
 ]);
 
 const FIELD_ALIASES = {
-  't': 'title',
-  'src': 'source',
-  's': 'source',
-  'a': 'author',
-  'cat': 'category',
-  'sent': 'sentiment',
-  'language': 'lang',
-  'word_count': 'words',
-  'wordcount': 'words',
-  'readingtime': 'reading'
+  t: 'title',
+  src: 'source',
+  s: 'source',
+  a: 'author',
+  cat: 'category',
+  sent: 'sentiment',
+  language: 'lang',
+  word_count: 'words',
+  wordcount: 'words',
+  readingtime: 'reading',
 };
 
 function tokenize(input) {
@@ -25,7 +41,10 @@ function tokenize(input) {
   const s = input.trim();
   while (i < s.length) {
     const c = s[i];
-    if (c === ' ' || c === '\t') { i++; continue; }
+    if (c === ' ' || c === '\t') {
+      i++;
+      continue;
+    }
     if (c === '"') {
       let j = i + 1;
       while (j < s.length && s[j] !== '"') j++;
@@ -123,21 +142,26 @@ function parseQuery(input) {
       }
       continue;
     }
-    if (t.type === 'not') { mustNot.push(t); continue; }
+    if (t.type === 'not') {
+      mustNot.push(t);
+      continue;
+    }
     if (t.type === 'field') {
       if (!fields[t.field]) fields[t.field] = [];
       fields[t.field].push(t.value);
       continue;
     }
-    if (nextIsOr) { should.push(t); nextIsOr = false; }
-    else must.push(t);
+    if (nextIsOr) {
+      should.push(t);
+      nextIsOr = false;
+    } else must.push(t);
   }
 
   const isStructured =
     mustNot.length > 0 ||
     should.length > 0 ||
     Object.keys(fields).length > 0 ||
-    tokens.some(t => t.type === 'phrase');
+    tokens.some((t) => t.type === 'phrase');
 
   return { raw: trimmed, must, should, mustNot, fields, isStructured };
 }
@@ -163,8 +187,10 @@ function queryToBM25String(parsed) {
 function articleMatchesStructured(article, parsed) {
   if (!parsed) return true;
   const text = (
-    (article.title || '') + ' ' +
-    (article.full_text || article.fullText || '') + ' ' +
+    (article.title || '') +
+    ' ' +
+    (article.full_text || article.fullText || '') +
+    ' ' +
     (article.summary || '')
   ).toLowerCase();
 
@@ -181,53 +207,77 @@ function articleMatchesStructured(article, parsed) {
   }
 
   if (parsed.should.length > 0) {
-    const anyMatch = parsed.should.some(s => text.includes(s.value.toLowerCase()));
+    const anyMatch = parsed.should.some((s) => text.includes(s.value.toLowerCase()));
     if (!anyMatch && parsed.must.length === 0) return false;
   }
 
   for (const [field, values] of Object.entries(parsed.fields)) {
     let fieldValue;
     switch (field) {
-      case 'title': fieldValue = (article.title || '').toLowerCase(); break;
-      case 'source': fieldValue = (article.source || '').toLowerCase(); break;
-      case 'author': fieldValue = (article.author || '').toLowerCase(); break;
-      case 'text': fieldValue = (article.full_text || article.fullText || '').toLowerCase(); break;
-      case 'category': fieldValue = (article.category || '').toLowerCase(); break;
-      case 'sentiment': fieldValue = (article.sentiment || '').toLowerCase(); break;
-      case 'type': fieldValue = (article.article_type || article.articleType || '').toLowerCase(); break;
+      case 'title':
+        fieldValue = (article.title || '').toLowerCase();
+        break;
+      case 'source':
+        fieldValue = (article.source || '').toLowerCase();
+        break;
+      case 'author':
+        fieldValue = (article.author || '').toLowerCase();
+        break;
+      case 'text':
+        fieldValue = (article.full_text || article.fullText || '').toLowerCase();
+        break;
+      case 'category':
+        fieldValue = (article.category || '').toLowerCase();
+        break;
+      case 'sentiment':
+        fieldValue = (article.sentiment || '').toLowerCase();
+        break;
+      case 'type':
+        fieldValue = (article.article_type || article.articleType || '').toLowerCase();
+        break;
       case 'tag': {
-        const tagList = Array.isArray(article.tags) ? article.tags.map(t => String(t).toLowerCase()) : [];
+        const tagList = Array.isArray(article.tags)
+          ? article.tags.map((t) => String(t).toLowerCase())
+          : [];
         const modeArr = parsed.fields.tagmode;
         const mode = modeArr && modeArr[0] ? modeArr[0].toLowerCase() : 'any';
-        const lowerVals = values.map(v => v.toLowerCase());
+        const lowerVals = values.map((v) => v.toLowerCase());
         if (mode === 'all') {
-          if (!lowerVals.every(v => tagList.includes(v))) return false;
+          if (!lowerVals.every((v) => tagList.includes(v))) return false;
         } else if (mode === 'none') {
-          if (lowerVals.some(v => tagList.includes(v))) return false;
+          if (lowerVals.some((v) => tagList.includes(v))) return false;
         } else {
-          if (!lowerVals.some(v => tagList.includes(v))) return false;
+          if (!lowerVals.some((v) => tagList.includes(v))) return false;
         }
         continue;
       }
       case 'tagnot': {
-        const tagList = Array.isArray(article.tags) ? article.tags.map(t => String(t).toLowerCase()) : [];
-        if (values.some(v => tagList.includes(v.toLowerCase()))) return false;
+        const tagList = Array.isArray(article.tags)
+          ? article.tags.map((t) => String(t).toLowerCase())
+          : [];
+        if (values.some((v) => tagList.includes(v.toLowerCase()))) return false;
         continue;
       }
       case 'tagmode':
         continue;
       case 'words': {
         const wc = article.word_count || 0;
-        const anyMatch = values.every(v => {
+        const anyMatch = values.every((v) => {
           const cond = parseScoreCondition(v);
           if (!cond) return true;
           switch (cond.op) {
-            case '>': return wc > cond.num;
-            case '>=': return wc >= cond.num;
-            case '<': return wc < cond.num;
-            case '<=': return wc <= cond.num;
-            case '=': return wc === cond.num;
-            default: return wc >= cond.num;
+            case '>':
+              return wc > cond.num;
+            case '>=':
+              return wc >= cond.num;
+            case '<':
+              return wc < cond.num;
+            case '<=':
+              return wc <= cond.num;
+            case '=':
+              return wc === cond.num;
+            default:
+              return wc >= cond.num;
           }
         });
         if (!anyMatch) return false;
@@ -236,16 +286,22 @@ function articleMatchesStructured(article, parsed) {
       case 'reading': {
         const wc = article.word_count || 0;
         const minutes = Math.max(1, Math.round(wc / 200));
-        const anyMatch = values.every(v => {
+        const anyMatch = values.every((v) => {
           const cond = parseScoreCondition(v);
           if (!cond) return true;
           switch (cond.op) {
-            case '>': return minutes > cond.num;
-            case '>=': return minutes >= cond.num;
-            case '<': return minutes < cond.num;
-            case '<=': return minutes <= cond.num;
-            case '=': return minutes === cond.num;
-            default: return minutes <= cond.num;
+            case '>':
+              return minutes > cond.num;
+            case '>=':
+              return minutes >= cond.num;
+            case '<':
+              return minutes < cond.num;
+            case '<=':
+              return minutes <= cond.num;
+            case '=':
+              return minutes === cond.num;
+            default:
+              return minutes <= cond.num;
           }
         });
         if (!anyMatch) return false;
@@ -253,7 +309,7 @@ function articleMatchesStructured(article, parsed) {
       }
       case 'lang': {
         const lang = (article.language || article.lang || '').toLowerCase();
-        if (!values.some(v => lang === v.toLowerCase())) return false;
+        if (!values.some((v) => lang === v.toLowerCase())) return false;
         continue;
       }
       case 'image': {
@@ -264,16 +320,22 @@ function articleMatchesStructured(article, parsed) {
       }
       case 'score': {
         const scoreVal = article.relevance_score || 0;
-        const anyMatch = values.every(v => {
+        const anyMatch = values.every((v) => {
           const cond = parseScoreCondition(v);
           if (!cond) return true;
           switch (cond.op) {
-            case '>': return scoreVal > cond.num;
-            case '>=': return scoreVal >= cond.num;
-            case '<': return scoreVal < cond.num;
-            case '<=': return scoreVal <= cond.num;
-            case '=': return scoreVal === cond.num;
-            default: return scoreVal >= cond.num;
+            case '>':
+              return scoreVal > cond.num;
+            case '>=':
+              return scoreVal >= cond.num;
+            case '<':
+              return scoreVal < cond.num;
+            case '<=':
+              return scoreVal <= cond.num;
+            case '=':
+              return scoreVal === cond.num;
+            default:
+              return scoreVal >= cond.num;
           }
         });
         if (!anyMatch) return false;
@@ -303,9 +365,10 @@ function articleMatchesStructured(article, parsed) {
         if (!want && article.paywall) return false;
         continue;
       }
-      default: continue;
+      default:
+        continue;
     }
-    const anyMatch = values.some(v => fieldValue.includes(v.toLowerCase()));
+    const anyMatch = values.some((v) => fieldValue.includes(v.toLowerCase()));
     if (!anyMatch) return false;
   }
 
@@ -320,5 +383,5 @@ module.exports = {
   parseScoreCondition,
   parseDate,
   FIELD_NAMES,
-  FIELD_ALIASES
+  FIELD_ALIASES,
 };

@@ -11,7 +11,7 @@ const {
   suggestQueries,
   didYouMean,
   topMentions,
-  trends
+  trends,
 } = require('../src/search');
 
 const articles = [
@@ -19,17 +19,19 @@ const articles = [
     id: 1,
     title: 'Pinocchio an den Muenchner Kammerspielen',
     summary: 'Wu Tsang inszeniert Pinocchio im Schauspielhaus.',
-    full_text: 'Die Inszenierung von Wu Tsang an den Muenchner Kammerspielen begeistert. Pinocchio ist eine grossartige Auffuehrung.',
+    full_text:
+      'Die Inszenierung von Wu Tsang an den Muenchner Kammerspielen begeistert. Pinocchio ist eine grossartige Auffuehrung.',
     source: 'SZ',
-    author: 'Egbert Tholl'
+    author: 'Egbert Tholl',
   },
   {
     id: 2,
     title: 'Wallenstein-Premiere',
     summary: 'Schillers Wallenstein an den Kammerspielen.',
-    full_text: 'Eine kraftvolle Inszenierung von Wallenstein an den Muenchner Kammerspielen. Walter Hess ueberzeugt.',
+    full_text:
+      'Eine kraftvolle Inszenierung von Wallenstein an den Muenchner Kammerspielen. Walter Hess ueberzeugt.',
     source: 'FAZ',
-    author: null
+    author: null,
   },
   {
     id: 3,
@@ -37,15 +39,15 @@ const articles = [
     summary: 'Ein Hamlet jenseits der Kammerspiele.',
     full_text: 'Die Auffuehrung war konfus und enttaeuschend.',
     source: 'Welt',
-    author: null
-  }
+    author: null,
+  },
 ];
 
 test('tokenizeAndStem normalisiert und stemmt deutsche Worte', () => {
   const tokens = tokenizeAndStem('Die Inszenierungen der Kammerspiele begeistern');
   assert.ok(tokens.length > 0);
-  assert.ok(tokens.some(t => t.startsWith('inszen')));
-  assert.ok(tokens.some(t => t.startsWith('kammerspiel')));
+  assert.ok(tokens.some((t) => t.startsWith('inszen')));
+  assert.ok(tokens.some((t) => t.startsWith('kammerspiel')));
 });
 
 test('tokenizeAndStem entfernt Stopwoerter', () => {
@@ -75,7 +77,7 @@ test('hybridSearch kombiniert BM25 + Fuzzy', () => {
 
 test('hybridSearch findet bei Tippfehler ebenfalls Treffer', () => {
   const results = hybridSearch(articles, 'Pinokio', { limit: 5 });
-  assert.ok(results.some(r => r.article.id === 1));
+  assert.ok(results.some((r) => r.article.id === 1));
 });
 
 test('hybridSearch findet Mehr-Wort-Anfragen', () => {
@@ -105,7 +107,7 @@ test('suggestQueries liefert leere Liste fuer kurze Praefixe', () => {
 test('hybridSearch akzeptiert NOT-Operator', () => {
   const arts = [
     { id: 1, title: 'Hamlet Premiere München' },
-    { id: 2, title: 'Hamburger Hamlet Premiere' }
+    { id: 2, title: 'Hamburger Hamlet Premiere' },
   ];
   const results = hybridSearch(arts, 'Hamlet -Hamburger', { limit: 5 });
   assert.equal(results.length, 1);
@@ -115,7 +117,7 @@ test('hybridSearch akzeptiert NOT-Operator', () => {
 test('hybridSearch akzeptiert exakte Phrase', () => {
   const arts = [
     { id: 1, title: 'Wokey Wokey Premiere' },
-    { id: 2, title: 'Wokey Bar Wokey' }
+    { id: 2, title: 'Wokey Bar Wokey' },
   ];
   const results = hybridSearch(arts, '"Wokey Wokey"', { limit: 5 });
   assert.equal(results[0].article.id, 1);
@@ -124,7 +126,7 @@ test('hybridSearch akzeptiert exakte Phrase', () => {
 test('hybridSearch nutzt Synonyme (Premiere -> Erstauffuehrung)', () => {
   const arts = [
     { id: 1, title: 'Erstauffuehrung von Hamlet' },
-    { id: 2, title: 'Tanz' }
+    { id: 2, title: 'Tanz' },
   ];
   const results = hybridSearch(arts, 'Premiere', { limit: 5, withSynonyms: true });
   assert.ok(results.length >= 1);
@@ -132,9 +134,7 @@ test('hybridSearch nutzt Synonyme (Premiere -> Erstauffuehrung)', () => {
 });
 
 test('didYouMean korrigiert Tippfehler', () => {
-  const arts = [
-    { id: 1, title: 'Pinocchio Wu Tsang Premiere Kammerspiele' }
-  ];
+  const arts = [{ id: 1, title: 'Pinocchio Wu Tsang Premiere Kammerspiele' }];
   const suggestion = didYouMean('Pinokio', arts);
   assert.ok(suggestion && suggestion.toLowerCase().includes('pinocchio'));
 });
@@ -145,10 +145,7 @@ test('didYouMean gibt null wenn alles korrekt', () => {
 });
 
 test('topMentions liefert haeufigste Begriffe sortiert', () => {
-  const arts = [
-    { title: 'Wallenstein Wallenstein Pinocchio' },
-    { title: 'Wallenstein' }
-  ];
+  const arts = [{ title: 'Wallenstein Wallenstein Pinocchio' }, { title: 'Wallenstein' }];
   const m = topMentions(arts, { limit: 5 });
   assert.equal(m[0].term.startsWith('wallen'), true);
 });
@@ -157,11 +154,11 @@ test('trends vergleicht zwei Zeitraeume', () => {
   const a = [
     { title: 'Hamlet Premiere' },
     { title: 'Hamlet Kritik' },
-    { title: 'Hamlet Interview' }
+    { title: 'Hamlet Interview' },
   ];
   const b = [{ title: 'Hamlet' }];
   const result = trends(a, b);
-  const hamlet = result.find(t => t.term.startsWith('haml'));
+  const hamlet = result.find((t) => t.term.startsWith('haml'));
   assert.ok(hamlet);
   assert.ok(hamlet.change >= 1);
 });
@@ -172,7 +169,7 @@ test('BM25Index gibt Recency-Bonus', () => {
   const yearAgo = new Date(now - 365 * 86400000).toISOString();
   const arts = [
     { id: 1, title: 'Hamlet Premiere', published_date: yearAgo },
-    { id: 2, title: 'Hamlet Premiere', published_date: dayAgo }
+    { id: 2, title: 'Hamlet Premiere', published_date: dayAgo },
   ];
   const idx = new BM25Index(arts);
   const results = idx.search('Hamlet', { applyRecency: true });
@@ -184,13 +181,14 @@ test('BM25Index gibt Proximity-Bonus fuer nahe Terme', () => {
     {
       id: 1,
       title: 'Wallenstein Premiere',
-      full_text: 'Wallenstein Premiere an den Kammerspielen war ein Ereignis.'
+      full_text: 'Wallenstein Premiere an den Kammerspielen war ein Ereignis.',
     },
     {
       id: 2,
       title: 'Wallenstein Premiere',
-      full_text: 'Wallenstein wird gegeben. Sehr viele weitere unwichtige Worte trennen die Begriffe. Dann ist die Premiere.'
-    }
+      full_text:
+        'Wallenstein wird gegeben. Sehr viele weitere unwichtige Worte trennen die Begriffe. Dann ist die Premiere.',
+    },
   ];
   const idx = new BM25Index(arts);
   const results = idx.search('Wallenstein Premiere Kammerspielen', { applyRecency: false });
@@ -202,13 +200,13 @@ test('BM25Index Coverage-Penalty: vollstaendige Matches gewinnen', () => {
     {
       id: 1,
       title: 'Wallenstein Premiere',
-      full_text: 'Wallenstein wird oft erwaehnt. Wallenstein Wallenstein Wallenstein.'
+      full_text: 'Wallenstein wird oft erwaehnt. Wallenstein Wallenstein Wallenstein.',
     },
     {
       id: 2,
       title: 'Wallenstein Premiere Kammerspielen',
-      full_text: 'Wallenstein hatte Premiere an den Kammerspielen.'
-    }
+      full_text: 'Wallenstein hatte Premiere an den Kammerspielen.',
+    },
   ];
   const idx = new BM25Index(arts);
   const results = idx.search('Wallenstein Premiere Kammerspielen', { applyRecency: false });

@@ -15,10 +15,12 @@ async function getBrowser() {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ]
+        '--disable-features=IsolateOrigins,site-per-process',
+      ],
     });
-    browser.on('disconnected', () => { browserPromise = null; });
+    browser.on('disconnected', () => {
+      browserPromise = null;
+    });
     return browser;
   })();
   return browserPromise;
@@ -26,7 +28,9 @@ async function getBrowser() {
 
 async function closeBrowser() {
   if (browserPromise) {
-    try { (await browserPromise).close(); } catch {}
+    try {
+      (await browserPromise).close();
+    } catch {}
     browserPromise = null;
   }
 }
@@ -35,13 +39,15 @@ async function fetchViaBrowser(url, { timeout = 30000 } = {}) {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+    );
     await page.setExtraHTTPHeaders({
-      'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8'
+      'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
     });
     const response = await page.goto(url, {
       waitUntil: 'domcontentloaded',
-      timeout
+      timeout,
     });
     if (!response) throw new Error('Keine Antwort');
 
@@ -51,11 +57,21 @@ async function fetchViaBrowser(url, { timeout = 30000 } = {}) {
     let body = await response.text();
     let contentType = response.headers()['content-type'] || '';
 
-    if (contentType.includes('html') && !body.trim().startsWith('<?xml') && !body.includes('<rss') && !body.includes('<feed')) {
+    if (
+      contentType.includes('html') &&
+      !body.trim().startsWith('<?xml') &&
+      !body.includes('<rss') &&
+      !body.includes('<feed')
+    ) {
       const pre = await page.$('pre');
       if (pre) {
-        const preText = await page.evaluate(el => el.textContent, pre);
-        if (preText && (preText.includes('<rss') || preText.includes('<feed') || preText.trim().startsWith('<?xml'))) {
+        const preText = await page.evaluate((el) => el.textContent, pre);
+        if (
+          preText &&
+          (preText.includes('<rss') ||
+            preText.includes('<feed') ||
+            preText.trim().startsWith('<?xml'))
+        ) {
           body = preText;
           contentType = 'application/xml';
         }
@@ -68,10 +84,12 @@ async function fetchViaBrowser(url, { timeout = 30000 } = {}) {
       contentType,
       finalUrl: response.url(),
       etag: response.headers().etag,
-      lastModified: response.headers()['last-modified']
+      lastModified: response.headers()['last-modified'],
     };
   } finally {
-    try { await page.close(); } catch {}
+    try {
+      await page.close();
+    } catch {}
   }
 }
 
@@ -89,23 +107,25 @@ async function fetchFeedViaBrowser(feed) {
     return {
       status: 'ok',
       title: parsed.title,
-      items: parsed.items.map(it => ({
-        ...it,
-        source: feed.name,
-        sourcePriority: feed.priority || 50
-      })).filter(i => i.url),
+      items: parsed.items
+        .map((it) => ({
+          ...it,
+          source: feed.name,
+          sourcePriority: feed.priority || 50,
+        }))
+        .filter((i) => i.url),
       responseTimeMs: Date.now() - start,
       etag: res.etag,
       lastModified: res.lastModified,
       contentType: res.contentType,
-      viaBrowser: true
+      viaBrowser: true,
     };
   } catch (err) {
     return {
       status: 'error',
       error: `Puppeteer: ${err.message}`,
       items: [],
-      responseTimeMs: Date.now() - start
+      responseTimeMs: Date.now() - start,
     };
   }
 }

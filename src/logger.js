@@ -34,15 +34,15 @@ const logger = winston.createLogger({
       filename: path.join(LOG_DIR, 'error.log'),
       level: 'error',
       maxsize: 10 * 1024 * 1024,
-      maxFiles: 5
+      maxFiles: 5,
     }),
     new winston.transports.File({
       filename: path.join(LOG_DIR, 'pressespiegel.log'),
       maxsize: 10 * 1024 * 1024,
-      maxFiles: 14
+      maxFiles: 14,
     }),
-    new winston.transports.Console({ format: consoleFormat })
-  ]
+    new winston.transports.Console({ format: consoleFormat }),
+  ],
 });
 
 module.exports = logger;
