@@ -7,26 +7,107 @@ const { LRUCache } = require('lru-cache');
 const { keywords, loadJson } = require('./config');
 const { normalize } = require('./analyzer');
 const { parseQuery, queryToBM25String, articleMatchesStructured } = require('./query-parser');
-const {
-  normalizeUmlauts,
-  germanCompoundSplit,
-  colognePhonetic,
-  extractSnippet,
-  splitSentences
-} = require('./text-utils');
+const { germanCompoundSplit, colognePhonetic, extractSnippet } = require('./text-utils');
 
 const GERMAN_STOPWORDS = new Set([
-  'der', 'die', 'das', 'ein', 'eine', 'einen', 'einer', 'eines', 'einem',
-  'und', 'oder', 'aber', 'denn', 'doch', 'sondern', 'weil', 'wenn', 'dass',
-  'ist', 'sind', 'war', 'waren', 'wird', 'werden', 'wurde', 'wurden',
-  'sein', 'seine', 'seiner', 'seinem', 'seinen', 'ihrer', 'ihrem', 'ihren',
-  'auf', 'an', 'in', 'im', 'aus', 'bei', 'mit', 'nach', 'von', 'vom',
-  'zu', 'zur', 'zum', 'fuer', 'fur', 'durch', 'ueber', 'unter', 'vor',
-  'gegen', 'ohne', 'als', 'wie', 'auch', 'noch', 'nur', 'schon', 'sehr',
-  'mehr', 'kann', 'koennte', 'soll', 'sollte', 'will', 'wollte', 'muss',
-  'man', 'er', 'sie', 'es', 'wir', 'ihr', 'ich', 'du', 'mich', 'mir', 'dir',
-  'sich', 'dem', 'den', 'des', 'so', 'nicht', 'nichts', 'kein', 'keine',
-  'da', 'dort', 'hier', 'jetzt', 'dann', 'noch', 'mal', 'am'
+  'der',
+  'die',
+  'das',
+  'ein',
+  'eine',
+  'einen',
+  'einer',
+  'eines',
+  'einem',
+  'und',
+  'oder',
+  'aber',
+  'denn',
+  'doch',
+  'sondern',
+  'weil',
+  'wenn',
+  'dass',
+  'ist',
+  'sind',
+  'war',
+  'waren',
+  'wird',
+  'werden',
+  'wurde',
+  'wurden',
+  'sein',
+  'seine',
+  'seiner',
+  'seinem',
+  'seinen',
+  'ihrer',
+  'ihrem',
+  'ihren',
+  'auf',
+  'an',
+  'in',
+  'im',
+  'aus',
+  'bei',
+  'mit',
+  'nach',
+  'von',
+  'vom',
+  'zu',
+  'zur',
+  'zum',
+  'fuer',
+  'fur',
+  'durch',
+  'ueber',
+  'unter',
+  'vor',
+  'gegen',
+  'ohne',
+  'als',
+  'wie',
+  'auch',
+  'noch',
+  'nur',
+  'schon',
+  'sehr',
+  'mehr',
+  'kann',
+  'koennte',
+  'soll',
+  'sollte',
+  'will',
+  'wollte',
+  'muss',
+  'man',
+  'er',
+  'sie',
+  'es',
+  'wir',
+  'ihr',
+  'ich',
+  'du',
+  'mich',
+  'mir',
+  'dir',
+  'sich',
+  'dem',
+  'den',
+  'des',
+  'so',
+  'nicht',
+  'nichts',
+  'kein',
+  'keine',
+  'da',
+  'dort',
+  'hier',
+  'jetzt',
+  'dann',
+  'noch',
+  'mal',
+  'am',
 ]);
 
 const tokenizer = new natural.AggressiveTokenizerDe();
@@ -36,10 +117,12 @@ const SYNONYMS_MAP = new Map();
 try {
   const syn = loadJson('synonyms.json');
   for (const group of syn.groups || []) {
-    const normalized = group.map(g => stemmer.stem(normalize(g)));
+    const normalized = group.map((g) => stemmer.stem(normalize(g)));
     for (const t of normalized) SYNONYMS_MAP.set(t, normalized);
   }
-} catch { /* synonyms optional */ }
+} catch {
+  /* synonyms optional */
+}
 
 function expandWithSynonyms(stems) {
   const expanded = new Set();
@@ -106,7 +189,7 @@ function proximityBoost(queryStems, doc, { maxWindow = 8 } = {}) {
     if (!indexByStem.has(stem)) indexByStem.set(stem, []);
     indexByStem.get(stem).push(pos);
   }
-  const presentTerms = uniqQuery.filter(t => indexByStem.has(t));
+  const presentTerms = uniqQuery.filter((t) => indexByStem.has(t));
   if (presentTerms.length < 2) return 0;
 
   let bestSpan = Infinity;
@@ -129,7 +212,18 @@ function proximityBoost(queryStems, doc, { maxWindow = 8 } = {}) {
 }
 
 class BM25Index {
-  constructor(articles, { k1 = 1.5, b = 0.75, titleBoost = 4, recencyHalfLife = 30, withPositions = true, withCompoundSplit = true, withPhonetic = true } = {}) {
+  constructor(
+    articles,
+    {
+      k1 = 1.5,
+      b = 0.75,
+      titleBoost = 4,
+      recencyHalfLife = 30,
+      withPositions = true,
+      withCompoundSplit = true,
+      withPhonetic = true,
+    } = {}
+  ) {
     this.k1 = k1;
     this.b = b;
     this.titleBoost = titleBoost;
@@ -144,11 +238,13 @@ class BM25Index {
     for (const article of articles) {
       const titleTokens = tokenizeAndStem(article.title, { withCompoundSplit });
       const summaryTokens = tokenizeAndStem(article.summary || '', { withCompoundSplit });
-      const bodyTokens = tokenizeAndStem(article.full_text || article.fullText || '', { withCompoundSplit });
+      const bodyTokens = tokenizeAndStem(article.full_text || article.fullText || '', {
+        withCompoundSplit,
+      });
       const allTokens = [
         ...Array(this.titleBoost).fill(titleTokens).flat(),
         ...summaryTokens,
-        ...bodyTokens
+        ...bodyTokens,
       ];
       const tf = new Map();
       for (const t of allTokens) tf.set(t, (tf.get(t) || 0) + 1);
@@ -162,7 +258,9 @@ class BM25Index {
       }
 
       const positions = withPositions
-        ? tokenizePositions(`${article.title || ''} ${article.summary || ''} ${article.full_text || article.fullText || ''}`)
+        ? tokenizePositions(
+            `${article.title || ''} ${article.summary || ''} ${article.full_text || article.fullText || ''}`
+          )
         : null;
 
       const phoneticCodes = withPhonetic
@@ -177,7 +275,7 @@ class BM25Index {
         sourcePriority: article.source_priority || 50,
         positions,
         titleStems: new Set(titleTokens),
-        phoneticCodes
+        phoneticCodes,
       });
       totalLen += allTokens.length;
     }
@@ -190,7 +288,11 @@ class BM25Index {
     return Math.log(1 + (this.N - n + 0.5) / (n + 0.5));
   }
 
-  score(queryStems, doc, { applyRecency = true, applyProximity = true, applyCoverage = true, phoneticCodes = null } = {}) {
+  score(
+    queryStems,
+    doc,
+    { applyRecency = true, applyProximity = true, applyCoverage = true, phoneticCodes = null } = {}
+  ) {
     let score = 0;
     let matched = 0;
     for (const term of queryStems) {
@@ -201,7 +303,13 @@ class BM25Index {
       const norm = 1 - this.b + this.b * (doc.len / (this.avgdl || 1));
       score += idf * ((tf * (this.k1 + 1)) / (tf + this.k1 * norm));
     }
-    if (score === 0 && phoneticCodes && doc.phoneticCodes && phoneticCodes.size && doc.phoneticCodes.size) {
+    if (
+      score === 0 &&
+      phoneticCodes &&
+      doc.phoneticCodes &&
+      phoneticCodes.size &&
+      doc.phoneticCodes.size
+    ) {
       let phoneticHits = 0;
       for (const code of phoneticCodes) {
         if (doc.phoneticCodes.has(code)) phoneticHits++;
@@ -214,28 +322,39 @@ class BM25Index {
     if (score === 0) return 0;
     if (applyCoverage && queryStems.length > 1) {
       const coverage = matched / queryStems.length;
-      score *= (0.3 + 0.7 * coverage);
+      score *= 0.3 + 0.7 * coverage;
     }
     if (applyProximity && doc.positions && queryStems.length >= 2) {
-      score *= (1 + proximityBoost(queryStems, doc));
+      score *= 1 + proximityBoost(queryStems, doc);
     }
     if (doc.titleStems && doc.titleStems.size) {
-      const titleHits = queryStems.filter(t => doc.titleStems.has(t)).length;
-      if (titleHits > 0) score *= (1 + 0.15 * titleHits);
+      const titleHits = queryStems.filter((t) => doc.titleStems.has(t)).length;
+      if (titleHits > 0) score *= 1 + 0.15 * titleHits;
     }
-    if (applyRecency) score *= (0.5 + doc.recency);
+    if (applyRecency) score *= 0.5 + doc.recency;
     return score;
   }
 
-  search(query, { limit = 50, withSynonyms = true, applyRecency = true, applyProximity = true, withPhonetic = true } = {}) {
+  search(
+    query,
+    {
+      limit = 50,
+      withSynonyms = true,
+      applyRecency = true,
+      applyProximity = true,
+      withPhonetic = true,
+    } = {}
+  ) {
     if (!query || !query.trim()) return [];
     const stems = tokenizeAndStem(query, { withSynonyms, withCompoundSplit: true });
     if (stems.length === 0) return [];
     const phoneticCodes = withPhonetic ? tokenizePhonetic(query) : null;
-    const scored = this.docs.map(doc => ({
-      article: doc.article,
-      score: this.score(stems, doc, { applyRecency, applyProximity, phoneticCodes })
-    })).filter(r => r.score > 0);
+    const scored = this.docs
+      .map((doc) => ({
+        article: doc.article,
+        score: this.score(stems, doc, { applyRecency, applyProximity, phoneticCodes }),
+      }))
+      .filter((r) => r.score > 0);
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, limit);
   }
@@ -248,7 +367,7 @@ function buildFuse(articles) {
       { name: 'summary', weight: 0.3 },
       { name: 'source', weight: 0.1 },
       { name: 'author', weight: 0.05 },
-      { name: 'full_text', weight: 0.05 }
+      { name: 'full_text', weight: 0.05 },
     ],
     threshold: 0.45,
     distance: 200,
@@ -256,7 +375,7 @@ function buildFuse(articles) {
     minMatchCharLength: 3,
     includeScore: true,
     useExtendedSearch: true,
-    findAllMatches: false
+    findAllMatches: false,
   });
 }
 
@@ -264,11 +383,14 @@ const SEARCH_CACHE = new LRUCache({
   max: 200,
   ttl: 60_000,
   allowStale: false,
-  updateAgeOnGet: false
+  updateAgeOnGet: false,
 });
 
 function cacheKey(articles, query, opts) {
-  const ids = articles.length > 0 ? articles[0].id + ':' + articles[articles.length - 1].id + ':' + articles.length : 'empty';
+  const ids =
+    articles.length > 0
+      ? articles[0].id + ':' + articles[articles.length - 1].id + ':' + articles.length
+      : 'empty';
   return `${ids}|${query}|${JSON.stringify(opts)}`;
 }
 
@@ -280,7 +402,7 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
   const parsed = parseQuery(query);
   let filteredArticles = articles;
   if (parsed && parsed.isStructured) {
-    filteredArticles = articles.filter(a => articleMatchesStructured(a, parsed));
+    filteredArticles = articles.filter((a) => articleMatchesStructured(a, parsed));
     if (filteredArticles.length === 0) {
       return { results: [], filteredCount: 0 };
     }
@@ -289,26 +411,26 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
   const bm25Query = parsed ? queryToBM25String(parsed) || query : query;
   const bm25 = new BM25Index(filteredArticles);
   const bm25Results = bm25.search(bm25Query, { limit: limit * 2, withSynonyms, applyRecency });
-  const bm25Map = new Map(bm25Results.map(r => [r.article.id, r.score]));
+  const bm25Map = new Map(bm25Results.map((r) => [r.article.id, r.score]));
 
   const fuse = buildFuse(filteredArticles);
   const fuseResults = fuse.search(bm25Query, { limit: limit * 2 });
-  const fuseMap = new Map(fuseResults.map(r => [r.item.id, 1 - (r.score || 0)]));
+  const fuseMap = new Map(fuseResults.map((r) => [r.item.id, 1 - (r.score || 0)]));
 
   const allIds = new Set([...bm25Map.keys(), ...fuseMap.keys()]);
-  const maxBm25 = Math.max(...bm25Results.map(r => r.score), 1);
+  const maxBm25 = Math.max(...bm25Results.map((r) => r.score), 1);
 
   const combined = [];
   for (const id of allIds) {
-    const article = filteredArticles.find(a => a.id === id);
+    const article = filteredArticles.find((a) => a.id === id);
     if (!article) continue;
     const bm25Norm = (bm25Map.get(id) || 0) / maxBm25;
     const fuseNorm = fuseMap.get(id) || 0;
     let score = bm25Norm * 0.65 + fuseNorm * 0.35;
 
-    if (parsed && parsed.must.some(t => t.type === 'phrase')) {
+    if (parsed && parsed.must.some((t) => t.type === 'phrase')) {
       const titleLower = (article.title || '').toLowerCase();
-      for (const phrase of parsed.must.filter(t => t.type === 'phrase')) {
+      for (const phrase of parsed.must.filter((t) => t.type === 'phrase')) {
         if (titleLower.includes(phrase.value.toLowerCase())) score += 0.3;
       }
     }
@@ -323,9 +445,15 @@ function runHybridSearch(articles, query, { limit, withSynonyms, applyRecency })
 }
 
 function hybridSearch(articles, query, opts = {}) {
-  const { limit = 50, withSynonyms = true, applyRecency = true, cache = true, didYouMeanFallback = true } = opts;
+  const {
+    limit = 50,
+    withSynonyms = true,
+    applyRecency = true,
+    cache = true,
+    didYouMeanFallback = true,
+  } = opts;
   if (!query || !query.trim()) {
-    return articles.slice(0, limit).map(a => ({ article: a, score: 0 }));
+    return articles.slice(0, limit).map((a) => ({ article: a, score: 0 }));
   }
 
   const key = cache ? cacheKey(articles, query, { limit, withSynonyms, applyRecency }) : null;
@@ -334,7 +462,12 @@ function hybridSearch(articles, query, opts = {}) {
     if (cached) return cached;
   }
 
-  let { results, filteredCount } = runHybridSearch(articles, query, { limit, withSynonyms, applyRecency });
+  const { results: initialResults, filteredCount } = runHybridSearch(articles, query, {
+    limit,
+    withSynonyms,
+    applyRecency,
+  });
+  let results = initialResults;
 
   const hasStructuredOperators = /[+\-:"]|\b(AND|OR|NOT)\b/.test(query);
   if (didYouMeanFallback && results.length === 0 && filteredCount > 0 && !hasStructuredOperators) {
@@ -342,7 +475,7 @@ function hybridSearch(articles, query, opts = {}) {
     if (suggestion && suggestion !== query) {
       const fallback = runHybridSearch(articles, suggestion, { limit, withSynonyms, applyRecency });
       if (fallback.results.length > 0) {
-        results = fallback.results.map(r => ({ ...r, _viaDidYouMean: suggestion }));
+        results = fallback.results.map((r) => ({ ...r, _viaDidYouMean: suggestion }));
       }
     }
   }
@@ -359,7 +492,7 @@ function queryTerms(query) {
       if (m.value && m.value.length >= 3) literals.push(m.value);
     }
   } else if (query) {
-    literals.push(...query.split(/\s+/).filter(t => t.length >= 3));
+    literals.push(...query.split(/\s+/).filter((t) => t.length >= 3));
   }
   const stems = [...new Set(tokenizeAndStem(query || ''))];
   return [...new Set([...literals, ...stems])];
@@ -369,7 +502,7 @@ function highlightTerms(text, query) {
   if (!query || !text) return text;
   const all = queryTerms(query);
   if (!all.length) return text;
-  const escaped = all.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const escaped = all.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const re = new RegExp(`(${escaped.join('|')})`, 'gi');
   return text.replace(re, '<mark>$1</mark>');
 }
@@ -399,7 +532,11 @@ function suggestQueries(prefix, articles) {
       if (w.length >= 3 && w.startsWith(lower)) add(w, 2);
     }
   }
-  for (const kw of [...(keywords.productions || []), ...(keywords.people || []), ...(keywords.venues || [])]) {
+  for (const kw of [
+    ...(keywords.productions || []),
+    ...(keywords.people || []),
+    ...(keywords.venues || []),
+  ]) {
     if (kw && normalize(kw).startsWith(lower)) add(kw, 10);
   }
 
@@ -413,7 +550,7 @@ function didYouMean(query, articles, { threshold = 3 } = {}) {
   if (!query || query.length < 4) return null;
   const allTerms = new Set();
   for (const a of articles) {
-    for (const w of (normalize(a.title || '').split(/\s+/))) {
+    for (const w of normalize(a.title || '').split(/\s+/)) {
       if (w.length >= 4) allTerms.add(w);
     }
   }
@@ -423,13 +560,23 @@ function didYouMean(query, articles, { threshold = 3 } = {}) {
   const queryTerms = normalize(query).split(/\s+/);
   const suggestions = [];
   for (const qt of queryTerms) {
-    if (qt.length < 4) { suggestions.push(qt); continue; }
-    if (allTerms.has(qt)) { suggestions.push(qt); continue; }
-    let best = null, bestDist = Infinity;
+    if (qt.length < 4) {
+      suggestions.push(qt);
+      continue;
+    }
+    if (allTerms.has(qt)) {
+      suggestions.push(qt);
+      continue;
+    }
+    let best = null,
+      bestDist = Infinity;
     for (const term of allTerms) {
       if (Math.abs(term.length - qt.length) > threshold) continue;
       const d = leven(qt, term);
-      if (d > 0 && d <= threshold && d < bestDist) { bestDist = d; best = term; }
+      if (d > 0 && d <= threshold && d < bestDist) {
+        bestDist = d;
+        best = term;
+      }
     }
     suggestions.push(best || qt);
   }
@@ -458,12 +605,14 @@ function topMentions(articles, { minLen = 4, limit = 30 } = {}) {
 function trends(articlesA, articlesB) {
   const a = topMentions(articlesA, { limit: 100 });
   const b = topMentions(articlesB, { limit: 100 });
-  const bMap = new Map(b.map(x => [x.term, x.count]));
-  return a.map(({ term, count }) => {
-    const prev = bMap.get(term) || 0;
-    const diff = count - prev;
-    return { term, count, previous: prev, change: diff };
-  }).sort((x, y) => y.change - x.change);
+  const bMap = new Map(b.map((x) => [x.term, x.count]));
+  return a
+    .map(({ term, count }) => {
+      const prev = bMap.get(term) || 0;
+      const diff = count - prev;
+      return { term, count, previous: prev, change: diff };
+    })
+    .sort((x, y) => y.change - x.change);
 }
 
 module.exports = {
@@ -479,5 +628,5 @@ module.exports = {
   trends,
   tokenizeAndStem,
   tokenizePhonetic,
-  clearSearchCache
+  clearSearchCache,
 };

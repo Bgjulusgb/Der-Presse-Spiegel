@@ -68,9 +68,15 @@ program
       console.log(`  ${chalk.bold('Gefunden:')}      ${summary.articlesFound}`);
       console.log(`  ${chalk.bold('Neu in DB:')}     ${chalk.green.bold(summary.articlesAdded)}`);
       console.log(`  ${chalk.bold('Duplikate:')}     ${summary.duplicatesFound}`);
-      console.log(`  ${chalk.bold('Fehler:')}        ${summary.errors > 0 ? chalk.red(summary.errors) : summary.errors}`);
+      console.log(
+        `  ${chalk.bold('Fehler:')}        ${summary.errors > 0 ? chalk.red(summary.errors) : summary.errors}`
+      );
       if (summary.articlesAdded > 0) {
-        console.log(chalk.gray(`\nTipp: ${chalk.white('pressespiegel report --last 7d')} erstellt einen HTML-Report`));
+        console.log(
+          chalk.gray(
+            `\nTipp: ${chalk.white('pressespiegel report --last 7d')} erstellt einen HTML-Report`
+          )
+        );
       }
     } catch (err) {
       logger.error('Scan fehlgeschlagen', { error: err.message, stack: err.stack });
@@ -105,11 +111,19 @@ program
 
       if (articles.length === 0) {
         console.log(chalk.yellow('\n⚠ Keine Artikel im Zeitraum.'));
-        console.log(chalk.gray(`Tipp: Erst ${chalk.white('pressespiegel scan --last 7d')} ausfuehren.`));
+        console.log(
+          chalk.gray(`Tipp: Erst ${chalk.white('pressespiegel scan --last 7d')} ausfuehren.`)
+        );
         return;
       }
 
-      const result = await generateReport({ from, to, articles, format: opts.format, title: opts.title });
+      const result = await generateReport({
+        from,
+        to,
+        articles,
+        format: opts.format,
+        title: opts.title,
+      });
       console.log('');
       if (result.html) console.log(chalk.green(`  HTML: ${result.html}`));
       if (result.pdf) console.log(chalk.green(`  PDF:  ${result.pdf}`));
@@ -160,9 +174,10 @@ program
       console.log(chalk.yellow('Noch keine Reports.'));
       return;
     }
-    const files = fs.readdirSync(REPORTS_DIR)
-      .filter(f => f.endsWith('.html') || f.endsWith('.pdf'))
-      .map(f => {
+    const files = fs
+      .readdirSync(REPORTS_DIR)
+      .filter((f) => f.endsWith('.html') || f.endsWith('.pdf'))
+      .map((f) => {
         const fp = path.join(REPORTS_DIR, f);
         const stat = fs.statSync(fp);
         return { name: f, path: fp, size: stat.size, mtime: stat.mtime };
@@ -175,7 +190,9 @@ program
     section(`${files.length} Report${files.length === 1 ? '' : 's'} in ${REPORTS_DIR}`);
     for (const f of files) {
       const sizeKb = Math.round(f.size / 1024);
-      console.log(`  ${chalk.gray(format(f.mtime, 'dd.MM.yyyy HH:mm'))}  ${chalk.cyan(f.name)} ${chalk.gray(`(${sizeKb} KB)`)}`);
+      console.log(
+        `  ${chalk.gray(format(f.mtime, 'dd.MM.yyyy HH:mm'))}  ${chalk.cyan(f.name)} ${chalk.gray(`(${sizeKb} KB)`)}`
+      );
     }
   });
 
@@ -200,11 +217,20 @@ program
       }
       section(`${rows.length} Treffer fuer "${query}"`);
       for (const r of rows) {
-        const sent = r.sentiment === 'positiv' ? chalk.green('▲') :
-                     r.sentiment === 'negativ' ? chalk.red('▼') : chalk.gray('·');
+        const sent =
+          r.sentiment === 'positiv'
+            ? chalk.green('▲')
+            : r.sentiment === 'negativ'
+              ? chalk.red('▼')
+              : chalk.gray('·');
         console.log(`\n  ${sent} ${chalk.bold(r.title)}`);
-        console.log(`    ${chalk.gray(r.source || '')} · ${chalk.gray(format(new Date(r.published_date), 'dd.MM.yyyy'))} · ${chalk.cyan(`Score ${r.relevance_score}`)}`);
-        if (r.summary) console.log(`    ${chalk.gray(r.summary.slice(0, 150) + (r.summary.length > 150 ? '…' : ''))}`);
+        console.log(
+          `    ${chalk.gray(r.source || '')} · ${chalk.gray(format(new Date(r.published_date), 'dd.MM.yyyy'))} · ${chalk.cyan(`Score ${r.relevance_score}`)}`
+        );
+        if (r.summary)
+          console.log(
+            `    ${chalk.gray(r.summary.slice(0, 150) + (r.summary.length > 150 ? '…' : ''))}`
+          );
         console.log(`    ${chalk.blue.underline(r.url)}`);
       }
     } finally {
@@ -216,12 +242,18 @@ const configCmd = program.command('config').description('Konfiguration anpassen'
 
 configCmd
   .command('add-keyword <kw>')
-  .option('--type <t>', 'Typ: required | productions | people | venues | exclude | theater_context', 'productions')
+  .option(
+    '--type <t>',
+    'Typ: required | productions | people | venues | exclude | theater_context',
+    'productions'
+  )
   .action((kw, opts) => {
     const data = loadJson('keywords.json');
     if (!data[opts.type]) {
       console.error(chalk.red(`Unbekannter Typ: ${opts.type}`));
-      console.log(chalk.gray('Verfuegbar: required, productions, people, venues, theater_context, exclude'));
+      console.log(
+        chalk.gray('Verfuegbar: required, productions, people, venues, theater_context, exclude')
+      );
       process.exit(1);
     }
     if (data[opts.type].includes(kw)) {
@@ -235,7 +267,11 @@ configCmd
 
 configCmd
   .command('remove-keyword <kw>')
-  .option('--type <t>', 'Typ: required | productions | people | venues | exclude | theater_context', 'productions')
+  .option(
+    '--type <t>',
+    'Typ: required | productions | people | venues | exclude | theater_context',
+    'productions'
+  )
   .action((kw, opts) => {
     const data = loadJson('keywords.json');
     if (!data[opts.type]) {
@@ -243,7 +279,7 @@ configCmd
       process.exit(1);
     }
     const before = data[opts.type].length;
-    data[opts.type] = data[opts.type].filter(k => k !== kw);
+    data[opts.type] = data[opts.type].filter((k) => k !== kw);
     if (data[opts.type].length === before) {
       console.log(chalk.yellow(`Nicht gefunden: ${kw}`));
       return;
@@ -258,7 +294,7 @@ configCmd
   .option('--priority <n>', 'Prioritaet (1-100)', '50')
   .action((url, opts) => {
     const data = loadJson('sources.json');
-    if (data.feeds.some(f => f.url === url)) {
+    if (data.feeds.some((f) => f.url === url)) {
       console.log(chalk.yellow(`Bereits vorhanden: ${url}`));
       return;
     }
@@ -266,7 +302,7 @@ configCmd
       name: opts.name || new URL(url).hostname,
       url,
       priority: parseInt(opts.priority, 10),
-      type: 'rss'
+      type: 'rss',
     });
     saveJson('sources.json', data);
     console.log(chalk.green(`Hinzugefuegt: ${opts.name || url}`));
@@ -287,7 +323,9 @@ configCmd
     section(`Pflicht-Begriffe (${kw.required.length})`);
     console.log('  ' + kw.required.join(', '));
     section(`Produktionen (${kw.productions.length})`);
-    console.log('  ' + kw.productions.slice(0, 50).join(', ') + (kw.productions.length > 50 ? '…' : ''));
+    console.log(
+      '  ' + kw.productions.slice(0, 50).join(', ') + (kw.productions.length > 50 ? '…' : '')
+    );
     section(`Personen (${kw.people.length})`);
     console.log('  ' + kw.people.slice(0, 30).join(', ') + (kw.people.length > 30 ? '…' : ''));
     section(`Ausschluss (${kw.exclude.length})`);
@@ -317,9 +355,11 @@ program
 
       if (stats.bySource.length > 0) {
         section('Top Quellen');
-        const max = Math.max(...stats.bySource.map(r => r.count));
+        const max = Math.max(...stats.bySource.map((r) => r.count));
         for (const row of stats.bySource.slice(0, 15)) {
-          console.log(`  ${chalk.cyan(String(row.count).padStart(5))} ${bar(row.count, max, 20)}  ${row.source}`);
+          console.log(
+            `  ${chalk.cyan(String(row.count).padStart(5))} ${bar(row.count, max, 20)}  ${row.source}`
+          );
         }
       }
 
@@ -327,9 +367,10 @@ program
       if (health.length > 0) {
         section('Feed-Gesundheit');
         for (const h of health) {
-          const status = h.consecutive_failures > 0
-            ? chalk.red(`Fehler: ${h.consecutive_failures}x Fehler in Folge`)
-            : chalk.green('OK');
+          const status =
+            h.consecutive_failures > 0
+              ? chalk.red(`Fehler: ${h.consecutive_failures}x Fehler in Folge`)
+              : chalk.green('OK');
           console.log(`  ${status}  ${h.source}`);
         }
       }
@@ -345,7 +386,9 @@ program
   .option('--since <date>', 'Pruefe seit Datum YYYY-MM-DD')
   .action(async (opts) => {
     try {
-      const since = opts.since ? new Date(opts.since) : new Date(Date.now() - 90 * 24 * 3600 * 1000);
+      const since = opts.since
+        ? new Date(opts.since)
+        : new Date(Date.now() - 90 * 24 * 3600 * 1000);
       const candidates = database.getRecentForDedup(since);
       section(`Pruefe ${candidates.length} Artikel auf Duplikate`);
       let dupCount = 0;
@@ -353,7 +396,13 @@ program
         const c = candidates[i];
         const others = candidates.slice(0, i);
         const hit = findDuplicate(
-          { id: c.id, title: c.title, url: c.url_normalized, first_paragraph: c.first_paragraph, source: c.source },
+          {
+            id: c.id,
+            title: c.title,
+            url: c.url_normalized,
+            first_paragraph: c.first_paragraph,
+            source: c.source,
+          },
           others
         );
         if (hit) {
@@ -365,7 +414,9 @@ program
           }
         }
       }
-      console.log(chalk.green(`\n${dupCount} Duplikate ${opts.dryRun ? 'gefunden (dry-run)' : 'markiert'}`));
+      console.log(
+        chalk.green(`\n${dupCount} Duplikate ${opts.dryRun ? 'gefunden (dry-run)' : 'markiert'}`)
+      );
     } finally {
       database.close();
     }
@@ -395,7 +446,7 @@ program
       console.log(`    Eintraege:    ${chalk.bold(result.itemCount)}`);
       if (result.sample.length) {
         console.log(chalk.cyan('\n  Beispiele:'));
-        result.sample.forEach(s => {
+        result.sample.forEach((s) => {
           console.log(`    - ${chalk.bold(s.title || '(ohne Titel)')}`);
           console.log(`      ${chalk.gray(s.url || '')}`);
         });
@@ -417,17 +468,24 @@ program
     const results = await Promise.all(
       srcCfg.feeds.map(async (f) => ({ feed: f, result: await testFeed(f.url, f.name) }))
     );
-    let ok = 0, fail = 0;
+    let ok = 0,
+      fail = 0;
     for (const { feed, result } of results) {
       if (result.ok) {
         ok++;
-        console.log(`  ${chalk.green('OK')} ${chalk.bold(feed.name.padEnd(38))} ${result.itemCount.toString().padStart(4)} Eintraege  ${chalk.gray(result.responseTimeMs + 'ms')}`);
+        console.log(
+          `  ${chalk.green('OK')} ${chalk.bold(feed.name.padEnd(38))} ${result.itemCount.toString().padStart(4)} Eintraege  ${chalk.gray(result.responseTimeMs + 'ms')}`
+        );
       } else {
         fail++;
-        console.log(`  ${chalk.red('FAIL')} ${chalk.bold(feed.name.padEnd(38))} ${chalk.red(result.error)}`);
+        console.log(
+          `  ${chalk.red('FAIL')} ${chalk.bold(feed.name.padEnd(38))} ${chalk.red(result.error)}`
+        );
       }
     }
-    console.log(`\n  ${chalk.green(ok + ' OK')} · ${chalk.red(fail + ' fehlgeschlagen')} von ${srcCfg.feeds.length}`);
+    console.log(
+      `\n  ${chalk.green(ok + ' OK')} · ${chalk.red(fail + ' fehlgeschlagen')} von ${srcCfg.feeds.length}`
+    );
     database.close();
   });
 
@@ -459,7 +517,11 @@ function openFile(filepath) {
   let child;
   try {
     if (platform === 'win32') {
-      child = spawn('cmd', ['/c', 'start', '""', filepath], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true });
+      child = spawn('cmd', ['/c', 'start', '""', filepath], {
+        detached: true,
+        stdio: 'ignore',
+        windowsVerbatimArguments: true,
+      });
     } else if (platform === 'darwin') {
       child = spawn('open', [filepath], { detached: true, stdio: 'ignore' });
     } else {

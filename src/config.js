@@ -10,12 +10,15 @@ if (fs.existsSync(dotenvPath)) {
   const origWrite = process.stdout.write.bind(process.stdout);
   process.stdout.write = (chunk, ...args) => {
     const s = chunk && chunk.toString ? chunk.toString() : String(chunk);
-    if (s.includes('injected env') || s.includes('tip:') || /^[◇⌘⚀-⛿].*injected/.test(s)) return true;
+    if (s.includes('injected env') || s.includes('tip:') || /^[◇⌘⚀-⛿].*injected/.test(s))
+      return true;
     return origWrite(chunk, ...args);
   };
   try {
     require('dotenv').config({ path: dotenvPath, quiet: true, debug: false });
-  } catch { /* optional */ }
+  } catch {
+    /* optional */
+  }
   process.stdout.write = origWrite;
 }
 
@@ -39,17 +42,13 @@ const sources = loadJson('sources.json');
 const keywords = loadJson('keywords.json');
 const sentiment = loadJson('sentiment.json');
 
-settings.scraping.user_agent =
-  process.env.USER_AGENT || settings.scraping.user_agent;
+settings.scraping.user_agent = process.env.USER_AGENT || settings.scraping.user_agent;
 
 if (process.env.REQUEST_TIMEOUT) {
   settings.scraping.request_timeout_ms = parseInt(process.env.REQUEST_TIMEOUT, 10);
 }
 if (process.env.MAX_CONCURRENT_REQUESTS) {
-  settings.scraping.max_concurrent_requests = parseInt(
-    process.env.MAX_CONCURRENT_REQUESTS,
-    10
-  );
+  settings.scraping.max_concurrent_requests = parseInt(process.env.MAX_CONCURRENT_REQUESTS, 10);
 }
 if (process.env.LOG_LEVEL) {
   settings.logging.level = process.env.LOG_LEVEL;
@@ -62,5 +61,5 @@ module.exports = {
   sentiment,
   loadJson,
   saveJson,
-  CONFIG_DIR
+  CONFIG_DIR,
 };

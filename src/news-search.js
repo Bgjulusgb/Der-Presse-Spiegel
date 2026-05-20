@@ -14,11 +14,6 @@ function buildBingNewsUrl(query, { mkt = 'de-DE' } = {}) {
   return `https://www.bing.com/news/search?q=${q}&format=rss&mkt=${mkt}`;
 }
 
-function buildGoogleAlertUrl(query) {
-  const q = encodeURIComponent(query);
-  return `https://news.google.com/rss/search?q=${q}+when:30d&hl=de&gl=DE&ceid=DE:de`;
-}
-
 const redirectCache = new Map();
 
 async function resolveGoogleNewsUrl(googleUrl) {
@@ -90,7 +85,6 @@ async function fetchGoogleNewsFeed(feed) {
   const start = Date.now();
   const queries = feed.queries || [feed.query || 'Münchner Kammerspiele'];
   const allItems = new Map();
-  let errorCount = 0;
 
   for (const query of queries) {
     const url = buildGoogleNewsUrl(query);
@@ -114,11 +108,10 @@ async function fetchGoogleNewsFeed(feed) {
           source: `${sourceName} (via Google News)`,
           sourcePriority: feed.priority || 80,
           googleNewsRedirect: true,
-          searchQuery: query
+          searchQuery: query,
         });
       }
     } catch (err) {
-      errorCount++;
       logger.warn(`Google News Query "${query}" fehlgeschlagen: ${err.message}`);
     }
   }
@@ -130,7 +123,7 @@ async function fetchGoogleNewsFeed(feed) {
     items,
     responseTimeMs: Date.now() - start,
     error: items.length === 0 ? `Alle ${queries.length} Queries fehlgeschlagen` : null,
-    feedType: 'google-news'
+    feedType: 'google-news',
   };
 }
 
@@ -149,7 +142,7 @@ async function fetchBingNewsFeed(feed) {
         allItems.set(item.url, {
           ...item,
           source: feed.name || 'Bing News',
-          sourcePriority: feed.priority || 70
+          sourcePriority: feed.priority || 70,
         });
       }
     } catch (err) {
@@ -163,7 +156,7 @@ async function fetchBingNewsFeed(feed) {
     items,
     responseTimeMs: Date.now() - start,
     feedType: 'bing-news',
-    error: items.length === 0 ? 'Keine Treffer' : null
+    error: items.length === 0 ? 'Keine Treffer' : null,
   };
 }
 
@@ -174,5 +167,5 @@ module.exports = {
   fetchGoogleNewsFeed,
   fetchBingNewsFeed,
   cleanGoogleNewsTitle,
-  extractSourceFromGoogleTitle
+  extractSourceFromGoogleTitle,
 };

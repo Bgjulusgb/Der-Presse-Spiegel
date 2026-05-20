@@ -10,7 +10,7 @@ const {
   parseDateRange,
   truncate,
   escapeHtml,
-  tokenize
+  tokenize,
 } = require('../src/utils');
 
 test('normalizeUrl entfernt Tracking-Parameter', () => {
@@ -102,8 +102,10 @@ test('truncate kuerzt korrekt', () => {
 });
 
 test('escapeHtml escaped korrekt', () => {
-  assert.equal(escapeHtml('<script>alert("x")</script>'),
-    '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');
+  assert.equal(
+    escapeHtml('<script>alert("x")</script>'),
+    '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;'
+  );
 });
 
 test('tokenize ignoriert kurze Tokens', () => {

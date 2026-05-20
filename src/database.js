@@ -7,11 +7,13 @@ let Database;
 try {
   Database = require('better-sqlite3');
 } catch (err) {
-  const msg = String(err && err.message || err);
+  const msg = String((err && err.message) || err);
   const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
   if (/bindings|better_sqlite3\.node|NODE_MODULE_VERSION/i.test(msg)) {
     console.error('\n  Native Module "better-sqlite3" konnte nicht geladen werden.');
-    console.error(`  Du verwendest Node.js v${process.versions.node} (NODE_MODULE_VERSION ${process.versions.modules}).`);
+    console.error(
+      `  Du verwendest Node.js v${process.versions.node} (NODE_MODULE_VERSION ${process.versions.modules}).`
+    );
     console.error('  Vermutlich gibt es kein vorgebautes Binary fuer Deine Node-Version.\n');
     console.error('  Loesung A (schnell, empfohlen):');
     console.error('    1) Installiere Node 22 LTS von https://nodejs.org (Node 24 wird nicht');
@@ -129,8 +131,13 @@ function migrate() {
     );
   `);
 
-  const cols = db.prepare("PRAGMA table_info(source_health)").all().map(c => c.name);
-  const ensure = (name, ddl) => { if (!cols.includes(name)) db.exec(`ALTER TABLE source_health ADD COLUMN ${ddl}`); };
+  const cols = db
+    .prepare('PRAGMA table_info(source_health)')
+    .all()
+    .map((c) => c.name);
+  const ensure = (name, ddl) => {
+    if (!cols.includes(name)) db.exec(`ALTER TABLE source_health ADD COLUMN ${ddl}`);
+  };
   ensure('etag', 'etag TEXT');
   ensure('last_modified', 'last_modified TEXT');
   ensure('last_response_ms', 'last_response_ms INTEGER');
@@ -262,7 +269,7 @@ const stmts = {
   `),
   getHealth: db.prepare('SELECT * FROM source_health WHERE source = ?'),
   toggleEnabled: db.prepare('UPDATE source_health SET enabled = @enabled WHERE source = @source'),
-  healthAll: db.prepare('SELECT * FROM source_health ORDER BY source')
+  healthAll: db.prepare('SELECT * FROM source_health ORDER BY source'),
 };
 
 function insertArticle(article) {
@@ -284,7 +291,7 @@ function insertArticle(article) {
     article_type: article.articleType || null,
     paywall: article.paywall ? 1 : 0,
     also_on: article.alsoOn ? JSON.stringify(article.alsoOn) : null,
-    meta: article.meta ? JSON.stringify(article.meta) : null
+    meta: article.meta ? JSON.stringify(article.meta) : null,
   };
   try {
     const result = stmts.insertArticle.run(row);
@@ -308,7 +315,7 @@ function markAsDuplicate(articleId, originalId, additionalUrl) {
   stmts.markDuplicate.run({
     id: articleId,
     duplicate_of: originalId,
-    also_on: null
+    also_on: null,
   });
 }
 
@@ -342,18 +349,18 @@ function getStats(from, to) {
     positive: raw.positive || 0,
     negative: raw.negative || 0,
     neutral: raw.neutral || 0,
-    paywalled: raw.paywalled || 0
+    paywalled: raw.paywalled || 0,
   };
   return {
     overview,
-    bySource: stmts.bySource.all(range)
+    bySource: stmts.bySource.all(range),
   };
 }
 
 function startScanRun(from, to) {
   const result = stmts.insertScanRun.run({
     from: from.toISOString(),
-    to: to.toISOString()
+    to: to.toISOString(),
   });
   return result.lastInsertRowid;
 }
@@ -366,7 +373,7 @@ function finishScanRun(id, summary) {
     articles_added: summary.articlesAdded || 0,
     duplicates_found: summary.duplicatesFound || 0,
     errors: summary.errors || 0,
-    notes: summary.notes || null
+    notes: summary.notes || null,
   });
 }
 
@@ -380,7 +387,7 @@ function recordSourceSuccess(source, info = {}) {
     content_type: info.contentType || null,
     feed_type: info.feedType || null,
     status_code: info.statusCode || null,
-    via_browser: info.viaBrowser ? 1 : 0
+    via_browser: info.viaBrowser ? 1 : 0,
   });
 }
 
@@ -390,7 +397,7 @@ function recordSourceFailure(source, error, info = {}) {
     error: String(error).slice(0, 500),
     response_ms: info.responseTimeMs || 0,
     error_class: info.errorClass || null,
-    status_code: info.statusCode || null
+    status_code: info.statusCode || null,
   });
 }
 
@@ -419,36 +426,49 @@ function parseArticleRow(row) {
     ...row,
     also_on: safeJsonParse(row.also_on, []),
     meta: safeJsonParse(row.meta, {}),
-    paywall: !!row.paywall
+    paywall: !!row.paywall,
   };
 }
 
 function addTag(articleId, tag) {
   if (!tag || !tag.trim()) return;
   try {
-    db.prepare('INSERT INTO article_tags (article_id, tag) VALUES (?, ?)').run(articleId, tag.trim().toLowerCase());
+    db.prepare('INSERT INTO article_tags (article_id, tag) VALUES (?, ?)').run(
+      articleId,
+      tag.trim().toLowerCase()
+    );
   } catch (err) {
     if (err.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw err;
   }
 }
 
 function removeTag(articleId, tag) {
-  db.prepare('DELETE FROM article_tags WHERE article_id = ? AND tag = ?').run(articleId, tag.trim().toLowerCase());
+  db.prepare('DELETE FROM article_tags WHERE article_id = ? AND tag = ?').run(
+    articleId,
+    tag.trim().toLowerCase()
+  );
 }
 
 function getTagsForArticle(articleId) {
-  return db.prepare('SELECT tag FROM article_tags WHERE article_id = ? ORDER BY tag').all(articleId).map(r => r.tag);
+  return db
+    .prepare('SELECT tag FROM article_tags WHERE article_id = ? ORDER BY tag')
+    .all(articleId)
+    .map((r) => r.tag);
 }
 
 function getAllTags() {
-  return db.prepare('SELECT tag, COUNT(*) as count FROM article_tags GROUP BY tag ORDER BY count DESC').all();
+  return db
+    .prepare('SELECT tag, COUNT(*) as count FROM article_tags GROUP BY tag ORDER BY count DESC')
+    .all();
 }
 
 function setBookmark(articleId, note) {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO bookmarks (article_id, note) VALUES (?, ?)
     ON CONFLICT(article_id) DO UPDATE SET note = excluded.note
-  `).run(articleId, note || null);
+  `
+  ).run(articleId, note || null);
 }
 
 function removeBookmark(articleId) {
@@ -460,25 +480,34 @@ function isBookmarked(articleId) {
 }
 
 function getBookmarks() {
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT a.*, b.note as bookmark_note, b.created_at as bookmark_at
     FROM bookmarks b JOIN articles a ON a.id = b.article_id
     ORDER BY b.created_at DESC
-  `).all();
+  `
+    )
+    .all();
 }
 
 function saveSearch(name, query, filters) {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO saved_searches (name, query, filters) VALUES (?, ?, ?)
     ON CONFLICT(name) DO UPDATE SET query = excluded.query, filters = excluded.filters
-  `).run(name, query || null, filters ? JSON.stringify(filters) : null);
+  `
+  ).run(name, query || null, filters ? JSON.stringify(filters) : null);
 }
 
 function getSavedSearches() {
-  return db.prepare('SELECT * FROM saved_searches ORDER BY created_at DESC').all().map(r => ({
-    ...r,
-    filters: r.filters ? safeJsonParse(r.filters, {}) : {}
-  }));
+  return db
+    .prepare('SELECT * FROM saved_searches ORDER BY created_at DESC')
+    .all()
+    .map((r) => ({
+      ...r,
+      filters: r.filters ? safeJsonParse(r.filters, {}) : {},
+    }));
 }
 
 function deleteSavedSearch(name) {
@@ -521,5 +550,5 @@ module.exports = {
   getSavedSearches,
   deleteSavedSearch,
   transaction,
-  close
+  close,
 };

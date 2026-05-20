@@ -12,11 +12,15 @@ before(async () => {
   port = 4900 + Math.floor(Math.random() * 100);
   const { server: srv } = await server.start({ port });
   httpServer = srv;
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 300));
 });
 
 after(() => {
-  try { httpServer && httpServer.close && httpServer.close(); } catch { /* ignore */ }
+  try {
+    httpServer && httpServer.close && httpServer.close();
+  } catch {
+    /* ignore */
+  }
 });
 
 async function get(url) {
@@ -53,11 +57,22 @@ test('GET /api/articles?facets=true liefert facets-Block', async () => {
 
 test('GET /api/articles mit neuen Filtern liefert kein 500', async () => {
   const params = [
-    'paywall=no', 'image=yes', 'dupes=hide', 'lang=de,en',
-    'wordsMin=100', 'wordsMax=2000', 'readingTimeMin=1', 'readingTimeMax=10',
-    'tagMode=any', 'tagNot=spam', 'tag=kultur',
-    'category=sehr_relevant,relevant', 'sentiment=positiv,neutral',
-    'minScore=10', 'maxScore=100', 'bookmark=no'
+    'paywall=no',
+    'image=yes',
+    'dupes=hide',
+    'lang=de,en',
+    'wordsMin=100',
+    'wordsMax=2000',
+    'readingTimeMin=1',
+    'readingTimeMax=10',
+    'tagMode=any',
+    'tagNot=spam',
+    'tag=kultur',
+    'category=sehr_relevant,relevant',
+    'sentiment=positiv,neutral',
+    'minScore=10',
+    'maxScore=100',
+    'bookmark=no',
   ];
   const { status, json } = await get('/api/articles?last=30d&' + params.join('&'));
   assert.equal(status, 200);
@@ -108,7 +123,7 @@ async function post(url, body = {}) {
   const res = await fetch(baseUrl() + url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
   return { status: res.status, json: await res.json() };
 }
@@ -134,7 +149,9 @@ test('POST /api/sources/opml-preview ohne opml liefert 400', async () => {
 });
 
 test('POST /api/sources/opml-preview mit invaliderem XML antwortet trotzdem strukturiert', async () => {
-  const { status, json } = await post('/api/sources/opml-preview', { opml: '<opml><body></body></opml>' });
+  const { status, json } = await post('/api/sources/opml-preview', {
+    opml: '<opml><body></body></opml>',
+  });
   assert.equal(status, 200);
   assert.ok(Array.isArray(json.previews));
   assert.equal(json.count, 0);

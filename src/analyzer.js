@@ -27,7 +27,7 @@ function preparedKeywords() {
     people: keywords.people.map(normalize),
     venues: (keywords.venues || []).map(normalize),
     theaterContext: (keywords.theater_context || []).map(normalize),
-    exclude: keywords.exclude.map(normalize)
+    exclude: keywords.exclude.map(normalize),
   };
 }
 
@@ -45,7 +45,10 @@ function countOccurrences(haystack, needle) {
 }
 
 function splitSentences(text) {
-  return text.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function findFuzzyMatch(haystack, needle, threshold = 0.88) {
@@ -72,16 +75,16 @@ function passesRequiredFilter(article) {
   const title = normalize(article.title || '');
   const text = normalize(article.fullText || '');
   const haystack = `${title} ${text}`;
-  const hasRequired = KW.required.some(k => haystack.includes(k));
+  const hasRequired = KW.required.some((k) => haystack.includes(k));
   if (!hasRequired) return { passes: false, reason: 'no-required-keyword' };
-  const excludeHit = KW.exclude.find(k => haystack.includes(k));
+  const excludeHit = KW.exclude.find((k) => haystack.includes(k));
   if (excludeHit) return { passes: false, reason: `exclude:${excludeHit}` };
   return { passes: true };
 }
 
 function detectArticleType(article) {
   const text = normalize(`${article.title || ''} ${article.fullText || ''}`);
-  const indicators = (list) => list.filter(w => text.includes(normalize(w))).length;
+  const indicators = (list) => list.filter((w) => text.includes(normalize(w))).length;
   const review = indicators(sentiment.review_indicators || []);
   const interview = indicators(sentiment.interview_indicators || []);
   const announcement = indicators(sentiment.announcement_indicators || []);
@@ -103,7 +106,7 @@ function findContextualMatch(text, keyword, contextWords, windowChars = 200) {
   const start = Math.max(0, idx - windowChars);
   const end = Math.min(text.length, idx + keyword.length + windowChars);
   const window = text.slice(start, end);
-  return contextWords.some(c => window.includes(c));
+  return contextWords.some((c) => window.includes(c));
 }
 
 function calculateRelevance(article, sourcePriority = 50) {
@@ -114,7 +117,11 @@ function calculateRelevance(article, sourcePriority = 50) {
   let score = 0;
   const reasons = [];
   const matches = {
-    required: [], productions: [], people: [], venues: [], theaterContext: false
+    required: [],
+    productions: [],
+    people: [],
+    venues: [],
+    theaterContext: false,
   };
 
   let titleHasRequired = false;
@@ -150,7 +157,9 @@ function calculateRelevance(article, sourcePriority = 50) {
       productionInTitle = true;
     } else if (text.includes(p)) {
       const isContextual = findContextualMatch(text, p, KW.required, 400);
-      const pts = isContextual ? (w.production_match || 25) : Math.floor((w.production_match || 25) / 2);
+      const pts = isContextual
+        ? w.production_match || 25
+        : Math.floor((w.production_match || 25) / 2);
       score += pts;
       reasons.push(`Produktion: ${p}${isContextual ? ' (Kontext OK)' : ''} (+${pts})`);
       matches.productions.push(p);
@@ -173,7 +182,7 @@ function calculateRelevance(article, sourcePriority = 50) {
       matches.people.push(person);
     } else if (text.includes(person)) {
       const isContextual = findContextualMatch(text, person, KW.required, 400);
-      const pts = isContextual ? (w.people_match || 20) : Math.floor((w.people_match || 20) / 2);
+      const pts = isContextual ? w.people_match || 20 : Math.floor((w.people_match || 20) / 2);
       score += pts;
       reasons.push(`Person: ${person}${isContextual ? ' (Kontext OK)' : ''} (+${pts})`);
       matches.people.push(person);
@@ -188,7 +197,7 @@ function calculateRelevance(article, sourcePriority = 50) {
     }
   }
 
-  const contextHits = KW.theaterContext.filter(c => haystack.includes(c)).length;
+  const contextHits = KW.theaterContext.filter((c) => haystack.includes(c)).length;
   if (contextHits >= 2) {
     score += w.theater_context_bonus || 8;
     matches.theaterContext = true;
@@ -212,7 +221,8 @@ function calculateRelevance(article, sourcePriority = 50) {
     reasons.push('Premiere erwaehnt');
   }
 
-  const wordCount = article.wordCount || (article.fullText || '').split(/\s+/).filter(Boolean).length;
+  const wordCount =
+    article.wordCount || (article.fullText || '').split(/\s+/).filter(Boolean).length;
   const minWords = keywords.thresholds.min_word_count || 50;
   const shortThreshold = keywords.thresholds.short_article_word_count || 100;
   if (wordCount > 0 && wordCount < minWords) {
@@ -247,8 +257,7 @@ function matchesAnyStem(token, stems) {
   if (stems.has(token)) return true;
   for (const stem of stems) {
     if (stem.length < 4) continue;
-    if (token.length >= stem.length && token.length <= stem.length + 4 &&
-        token.startsWith(stem)) {
+    if (token.length >= stem.length && token.length <= stem.length + 4 && token.startsWith(stem)) {
       return true;
     }
   }
@@ -312,7 +321,11 @@ function generateSummary(article, maxLength) {
     if (idx < 3) sc += 1;
     for (const r of requiredHits) if (ns.includes(r)) sc += 4;
     for (const p of productionHits) if (p.length >= 4 && ns.includes(p)) sc += 3;
-    if (normalizedTitle && levenshteinSimilarity(ns.slice(0, 80), normalizedTitle.slice(0, 80)) > 0.3) sc += 1;
+    if (
+      normalizedTitle &&
+      levenshteinSimilarity(ns.slice(0, 80), normalizedTitle.slice(0, 80)) > 0.3
+    )
+      sc += 1;
     if (s.length < 30) sc -= 2;
     return { s, sc, idx };
   });
@@ -347,9 +360,9 @@ function analyze(article, sourcePriority = 50) {
     sentimentScore: sentimentResult.score,
     sentimentHits: {
       positive: sentimentResult.positiveHits,
-      negative: sentimentResult.negativeHits
+      negative: sentimentResult.negativeHits,
     },
-    summary
+    summary,
   };
 }
 
@@ -364,5 +377,5 @@ module.exports = {
   categorize,
   findContextualMatch,
   findFuzzyMatch,
-  normalize
+  normalize,
 };

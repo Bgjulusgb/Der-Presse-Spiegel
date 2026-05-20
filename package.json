@@ -44,9 +44,6 @@
   ],
   "author": "Muenchner Kammerspiele",
   "license": "MIT",
-  "engines": {
-    "node": ">=20.0.0"
-  },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "axios": "^1.16.1",

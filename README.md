@@ -30,7 +30,7 @@ npm run ui          # oeffnet http://localhost:4711 im Browser
 
 ### Troubleshooting: `Could not locate the bindings file` / better-sqlite3
 
-Wenn beim Start ein Fehler wie *"Could not locate the bindings file"* auftritt
+Wenn beim Start ein Fehler wie _"Could not locate the bindings file"_ auftritt
 (typisch nach dem Wechsel auf Node 24), gibt es zwei Loesungen:
 
 1. **Empfohlen:** Node 22 LTS installieren von https://nodejs.org, dann
@@ -51,20 +51,20 @@ npm run build:mac   # dmg + zip
 
 Die Web-/Desktop-UI hat zwoelf Tabs:
 
-| Tab           | Funktion                                                   |
-|---------------|------------------------------------------------------------|
-| Dashboard     | Live-Uebersicht, Sentiment, Top-Quellen, Top-Artikel       |
-| Artikel       | Volltextsuche, Filter, Sortierung, Detail-Modal            |
-| Scan          | RSS-Abruf starten, Live-Log, Feed-Gesundheit               |
-| Reports       | HTML- und PDF-Reports erzeugen, oeffnen, loeschen          |
-| Tags          | Auto-Tags nach Kategorien, klickbar fuer Filter            |
-| Suchbegriffe  | Spielplan, Ensemble, Exclude-Liste live bearbeiten         |
-| Quellen       | Feeds verwalten, einzeln testen, an/aus                    |
-| Lesezeichen   | Markierte Artikel                                          |
-| Trends        | Wort-Wolke, Aufsteiger, Tag-Wolke                          |
-| Duplikate     | Pruefung der letzten 90 Tage                               |
-| Einstellungen | Scraping, Dedup, Schedule                                  |
-| Logs          | letzte 200 Eintraege                                       |
+| Tab           | Funktion                                             |
+| ------------- | ---------------------------------------------------- |
+| Dashboard     | Live-Uebersicht, Sentiment, Top-Quellen, Top-Artikel |
+| Artikel       | Volltextsuche, Filter, Sortierung, Detail-Modal      |
+| Scan          | RSS-Abruf starten, Live-Log, Feed-Gesundheit         |
+| Reports       | HTML- und PDF-Reports erzeugen, oeffnen, loeschen    |
+| Tags          | Auto-Tags nach Kategorien, klickbar fuer Filter      |
+| Suchbegriffe  | Spielplan, Ensemble, Exclude-Liste live bearbeiten   |
+| Quellen       | Feeds verwalten, einzeln testen, an/aus              |
+| Lesezeichen   | Markierte Artikel                                    |
+| Trends        | Wort-Wolke, Aufsteiger, Tag-Wolke                    |
+| Duplikate     | Pruefung der letzten 90 Tage                         |
+| Einstellungen | Scraping, Dedup, Schedule                            |
+| Logs          | letzte 200 Eintraege                                 |
 
 ## Such-Algorithmus
 
@@ -145,7 +145,7 @@ Robuste Multi-Layer-Pipeline:
 
 - **HTTP-Client undici** mit HTTP/2 und nativen Streams
 - Fuenf rotierende **User-Agents** (Firefox, Chrome, Safari)
-- Vollstaendige Browser-Header inkl. Sec-Fetch-*, Accept-Encoding
+- Vollstaendige Browser-Header inkl. Sec-Fetch-\*, Accept-Encoding
 - **Auto-Encoding** via Content-Type, BOM, XML-Decl, Meta-Charset
 - **Conditional GET** mit ETag und Last-Modified pro Feed
 - **Multi-Format-Parser**: RSS 2.0, Atom, RDF (RSS 1.0), JSON Feed
@@ -231,37 +231,37 @@ pressespiegel schedule                          Cron-Modus
 
 ## REST-API
 
-| Endpoint                          | Methode | Beschreibung                                 |
-|-----------------------------------|---------|----------------------------------------------|
-| /api/health                       | GET     | Status                                       |
-| /api/articles                     | GET     | gefilterte/durchsuchte Artikel              |
-| /api/article/:id                  | GET     | Detail-Daten eines Artikels                 |
-| /api/article/:id/tags             | GET/POST/DELETE | Tags pro Artikel                    |
-| /api/article/:id/bookmark         | POST/DELETE | Lesezeichen                             |
-| /api/stats                        | GET     | Statistiken                                  |
-| /api/scan                         | POST    | Scan starten                                 |
-| /api/scan/status                  | GET     | aktueller Scan-Status                       |
-| /api/report                       | POST    | Report generieren                            |
-| /api/reports                      | GET     | Liste aller Reports                          |
-| /api/reports/:filename            | GET/DELETE | Report oeffnen/loeschen                  |
-| /api/sources                      | GET/PUT | Quellen-Verwaltung                           |
-| /api/sources/test                 | POST    | einzelnen Feed live testen                  |
-| /api/sources/toggle               | POST    | Quelle aktivieren/deaktivieren              |
-| /api/sources/opml                 | GET     | OPML-Export aller Feeds                     |
-| /api/sources/opml-import          | POST    | OPML-Import                                  |
-| /api/keywords                     | GET/PUT | Suchbegriffe                                 |
-| /api/settings                     | GET/PUT | Einstellungen                                |
-| /api/tags                         | GET     | alle Tags mit Counts                         |
-| /api/tags/retag-all               | POST    | gesamte DB neu taggen                       |
-| /api/bookmarks                    | GET     | Lesezeichen-Liste                            |
-| /api/saved-searches               | GET/POST/DELETE | gespeicherte Suchen                  |
-| /api/mentions                     | GET     | Top-Begriffe                                 |
-| /api/trends                       | GET     | Vergleich zweier Zeitraeume                 |
-| /api/did-you-mean                 | GET     | Tippfehler-Korrektur                        |
-| /api/suggest                      | GET     | Autocomplete-Vorschlaege                    |
-| /api/duplicates/check             | GET     | Duplikat-Pruefung                            |
-| /api/export                       | GET     | CSV oder JSON Export                         |
-| /api/logs                         | GET     | letzte Log-Eintraege                        |
+| Endpoint                  | Methode         | Beschreibung                   |
+| ------------------------- | --------------- | ------------------------------ |
+| /api/health               | GET             | Status                         |
+| /api/articles             | GET             | gefilterte/durchsuchte Artikel |
+| /api/article/:id          | GET             | Detail-Daten eines Artikels    |
+| /api/article/:id/tags     | GET/POST/DELETE | Tags pro Artikel               |
+| /api/article/:id/bookmark | POST/DELETE     | Lesezeichen                    |
+| /api/stats                | GET             | Statistiken                    |
+| /api/scan                 | POST            | Scan starten                   |
+| /api/scan/status          | GET             | aktueller Scan-Status          |
+| /api/report               | POST            | Report generieren              |
+| /api/reports              | GET             | Liste aller Reports            |
+| /api/reports/:filename    | GET/DELETE      | Report oeffnen/loeschen        |
+| /api/sources              | GET/PUT         | Quellen-Verwaltung             |
+| /api/sources/test         | POST            | einzelnen Feed live testen     |
+| /api/sources/toggle       | POST            | Quelle aktivieren/deaktivieren |
+| /api/sources/opml         | GET             | OPML-Export aller Feeds        |
+| /api/sources/opml-import  | POST            | OPML-Import                    |
+| /api/keywords             | GET/PUT         | Suchbegriffe                   |
+| /api/settings             | GET/PUT         | Einstellungen                  |
+| /api/tags                 | GET             | alle Tags mit Counts           |
+| /api/tags/retag-all       | POST            | gesamte DB neu taggen          |
+| /api/bookmarks            | GET             | Lesezeichen-Liste              |
+| /api/saved-searches       | GET/POST/DELETE | gespeicherte Suchen            |
+| /api/mentions             | GET             | Top-Begriffe                   |
+| /api/trends               | GET             | Vergleich zweier Zeitraeume    |
+| /api/did-you-mean         | GET             | Tippfehler-Korrektur           |
+| /api/suggest              | GET             | Autocomplete-Vorschlaege       |
+| /api/duplicates/check     | GET             | Duplikat-Pruefung              |
+| /api/export               | GET             | CSV oder JSON Export           |
+| /api/logs                 | GET             | letzte Log-Eintraege           |
 
 ## Tech-Stack
 
@@ -338,29 +338,29 @@ npm test
 
 114 Tests, alle gruen. Coverage:
 
-- utils.test.js          URL-Normalisierung, Levenshtein, Cosine, Datum
-- analyzer.test.js       Relevanz-Scoring, Sentiment, Negationen, Kontext
-- deduplicator.test.js   Dreistufige Dedup, Sieger-Auswahl
-- scraper.test.js        Datums-Extraktion aus Meta/JSON-LD/URL/Text
-- search.test.js         BM25, Fuse-Hybrid, Stemming, did-you-mean,
-                         Trends, Recency-Boost
-- query-parser.test.js   Phrasen, Bool, Felder, Score/Date/Tag-Filter
-- tagger.test.js         Auto-Tagging mit Bedingungen
-- feed-fetcher.test.js   RSS/Atom/RDF/JSON, Encoding-Detection
+- utils.test.js URL-Normalisierung, Levenshtein, Cosine, Datum
+- analyzer.test.js Relevanz-Scoring, Sentiment, Negationen, Kontext
+- deduplicator.test.js Dreistufige Dedup, Sieger-Auswahl
+- scraper.test.js Datums-Extraktion aus Meta/JSON-LD/URL/Text
+- search.test.js BM25, Fuse-Hybrid, Stemming, did-you-mean,
+  Trends, Recency-Boost
+- query-parser.test.js Phrasen, Bool, Felder, Score/Date/Tag-Filter
+- tagger.test.js Auto-Tagging mit Bedingungen
+- feed-fetcher.test.js RSS/Atom/RDF/JSON, Encoding-Detection
 
 ## Edge Cases
 
-- Cloudflare/Bot-Block         Puppeteer-Fallback (use_browser-Flag)
-- Paywall                      erkannt und markiert, RSS-Snippet bleibt
-- Kein Datum                   Multi-Stage-Detection
-- Falsches Encoding            Auto-Detection plus iconv-lite
-- RSS-Feed down                source_health-Eintrag, andere Feeds laufen
-- Tracking-Parameter           vor URL-Vergleich entfernt
-- Schwester-Theater            Hamburger/Berliner/Wiener via Exclude
-- Tippfehler in Suche          Fuse-Hybrid plus did-you-mean
-- HTML-Entities in Titeln      he-Decoder
-- 304 Not Modified             korrekt erkannt
-- Wiederholte Feed-Fehler      Auto-Disable nach 8 Fails
+- Cloudflare/Bot-Block Puppeteer-Fallback (use_browser-Flag)
+- Paywall erkannt und markiert, RSS-Snippet bleibt
+- Kein Datum Multi-Stage-Detection
+- Falsches Encoding Auto-Detection plus iconv-lite
+- RSS-Feed down source_health-Eintrag, andere Feeds laufen
+- Tracking-Parameter vor URL-Vergleich entfernt
+- Schwester-Theater Hamburger/Berliner/Wiener via Exclude
+- Tippfehler in Suche Fuse-Hybrid plus did-you-mean
+- HTML-Entities in Titeln he-Decoder
+- 304 Not Modified korrekt erkannt
+- Wiederholte Feed-Fehler Auto-Disable nach 8 Fails
 
 ## Datenschutz
 

@@ -21,7 +21,11 @@ function buildMenu() {
         {
           label: 'Schnell-Scan (24h)',
           accelerator: 'CmdOrCtrl+R',
-          click: () => mainWindow && mainWindow.webContents.executeJavaScript('document.getElementById("quick-scan")?.click()')
+          click: () =>
+            mainWindow &&
+            mainWindow.webContents.executeJavaScript(
+              'document.getElementById("quick-scan")?.click()'
+            ),
         },
         { type: 'separator' },
         {
@@ -29,18 +33,18 @@ function buildMenu() {
           click: () => {
             const reportsDir = path.resolve(__dirname, '..', 'reports');
             shell.openPath(reportsDir);
-          }
+          },
         },
         {
           label: 'Daten-Ordner oeffnen',
           click: () => {
             const dataDir = path.resolve(__dirname, '..', 'data');
             shell.openPath(dataDir);
-          }
+          },
         },
         { type: 'separator' },
-        { role: 'quit', label: 'Beenden' }
-      ]
+        { role: 'quit', label: 'Beenden' },
+      ],
     },
     {
       label: 'Bearbeiten',
@@ -51,8 +55,8 @@ function buildMenu() {
         { role: 'cut', label: 'Ausschneiden' },
         { role: 'copy', label: 'Kopieren' },
         { role: 'paste', label: 'Einfuegen' },
-        { role: 'selectAll', label: 'Alles markieren' }
-      ]
+        { role: 'selectAll', label: 'Alles markieren' },
+      ],
     },
     {
       label: 'Ansicht',
@@ -65,8 +69,8 @@ function buildMenu() {
         { role: 'zoomIn', label: 'Zoom +' },
         { role: 'zoomOut', label: 'Zoom -' },
         { type: 'separator' },
-        { role: 'togglefullscreen', label: 'Vollbild' }
-      ]
+        { role: 'togglefullscreen', label: 'Vollbild' },
+      ],
     },
     {
       label: 'Hilfe',
@@ -78,12 +82,12 @@ function buildMenu() {
               type: 'info',
               title: 'Pressespiegel Kammerspiele',
               message: 'Pressespiegel Kammerspiele',
-              detail: `Version: ${app.getVersion()}\nNode: ${process.versions.node}\nElectron: ${process.versions.electron}\n\nAlle Daten bleiben lokal.\nKeine Cloud, kein E-Mail.`
+              detail: `Version: ${app.getVersion()}\nNode: ${process.versions.node}\nElectron: ${process.versions.electron}\n\nAlle Daten bleiben lokal.\nKeine Cloud, kein E-Mail.`,
             });
-          }
-        }
-      ]
-    }
+          },
+        },
+      ],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -93,16 +97,17 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: Math.min(1400, width - 40),
     height: Math.min(900, height - 40),
-    minWidth: 900, minHeight: 600,
+    minWidth: 900,
+    minHeight: 600,
     title: 'Pressespiegel Kammerspiele',
     backgroundColor: '#0b1120',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
     },
-    show: false
+    show: false,
   });
 
   mainWindow.once('ready-to-show', () => {

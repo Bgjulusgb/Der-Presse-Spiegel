@@ -11,11 +11,11 @@ module.exports = [
       sourceType: 'commonjs',
       globals: {
         ...globals.node,
-        ...globals.es2023
-      }
+        ...globals.es2023,
+      },
     },
     linterOptions: {
-      reportUnusedDisableDirectives: 'warn'
+      reportUnusedDisableDirectives: 'warn',
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
@@ -26,27 +26,27 @@ module.exports = [
       'no-var': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       semi: ['error', 'always'],
-      'no-prototype-builtins': 'off'
-    }
+      'no-prototype-builtins': 'off',
+    },
   },
   {
     files: ['web/**/*.js'],
     languageOptions: {
       sourceType: 'script',
       globals: {
-        ...globals.browser
-      }
-    }
+        ...globals.browser,
+      },
+    },
   },
   {
     files: ['tests/**/*.js'],
     languageOptions: {
       globals: {
-        ...globals.node
-      }
-    }
+        ...globals.node,
+      },
+    },
   },
   {
-    ignores: ['node_modules/**', 'dist/**', 'data/**', 'logs/**', 'reports/**', 'coverage/**']
-  }
+    ignores: ['node_modules/**', 'dist/**', 'data/**', 'logs/**', 'reports/**', 'coverage/**'],
+  },
 ];

@@ -12,8 +12,11 @@ const { autoTag } = require('./tagger');
 function applyTags(articleId, article, analysis) {
   const tags = autoTag(article, analysis);
   for (const tag of tags) {
-    try { database.addTag(articleId, tag); }
-    catch (e) { logger.debug(`Tag-Fehler ${tag}: ${e.message}`); }
+    try {
+      database.addTag(articleId, tag);
+    } catch (e) {
+      logger.debug(`Tag-Fehler ${tag}: ${e.message}`);
+    }
   }
   return tags;
 }
@@ -37,7 +40,7 @@ async function runScan({ from, to }) {
     articlesAdded: 0,
     duplicatesFound: 0,
     errors: 0,
-    notes: ''
+    notes: '',
   };
 
   try {
@@ -69,7 +72,7 @@ async function runScan({ from, to }) {
           sentimentScore: analysis.sentimentScore,
           category: analysis.category,
           articleType: analysis.articleType,
-          meta: { ...raw.meta, reasons: analysis.relevanceReasons }
+          meta: { ...raw.meta, reasons: analysis.relevanceReasons },
         };
 
         const candidate = {
@@ -78,7 +81,7 @@ async function runScan({ from, to }) {
           url_normalized: article.urlNormalized,
           title: article.title,
           first_paragraph: article.firstParagraph,
-          source: article.source
+          source: article.source,
         };
         const dupHit = findDuplicate(candidate, existing);
 
@@ -95,14 +98,20 @@ async function runScan({ from, to }) {
               summary.articlesAdded++;
               applyTags(inserted.id, article, analysis);
             }
-            logger.info(`Duplikat erkannt -> bestehend behalten: "${article.title}" (${dupHit.reason})`);
+            logger.info(
+              `Duplikat erkannt -> bestehend behalten: "${article.title}" (${dupHit.reason})`
+            );
           } else {
             const inserted = database.insertArticle(article);
             if (inserted.inserted) {
               summary.articlesAdded++;
               applyTags(inserted.id, article, analysis);
             }
-            database.markAsDuplicate(dupHit.duplicate.id, inserted.id, dupHit.duplicate.url || normalizeUrl(dupHit.duplicate.url_normalized));
+            database.markAsDuplicate(
+              dupHit.duplicate.id,
+              inserted.id,
+              dupHit.duplicate.url || normalizeUrl(dupHit.duplicate.url_normalized)
+            );
             summary.duplicatesFound++;
             existing.push({
               id: inserted.id,
@@ -110,7 +119,7 @@ async function runScan({ from, to }) {
               title: article.title,
               first_paragraph: article.firstParagraph,
               source: article.source,
-              published_date: article.publishedDate ? article.publishedDate.toISOString() : null
+              published_date: article.publishedDate ? article.publishedDate.toISOString() : null,
             });
             logger.info(`Duplikat erkannt -> neuer Artikel wird Sieger: "${article.title}"`);
           }
@@ -125,7 +134,7 @@ async function runScan({ from, to }) {
               title: article.title,
               first_paragraph: article.firstParagraph,
               source: article.source,
-              published_date: article.publishedDate ? article.publishedDate.toISOString() : null
+              published_date: article.publishedDate ? article.publishedDate.toISOString() : null,
             });
           }
         }
@@ -147,7 +156,7 @@ async function runScan({ from, to }) {
       dead: health.dead,
       new_articles: summary.articlesAdded,
       duplicates_removed: summary.duplicatesFound,
-      runId
+      runId,
     };
     logger.info(`Scan abgeschlossen`, finalSummary);
     return finalSummary;

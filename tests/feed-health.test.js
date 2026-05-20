@@ -9,7 +9,11 @@ test('classifyFeedHealth: null -> unknown', () => {
 });
 
 test('classifyFeedHealth: erfolgreich ohne Fehler -> ok', () => {
-  const h = { consecutive_failures: 0, last_success: new Date().toISOString(), last_error_class: null };
+  const h = {
+    consecutive_failures: 0,
+    last_success: new Date().toISOString(),
+    last_error_class: null,
+  };
   assert.equal(database.classifyFeedHealth(h), 'ok');
 });
 

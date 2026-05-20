@@ -18,7 +18,7 @@ function makeArticle(props = {}) {
     bookmarked: false,
     relevance_score: 50,
     article_type: 'news',
-    ...props
+    ...props,
   };
 }
 

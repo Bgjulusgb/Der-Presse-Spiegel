@@ -56,16 +56,16 @@
 
 ## Such-Syntax (siehe `src/query-parser.js`)
 
-| Operator | Beispiel | Effekt |
-|---|---|---|
-| Phrase | `"Wokey Wokey"` | Exakte Phrase |
-| NOT | `Hamlet -Hamburger` | Ausschluss |
-| OR | `Wallenstein OR Mephisto` | Boolesch oder |
-| Feld | `title:Premiere` | Nur in diesem Feld |
-| Datum | `after:2024-01-01`, `before:2024-12-31` | Datumsfilter |
-| Score | `score:>=50` | Numerisch |
-| Tag | `tag:produktion:pinocchio` | Tag-Filter |
-| Bookmark | `bookmark:yes` | Lesezeichen-Filter |
+| Operator | Beispiel                                | Effekt             |
+| -------- | --------------------------------------- | ------------------ |
+| Phrase   | `"Wokey Wokey"`                         | Exakte Phrase      |
+| NOT      | `Hamlet -Hamburger`                     | Ausschluss         |
+| OR       | `Wallenstein OR Mephisto`               | Boolesch oder      |
+| Feld     | `title:Premiere`                        | Nur in diesem Feld |
+| Datum    | `after:2024-01-01`, `before:2024-12-31` | Datumsfilter       |
+| Score    | `score:>=50`                            | Numerisch          |
+| Tag      | `tag:produktion:pinocchio`              | Tag-Filter         |
+| Bookmark | `bookmark:yes`                          | Lesezeichen-Filter |
 
 ## Datenbank-Schema (vereinfacht)
 

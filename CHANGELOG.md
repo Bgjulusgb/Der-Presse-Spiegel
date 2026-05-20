@@ -6,7 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 ## [Unreleased]
 
 ### Added — Feed-Robustheit & Operations (4 Bereiche)
+
 **Bereich 1: sources.json bereinigt**
+
 - Tote Feeds entfernt: Badische Zeitung, Wiener Zeitung (Kultur), MunichNOW, Stuttgart Journal, The Munich Eye, German Brief, Reuters Germany, MUH Bayerische Aspekte.
 - URLs korrigiert: Bundesregierung (neue Feed-IDs `1151242`/`1151244`), deutschland.de, Berliner Zeitung + Kultur, VAN Magazin, euronews, Freitag, Perlentaucher, Theaterkompass.
 - Stuttgarter Nachrichten ersetzt durch Stuttgarter Zeitung (alter Feed eingestellt).
@@ -14,13 +16,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 - Bundesregierung Pressemitteilungen + FAZ Buehne und Konzert + BR24 Kultur als neue Feeds.
 
 **Bereich 2: feed-fetcher.js robuster**
-- `USER_AGENTS` ersetzt durch **`BROWSER_PROFILES`** — 5 vollständige Browser-Fingerprints (Chrome/Win, Safari/Mac, Firefox/Win, Firefox/Linux, Chrome/Mac) mit Accept, Accept-Language, Accept-Encoding, Sec-Fetch-*, Sec-Ch-Ua, Upgrade-Insecure-Requests, DNT.
+
+- `USER_AGENTS` ersetzt durch **`BROWSER_PROFILES`** — 5 vollständige Browser-Fingerprints (Chrome/Win, Safari/Mac, Firefox/Win, Firefox/Linux, Chrome/Mac) mit Accept, Accept-Language, Accept-Encoding, Sec-Fetch-\*, Sec-Ch-Ua, Upgrade-Insecure-Requests, DNT.
 - **Per-Domain-Backoff**: Nach 3x HTTP 403 in 60s → 5min Cooldown pro Host. Stats in `getDomainFailureStats()`.
 - **403-Auto-Puppeteer-Fallback**: Bei HTTP 403 ohne `use_browser:true` wird der Browser einmalig versucht — kein dauerhaftes Flag-Setting nötig.
 - **Referer-Header** für ARD-Domains (br.de, mdr.de, swr.de, wdr.de, rbb24.de, ndr.de, sr.de, hr.de, deutschlandfunk.de, deutschlandfunkkultur.de, 3sat.de, zdf.de) — simuliert internen Aufruf.
 - `classifyError()`: kategorisiert Fehler in `forbidden|notfound|gone|server|ratelimit|dns|timeout|socket|unknown` für gezielte Retry/Auto-Disable-Regeln.
 
 **Bereich 3: Feed-Health + Scan-Summary + neue Auto-Disable-Regeln**
+
 - DB-Schema: neue Spalten `last_error_class`, `last_status_code`, `last_via_browser` in `source_health` (Auto-Migration via ALTER TABLE).
 - `database.classifyFeedHealth(h)`: liefert `ok|degraded|blocked|dead|unknown` aus error-class und consecutive_failures.
 - **Auto-Disable-Schwellen je Fehlerklasse**:
@@ -30,6 +34,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 - **WebSocket scan_summary**: nach jedem Scan strukturierter Broadcast mit `total_feeds`, `ok`, `blocked_403`, `dead`, `new_articles`, `duplicates_removed`, `duration_ms`.
 
 **Bereich 4: UI**
+
 - Sources-Tab: **Feed-Health-Stats-Zeile** mit klickbaren Pills `[✓ ok] [◐ degraded] [⊘ blocked] [✕ dead] [ø unknown] [gesamt]`. Klick auf eine Pille filtert die Feed-Liste.
 - Erweiterte Test-Diagnose: HTTP-Code, Antwortzeit, Item-Count, **letztes Item-Datum**, **via-Browser**-Badge, errorClass bei Fehlern.
 - **Massen-Aktionen**: „Alle toten Feeds deaktivieren" + „Alle geblockt auf Browser-Modus" mit Bestätigungs-Snackbar.
@@ -38,6 +43,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 - CSS für health-pills, opml-rows, scan-summary-grid in Light- und Dark-Mode.
 
 ### Added — vorheriger Stand (search/filter/RSS)
+
 - **`docs/ROADMAP.md`** mit priorisierter Verbesserungs-/Erweiterungsliste (P0–P3, ~80 Items).
 - **39 weitere Tests** in `tests/feed-fetcher-extensions.test.js`, `tests/feed-health.test.js`, plus erweiterte `tests/server-api.test.js` (Total jetzt 208, vorher 169).
 - **`src/text-utils.js`**: Umlaut-Normalisierung (ä↔ae), Variants-Expansion, deutsches Compound-Splitting mit Scoring-Heuristik, Kölner-Phonetik-Encoding, Spracherkennung (`franc-min`), Lesezeit-Schätzung, Keyword-Extraktion (`keyword-extractor`), Satz-Splitter, sentence-boundary Snippet-Extraktion, `hasImage`-Detector.
@@ -67,16 +73,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 - Dokumentation: `CONTRIBUTING.md`, `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`, `docs/openapi.yaml`.
 
 ### Changed
+
 - Default-Scraping-Settings: 8 statt 4 parallele Requests, 15s Timeout, 2 Retries, 800ms Rate-Limit, Auto-Disable nach 6 Fehlern.
 - Dark-Mode-Kontrast deutlich verbessert (Text, Surfaces, Status-Badges).
 - Paywall-Erkennung erweitert um FAZ+, taz+, Welt+, Piano, deutsche Phrasen ("Bezahlinhalt", "jetzt abonnieren").
 - Feed-Health-Liste sortiert nach Fehlern, mit Response-Time und ✓/✕ Icons.
 
 ### Removed
+
 - Quelle "Koelner Stadt-Anzeiger" entfernt.
 - Quelle "ARD Mediathek - Kultur" entfernt (Endpoint liefert dauerhaft HTTP 404).
 
 ### Fixed
+
 - `config/sources.json` enthielt zwei JSON-Dokumente mit `=======`-Merge-Marker und liess `src/config.js` mit SyntaxError abstuerzen.
 - `web/app.js:637` hatte ein gebrochenes Template-Literal, das `'+'+(t.change > 0 ? '+' : ''}5` als Text in die Trends-UI rendern liess.
 - Browser-Warnung "Could not parse CSS stylesheet" konnte durch `NaN%` in dynamisch erzeugten Inline-Styles ausgeloest werden. Alle Renderer in `web/app.js` und `src/reporter.js` nutzen jetzt `safeNum`/`clampPct`/`toFixed(2)`.

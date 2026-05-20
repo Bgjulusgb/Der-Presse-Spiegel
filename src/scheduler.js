@@ -30,8 +30,11 @@ async function weeklyReport() {
     await runScan({ from, to });
     const articles = database.getArticlesByRange(from, to);
     const result = await generateReport({
-      from, to, articles, format: 'both',
-      title: 'Wochenbericht Muenchner Kammerspiele'
+      from,
+      to,
+      articles,
+      format: 'both',
+      title: 'Wochenbericht Muenchner Kammerspiele',
     });
     logger.info('[Cron] Wochenbericht erstellt', { html: result.html, pdf: result.pdf });
   } catch (err) {
@@ -46,8 +49,11 @@ async function monthlyReport() {
   try {
     const articles = database.getArticlesByRange(from, to);
     const result = await generateReport({
-      from, to, articles, format: 'both',
-      title: 'Monatsbericht Muenchner Kammerspiele'
+      from,
+      to,
+      articles,
+      format: 'both',
+      title: 'Monatsbericht Muenchner Kammerspiele',
     });
     logger.info('[Cron] Monatsbericht erstellt', { html: result.html, pdf: result.pdf });
   } catch (err) {

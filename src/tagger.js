@@ -6,17 +6,20 @@ const { normalize } = require('./analyzer');
 let tagsConfig = null;
 function getConfig() {
   if (tagsConfig) return tagsConfig;
-  try { tagsConfig = loadJson('tags.json'); }
-  catch { tagsConfig = { rules: [], categories: {}, category_colors: {} }; }
+  try {
+    tagsConfig = loadJson('tags.json');
+  } catch {
+    tagsConfig = { rules: [], categories: {}, category_colors: {} };
+  }
   return tagsConfig;
 }
 
 function matchesAllTexts(haystack, texts) {
-  return texts.every(t => haystack.includes(normalize(t)));
+  return texts.every((t) => haystack.includes(normalize(t)));
 }
 
 function matchesAnyText(haystack, texts) {
-  return texts.some(t => haystack.includes(normalize(t)));
+  return texts.some((t) => haystack.includes(normalize(t)));
 }
 
 function autoTag(article, analysis) {
@@ -88,5 +91,5 @@ module.exports = {
   tagCategoryColor,
   tagsByCategory,
   getCategories,
-  getCategoryColors
+  getCategoryColors,
 };

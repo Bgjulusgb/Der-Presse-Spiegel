@@ -26,8 +26,9 @@ const mockArticles = [
     sourcePriority: 100,
     author: 'Egbert Tholl',
     publishedDate: subDays(new Date(), 1),
-    fullText: 'Nora Abdel-Maksoud hat an den Muenchner Kammerspielen ihre neue Inszenierung "Wokey Wokey" zur Premiere gebracht. Der Abend war brillant, klug und ausgesprochen sehenswert. Die Schauspielerin Wiebke Puls ueberzeugt in einer Hauptrolle. Das Publikum jubelte am Ende minutenlang. Die Regie zeigt politischen Mut und feinsinnige Komik. Eine grossartige Inszenierung der Intendantin Barbara Mundel und ihres Ensembles. Premiere im Schauspielhaus.',
-    paywall: false
+    fullText:
+      'Nora Abdel-Maksoud hat an den Muenchner Kammerspielen ihre neue Inszenierung "Wokey Wokey" zur Premiere gebracht. Der Abend war brillant, klug und ausgesprochen sehenswert. Die Schauspielerin Wiebke Puls ueberzeugt in einer Hauptrolle. Das Publikum jubelte am Ende minutenlang. Die Regie zeigt politischen Mut und feinsinnige Komik. Eine grossartige Inszenierung der Intendantin Barbara Mundel und ihres Ensembles. Premiere im Schauspielhaus.',
+    paywall: false,
   },
   {
     url: 'https://www.br.de/nachrichten/kultur/pinocchio-wu-tsang-kammerspiele',
@@ -36,8 +37,9 @@ const mockArticles = [
     sourcePriority: 95,
     author: 'Christoph Leibold',
     publishedDate: subDays(new Date(), 2),
-    fullText: 'An den Muenchner Kammerspielen feiert "Pinocchio" Premiere. Die Regie von Wu Tsang verwandelt die bekannte Geschichte in einen visuell beeindruckenden Theaterabend. Die Inszenierung im Schauspielhaus war fesselnd. Das Ensemble der Kammerspiele zeigt sich virtuos.',
-    paywall: false
+    fullText:
+      'An den Muenchner Kammerspielen feiert "Pinocchio" Premiere. Die Regie von Wu Tsang verwandelt die bekannte Geschichte in einen visuell beeindruckenden Theaterabend. Die Inszenierung im Schauspielhaus war fesselnd. Das Ensemble der Kammerspiele zeigt sich virtuos.',
+    paywall: false,
   },
   {
     url: 'https://www.nachtkritik.de/kammerspiele-tristan',
@@ -46,8 +48,9 @@ const mockArticles = [
     sourcePriority: 100,
     author: 'Sabine Leucht',
     publishedDate: subDays(new Date(), 3),
-    fullText: 'Die neue Inszenierung von Tristan und Isolde an den Muenchner Kammerspielen wirkt ueberladen und unausgegoren. Die Regie verirrt sich in eigenen Konzepten. Die Auffuehrung war zaeh, ermuedend und letztlich missglueckt. Das Publikum reagierte verhalten.',
-    paywall: false
+    fullText:
+      'Die neue Inszenierung von Tristan und Isolde an den Muenchner Kammerspielen wirkt ueberladen und unausgegoren. Die Regie verirrt sich in eigenen Konzepten. Die Auffuehrung war zaeh, ermuedend und letztlich missglueckt. Das Publikum reagierte verhalten.',
+    paywall: false,
   },
   {
     url: 'https://www.zeit.de/kultur/wallenstein-kammerspiele',
@@ -56,8 +59,9 @@ const mockArticles = [
     sourcePriority: 90,
     author: 'Peter Kuemmel',
     publishedDate: subDays(new Date(), 4),
-    fullText: 'Schillers "Wallenstein" feierte an den Muenchner Kammerspielen Premiere. Die Inszenierung ueberzeugt mit einer kraftvollen Buehnenpraesenz und einem hervorragend agierenden Ensemble. Walter Hess und Thomas Schmauser in Hauptrollen. Eine ausgereifte Arbeit. Die Vorstellung dauerte drei Stunden.',
-    paywall: false
+    fullText:
+      'Schillers "Wallenstein" feierte an den Muenchner Kammerspielen Premiere. Die Inszenierung ueberzeugt mit einer kraftvollen Buehnenpraesenz und einem hervorragend agierenden Ensemble. Walter Hess und Thomas Schmauser in Hauptrollen. Eine ausgereifte Arbeit. Die Vorstellung dauerte drei Stunden.',
+    paywall: false,
   },
   {
     url: 'https://www.merkur.de/kultur/eurydike-orpheus-kammerspiele',
@@ -66,8 +70,9 @@ const mockArticles = [
     sourcePriority: 75,
     author: null,
     publishedDate: subDays(new Date(), 5),
-    fullText: 'Die polnische Regisseurin Anna Smolar bringt "Eurydike und Orpheus" an die Muenchner Kammerspiele. Die Inszenierung gilt als gelungen. Das Stueck laeuft im Werkraum.',
-    paywall: false
+    fullText:
+      'Die polnische Regisseurin Anna Smolar bringt "Eurydike und Orpheus" an die Muenchner Kammerspiele. Die Inszenierung gilt als gelungen. Das Stueck laeuft im Werkraum.',
+    paywall: false,
   },
   {
     url: 'https://www.faz.net/feuilleton/buehne-mephisto-kammerspiele',
@@ -76,8 +81,9 @@ const mockArticles = [
     sourcePriority: 95,
     author: 'Simon Strauss',
     publishedDate: subDays(new Date(), 6),
-    fullText: 'Klaus Manns "Mephisto" in einer Inszenierung an den Muenchner Kammerspielen. Die Regie schafft eine starke Parabel auf gegenwaertige politische Verhaeltnisse. Beeindruckend. Das Ensemble agiert hervorragend.',
-    paywall: true
+    fullText:
+      'Klaus Manns "Mephisto" in einer Inszenierung an den Muenchner Kammerspielen. Die Regie schafft eine starke Parabel auf gegenwaertige politische Verhaeltnisse. Beeindruckend. Das Ensemble agiert hervorragend.',
+    paywall: true,
   },
   {
     url: 'https://example.com/hamburger-kammerspiele',
@@ -87,7 +93,7 @@ const mockArticles = [
     author: null,
     publishedDate: subDays(new Date(), 2),
     fullText: 'An den Hamburger Kammerspielen wird ein Stueck gespielt.',
-    paywall: false
+    paywall: false,
   },
   {
     url: 'https://www.abendzeitung-muenchen.de/kultur/buehne/interview-mundel',
@@ -96,9 +102,10 @@ const mockArticles = [
     sourcePriority: 75,
     author: 'Robert Braunmueller',
     publishedDate: subDays(new Date(), 1),
-    fullText: 'Im Gespraech mit der Intendantin der Muenchner Kammerspiele. Barbara Mundel erklaert: Theater muss provozieren. Sie sagt, das Ensemble sei gut aufgestellt. Frage: Wie sehen Sie die kommende Spielzeit? Antwort: Mit grosser Vorfreude.',
-    paywall: false
-  }
+    fullText:
+      'Im Gespraech mit der Intendantin der Muenchner Kammerspiele. Barbara Mundel erklaert: Theater muss provozieren. Sie sagt, das Ensemble sei gut aufgestellt. Frage: Wie sehen Sie die kommende Spielzeit? Antwort: Mit grosser Vorfreude.',
+    paywall: false,
+  },
 ];
 
 console.log('Inserting mock articles...');
@@ -120,11 +127,13 @@ for (const raw of mockArticles) {
     sentimentScore: analysis.sentimentScore,
     category: analysis.category,
     articleType: analysis.articleType,
-    meta: { reasons: analysis.relevanceReasons }
+    meta: { reasons: analysis.relevanceReasons },
   };
   database.insertArticle(article);
   inserted++;
-  console.log(`OK [${analysis.category}/${analysis.sentiment}/${analysis.relevanceScore}] ${raw.title}`);
+  console.log(
+    `OK [${analysis.category}/${analysis.sentiment}/${analysis.relevanceScore}] ${raw.title}`
+  );
 }
 console.log(`\nInserted ${inserted} articles.`);
 
