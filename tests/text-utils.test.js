@@ -58,21 +58,21 @@ test('colognePhonetic: leerer/null Input liefert leeren String', () => {
   assert.equal(T.colognePhonetic(null), '');
 });
 
-test('detectLanguage: deutscher Text', () => {
+test('detectLanguage: deutscher Text', async () => {
   const text =
     'Die Premiere am Münchner Theater war ein voller Erfolg gestern Abend mit großer Resonanz.';
-  assert.equal(T.detectLanguage(text), 'de');
+  assert.equal(await T.detectLanguage(text), 'de');
 });
 
-test('detectLanguage: kurzer Text fällt auf Fallback', () => {
-  assert.equal(T.detectLanguage('hi', { fallback: 'de' }), 'de');
-  assert.equal(T.detectLanguage('hi', { fallback: 'en' }), 'en');
+test('detectLanguage: kurzer Text fällt auf Fallback', async () => {
+  assert.equal(await T.detectLanguage('hi', { fallback: 'de' }), 'de');
+  assert.equal(await T.detectLanguage('hi', { fallback: 'en' }), 'en');
 });
 
-test('detectLanguage: franzoesischer Text', () => {
+test('detectLanguage: franzoesischer Text', async () => {
   const text =
     'La première au théâtre était un grand succès ce soir avec un public enthousiaste et nombreux.';
-  assert.equal(T.detectLanguage(text), 'fr');
+  assert.equal(await T.detectLanguage(text), 'fr');
 });
 
 test('estimateReadingMinutes: 200 Worte = 1 Minute', () => {
