@@ -9,22 +9,48 @@ try {
 } catch (err) {
   const msg = String((err && err.message) || err);
   const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+  const isWin = process.platform === 'win32';
   if (/bindings|better_sqlite3\.node|NODE_MODULE_VERSION/i.test(msg)) {
-    console.error('\n  Native Module "better-sqlite3" konnte nicht geladen werden.');
+    const bar = '═'.repeat(70);
+    console.error(`\n${bar}`);
+    console.error('  Native Module "better-sqlite3" konnte nicht geladen werden.');
+    console.error(bar);
     console.error(
-      `  Du verwendest Node.js v${process.versions.node} (NODE_MODULE_VERSION ${process.versions.modules}).`
+      `  Plattform: ${process.platform}-${process.arch}, Node v${process.versions.node} (ABI ${process.versions.modules})\n`
     );
-    console.error('  Vermutlich gibt es kein vorgebautes Binary fuer Deine Node-Version.\n');
-    console.error('  Loesung A (schnell, empfohlen):');
-    console.error('    1) Installiere Node 22 LTS von https://nodejs.org (Node 24 wird nicht');
-    console.error('       von allen native-Modules unterstuetzt).');
-    console.error('    2) Loesche node_modules und package-lock.json, dann: npm install\n');
-    console.error('  Loesung B (Build aus Source, braucht Visual Studio Build Tools + Python):');
-    console.error('    npm rebuild better-sqlite3 --build-from-source');
-    console.error('    oder: npm run fix-sqlite\n');
-    if (nodeMajor >= 24) {
-      console.error('  Hinweis: Node 24 ist sehr neu. Wenn moeglich auf Node 22 LTS wechseln.\n');
+    console.error('  Loesung 1 — Neuinstallation (am schnellsten):');
+    if (isWin) {
+      console.error('     rmdir /s /q node_modules');
+      console.error('     del package-lock.json');
+      console.error('     npm install');
+    } else {
+      console.error('     rm -rf node_modules package-lock.json');
+      console.error('     npm install');
     }
+    console.error('     oder einfach:  npm run fix-sqlite:clean\n');
+    console.error('  Loesung 2 — Aus Quellcode bauen (braucht Build-Tools):');
+    console.error('     npm run fix-sqlite');
+    if (isWin) {
+      console.error('     Windows: Visual Studio Build Tools 2022 + Python 3.x installieren');
+      console.error('     https://visualstudio.microsoft.com/visual-cpp-build-tools/\n');
+    } else {
+      console.error('');
+    }
+    console.error('  Loesung 3 — Node-Version pruefen:');
+    if (nodeMajor < 20) {
+      console.error(
+        `     Node v${process.versions.node} ist zu alt — Node 20 LTS oder neuer noetig.`
+      );
+    } else if (nodeMajor >= 26) {
+      console.error(`     Node v${process.versions.node} ist sehr neu. Auf Node 22 LTS wechseln.`);
+    } else {
+      console.error(
+        `     Node v${process.versions.node} sollte funktionieren. Falls nicht, Node 22 LTS verwenden.`
+      );
+    }
+    console.error('     Download: https://nodejs.org/de/download/\n');
+    console.error('  Vollstaendige Diagnose:  npm run doctor');
+    console.error(`${bar}\n`);
     process.exit(1);
   }
   throw err;
