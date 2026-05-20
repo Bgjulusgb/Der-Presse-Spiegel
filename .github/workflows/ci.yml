@@ -24,6 +24,9 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
-      - run: npm test
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_OPTIONS: --no-experimental-require-module
       - name: Lint
         run: npm run lint --if-present
