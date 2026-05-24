@@ -10,9 +10,8 @@ const {
   passesRequiredFilter,
   detectArticleType,
   categorize,
-  generateSummary,
+  extractExcerpt,
   findContextualMatch,
-  findFuzzyMatch,
   articleBodyText,
 } = require('../src/analyzer');
 
@@ -204,12 +203,12 @@ test('detectArticleType erkennt Interviews', () => {
   assert.equal(type, 'interview');
 });
 
-test('generateSummary respektiert Maximallaenge', () => {
+test('extractExcerpt respektiert Maximallaenge', () => {
   const article = {
-    fullText: 'Lorem ipsum. '.repeat(100),
+    fullText: 'Lorem ipsum dolor sit amet. '.repeat(100),
   };
-  const summary = generateSummary(article, 50);
-  assert.ok(summary.length <= 51);
+  const excerpt = extractExcerpt(article, 50);
+  assert.ok(excerpt.length <= 51);
 });
 
 test('passesRequiredFilter schliesst Hamburger Kammerspiele aus', () => {
@@ -262,11 +261,6 @@ test('calculateRelevance gibt mehr Punkte bei Titel + Produktion', () => {
   assert.ok(both.score > textOnly.score + 30);
 });
 
-test('findFuzzyMatch erkennt aehnliche Phrasen', () => {
-  const text = 'die muenchner kammerspielen zeigen wachse oder weiche';
-  assert.equal(findFuzzyMatch(text, 'wachse oder weiche'), true);
-});
-
 test('findContextualMatch findet Wort in Naehe', () => {
   const text = 'an den muenchner kammerspielen feierte pinocchio premiere';
   const ctx = findContextualMatch(text, 'pinocchio', ['kammerspielen'], 100);
@@ -279,16 +273,15 @@ test('findContextualMatch ignoriert wenn zu weit weg', () => {
   assert.equal(ctx, false);
 });
 
-test('generateSummary bevorzugt Saetze mit Schluesselwoertern', () => {
+test('extractExcerpt liefert woertlichen Textanfang ohne Umsortierung', () => {
   const article = {
     title: 'Hamlet Premiere',
     fullText:
-      'Das Wetter war schoen am Abend. Die Premiere von Hamlet an den Muenchner Kammerspielen war ein Erfolg. Der Verkehr stockte. Die Inszenierung beeindruckte das Publikum.',
+      'Das Wetter war schoen am Abend. Die Premiere von Hamlet an den Muenchner Kammerspielen war ein Erfolg. Der Verkehr stockte.',
   };
-  const summary = generateSummary(article, 300);
-  assert.ok(
-    summary.toLowerCase().includes('kammerspielen') || summary.toLowerCase().includes('hamlet')
-  );
+  const excerpt = extractExcerpt(article, 300);
+  // Muss woertlich am Original-Anfang beginnen (keine Generierung/Umsortierung).
+  assert.ok(article.fullText.startsWith(excerpt.replace(/…$/, '').trim()));
 });
 
 test('analyze vollstaendiger Durchlauf', () => {

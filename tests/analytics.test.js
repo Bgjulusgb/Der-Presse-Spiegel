@@ -68,11 +68,13 @@ test('ner.extractEntities findet Produktionen', () => {
   assert.ok(prods.some((p) => p.value === 'Wokey Wokey'));
 });
 
-test('ner.extractEntities berechnet Konfidenz', () => {
+test('ner.extractEntities liefert deterministische Treffer mit Mention-Zaehler', () => {
   const article = sampleArticles[0];
   const entities = ner.extractEntities(article);
   for (const e of entities) {
-    assert.ok(e.confidence >= 0 && e.confidence <= 1);
+    assert.ok(Number.isInteger(e.mentions) && e.mentions >= 1);
+    assert.equal(typeof e.inTitle, 'boolean');
+    assert.equal(e.confidence, undefined);
   }
 });
 
@@ -204,12 +206,6 @@ test('tonality.analyzeTonality erkennt enthusiastischen Ton', () => {
   const article = sampleArticles[0];
   const ton = tonality.analyzeTonality(article);
   assert.ok(['enthusiastic', 'neutral_reporting'].includes(ton.tonality));
-});
-
-test('tonality.detectSarcasm erkennt Sarkasmus', () => {
-  const sarcastic = 'Natuerlich war die Auffuehrung nicht schlecht.';
-  const isSarcastic = tonality.detectSarcasm(sarcastic);
-  assert.ok(typeof isSarcastic === 'boolean');
 });
 
 // Events Tests

@@ -1,7 +1,6 @@
 'use strict';
 
 const { keywords, sentiment, settings } = require('./config');
-const { levenshteinSimilarity } = require('./utils');
 
 function normalize(text) {
   return String(text || '')
@@ -51,26 +50,6 @@ function splitSentences(text) {
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
-}
-
-function findFuzzyMatch(haystack, needle, threshold = 0.88) {
-  if (!needle || !haystack) return false;
-  if (haystack.includes(needle)) return true;
-  if (needle.length < 6) return false;
-  const words = haystack.split(/\s+/);
-  const needleWords = needle.split(/\s+/);
-  if (needleWords.length === 1) {
-    for (const w of words) {
-      if (w.length < 5) continue;
-      if (levenshteinSimilarity(w, needle) >= threshold) return true;
-    }
-    return false;
-  }
-  for (let i = 0; i <= words.length - needleWords.length; i++) {
-    const window = words.slice(i, i + needleWords.length).join(' ');
-    if (levenshteinSimilarity(window, needle) >= threshold) return true;
-  }
-  return false;
 }
 
 // Builds the full searchable body text from all available fields
@@ -147,8 +126,19 @@ function passesRequiredFilter(article) {
   const text = normalize(articleBodyText(article));
   const haystack = `${title} ${text}`;
 
+  // Akzeptanz-Pfade (deterministisch, exakte Teilstring-Treffer):
+  // 1. Pflicht-Keyword ("Kammerspiele") direkt vorhanden, ODER
+  // 2. ein bekanntes Ensemble-Mitglied (eindeutiger Voll-Name) erwaehnt, ODER
+  // 3. eine eindeutige Produktion (Name >= 8 Zeichen) erwaehnt.
+  // So werden auch Artikel ueber Personen/Produktionen importiert, die das
+  // Wort "Kammerspiele" nicht woertlich nennen -> maximaler relevanter Import.
   const hasRequired = KW.required.some((k) => haystack.includes(k));
-  if (!hasRequired) return { passes: false, reason: 'no-required-keyword' };
+  const hasPerson = KW.people.some((p) => p.length >= 6 && haystack.includes(p));
+  const hasDistinctProduction = KW.productions.some((p) => p.length >= 8 && haystack.includes(p));
+
+  if (!hasRequired && !hasPerson && !hasDistinctProduction) {
+    return { passes: false, reason: 'no-required-keyword' };
+  }
 
   // Strukturelle Ausschluesse (Stellenanzeige, Leserbrief etc.) nur im Titel
   // pruefen. Diese Begriffe tauchen sonst als UI-Labels (Cookie-Banner,
@@ -183,13 +173,15 @@ function rssLikelyRelevant(item) {
   );
   const haystack = `${title} ${body}`;
 
-  // Pflicht-Keyword direkt vorhanden -> sicher relevant.
+  // Pflicht-Keyword, bekannte Person oder eindeutige Produktion -> sicher relevant.
   if (KW.required.some((k) => haystack.includes(k))) return true;
+  if (KW.people.some((p) => p.length >= 6 && haystack.includes(p))) return true;
+  if (KW.productions.some((p) => p.length >= 8 && haystack.includes(p))) return true;
 
   // Zu wenig Beschreibungstext, um sicher zu urteilen -> anreichern.
   if (body.length < 120) return true;
 
-  // Genug Text, aber kein Pflicht-Keyword -> ueberspringen.
+  // Genug Text, aber kein Treffer -> ueberspringen.
   return false;
 }
 
@@ -280,11 +272,6 @@ function calculateRelevance(article, sourcePriority = 50) {
       const pts = isContextual ? basePoints * Math.min(count, 3) : Math.floor(basePoints / 2);
       score += pts;
       reasons.push(`Produktion: ${p}${isContextual ? ' (Kontext OK)' : ''} (${count}x, +${pts})`);
-      matches.productions.push(p);
-      productionCount++;
-    } else if (p.length >= 8 && findFuzzyMatch(haystack, p, 0.9)) {
-      score += w.fuzzy_title_match || 40;
-      reasons.push(`Produktion (fuzzy): ${p}`);
       matches.productions.push(p);
       productionCount++;
     }
@@ -493,42 +480,27 @@ function analyzeSentiment(text) {
   return { label, score, positiveHits, negativeHits, confidence, hitCount };
 }
 
-function generateSummary(article, maxLength) {
+// Deterministischer woertlicher Auszug: liefert den Anfang des Originaltextes,
+// sauber an einer Satzgrenze (sonst an Wortgrenze) abgeschnitten. Keine
+// Umsortierung, keine Gewichtung, keine Generierung -> keine Halluzination.
+function extractExcerpt(article, maxLength) {
   const limit = maxLength || (settings.reports && settings.reports.max_summary_length) || 320;
-  const text = (article.fullText || '').replace(/\s+/g, ' ').trim();
+  const text = (article.fullText || article.firstParagraph || '').replace(/\s+/g, ' ').trim();
   if (!text) return '';
   if (text.length <= limit) return text;
-  const sentences = splitSentences(text);
-  if (sentences.length === 0) return text.slice(0, limit) + '…';
-  const normalizedTitle = normalize(article.title || '');
-  const requiredHits = KW.required;
-  const productionHits = KW.productions;
-
-  const scored = sentences.slice(0, 30).map((s, idx) => {
-    const ns = normalize(s);
-    let sc = 0;
-    if (idx === 0) sc += 4; // Intro ist wichtig
-    if (idx < 3) sc += 2; // Frühe Sätze
-    for (const r of requiredHits) if (ns.includes(r)) sc += 5; // Kammerspiele-Erwähnung
-    for (const p of productionHits) if (p.length >= 4 && ns.includes(p)) sc += 4; // Produktion
-    if (
-      normalizedTitle &&
-      levenshteinSimilarity(ns.slice(0, 80), normalizedTitle.slice(0, 80)) > 0.3
-    )
-      sc += 2;
-    if (s.length < 30) sc -= 2; // Strafen für sehr kurze Sätze
-    return { s, sc, idx };
-  });
-  scored.sort((a, b) => b.sc - a.sc || a.idx - b.idx);
-
-  let summary = '';
-  for (const { s } of scored) {
-    if ((summary + ' ' + s).trim().length > limit) continue;
-    summary = (summary + ' ' + s).trim();
-    if (summary.length >= limit * 0.7) break;
+  const window = text.slice(0, limit);
+  // An letzter Satzgrenze innerhalb des Fensters schneiden, falls vorhanden.
+  const lastSentenceEnd = Math.max(
+    window.lastIndexOf('. '),
+    window.lastIndexOf('! '),
+    window.lastIndexOf('? ')
+  );
+  if (lastSentenceEnd >= limit * 0.5) {
+    return window.slice(0, lastSentenceEnd + 1).trim();
   }
-  if (!summary) summary = text.slice(0, limit) + '…';
-  return summary;
+  // Sonst an letzter Wortgrenze schneiden.
+  const lastSpace = window.lastIndexOf(' ');
+  return (lastSpace > 0 ? window.slice(0, lastSpace) : window).trim() + '…';
 }
 
 // Haupt-Analyse-Funktion mit erweiterten Metadaten
@@ -536,7 +508,7 @@ function analyze(article, sourcePriority = 50) {
   const filter = passesRequiredFilter(article);
   const relevance = calculateRelevance(article, sourcePriority);
   const sentimentResult = analyzeSentiment(`${article.title} ${article.fullText || ''}`);
-  const summary = generateSummary(article);
+  const summary = extractExcerpt(article);
   const depth = calculateArticleDepth(article);
 
   return {
@@ -567,10 +539,9 @@ module.exports = {
   passesRequiredFilter,
   detectArticleType,
   isReview,
-  generateSummary,
+  extractExcerpt,
   categorize,
   findContextualMatch,
-  findFuzzyMatch,
   normalize,
   articleBodyText,
   calculateArticleDepth,

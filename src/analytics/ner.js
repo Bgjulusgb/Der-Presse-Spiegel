@@ -38,7 +38,6 @@ function extractEntities(article) {
         value: person,
         inTitle: titleCount > 0,
         mentions: titleCount + textCount,
-        confidence: Math.min(1, (titleCount * 2 + textCount) / 10),
       });
     }
   }
@@ -55,7 +54,6 @@ function extractEntities(article) {
         value: prod,
         inTitle: titleCount > 0,
         mentions: titleCount + textCount,
-        confidence: Math.min(1, (titleCount * 2 + textCount) / 10),
       });
     }
   }
@@ -72,7 +70,6 @@ function extractEntities(article) {
         value: venue,
         inTitle: titleCount > 0,
         mentions: titleCount + textCount,
-        confidence: Math.min(1, (titleCount + textCount) / 5),
       });
     }
   }
@@ -88,7 +85,6 @@ function extractEntities(article) {
         value: kw,
         inTitle: false,
         mentions: textCount,
-        confidence: 0.6,
       });
     }
   }

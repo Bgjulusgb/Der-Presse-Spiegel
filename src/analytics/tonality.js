@@ -70,17 +70,6 @@ function analyzeTonality(article) {
   };
 }
 
-function detectSarcasm(text) {
-  const sarcasmMarkers = ['natuerlich', 'klasse', 'ausgezeichnet', 'super'];
-  const normalized = normalize(text);
-
-  // Simple heuristic: sarcasm markers combined with negative context
-  const hasSarcasmMarker = sarcasmMarkers.some((m) => normalized.includes(m));
-  const hasNegativeContext = normalized.includes('nicht') || normalized.includes('kein');
-
-  return hasSarcasmMarker && hasNegativeContext;
-}
-
 function analyzeTonalityContrast(articles) {
   const byDate = new Map();
 
@@ -120,7 +109,6 @@ const { format } = require('date-fns');
 
 module.exports = {
   analyzeTonality,
-  detectSarcasm,
   analyzeTonalityContrast,
   normalize,
 };
