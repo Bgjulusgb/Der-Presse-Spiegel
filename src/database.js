@@ -547,6 +547,13 @@ function insertArticleEntities(articleId, entities) {
   }
 }
 
+function toIsoOrNull(value) {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 function insertDetectedEvents(articleId, events) {
   const stmt = db.prepare(`
     INSERT INTO detected_events (article_id, event_type, event_date, details, confidence)
@@ -556,7 +563,7 @@ function insertDetectedEvents(articleId, events) {
     stmt.run(
       articleId,
       event.type,
-      event.date,
+      toIsoOrNull(event.date),
       JSON.stringify(event),
       event.confidence || 0.5
     );

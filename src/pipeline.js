@@ -8,6 +8,8 @@ const { findDuplicate, chooseWinner } = require('./deduplicator');
 const { sources } = require('./config');
 const { normalizeUrl } = require('./utils');
 const { autoTag } = require('./tagger');
+const ner = require('./analytics/ner');
+const events = require('./analytics/events');
 
 function applyTags(articleId, article, analysis) {
   const tags = autoTag(article, analysis);
@@ -19,6 +21,19 @@ function applyTags(articleId, article, analysis) {
     }
   }
   return tags;
+}
+
+// Extrahiert Entitaeten (Personen/Produktionen/Orte) und Ereignisse
+// (Premiere, Casting, ...) und speichert sie fuer die Analytics-Endpoints.
+function applyAnalytics(articleId, article) {
+  try {
+    const entities = ner.extractEntities(article);
+    if (entities.length > 0) database.insertArticleEntities(articleId, entities);
+    const detected = events.detectEvents(article, entities);
+    if (detected.length > 0) database.insertDetectedEvents(articleId, detected);
+  } catch (e) {
+    logger.debug(`Analytics-Fehler fuer Artikel ${articleId}: ${e.message}`);
+  }
 }
 
 function summariseFeedHealth() {
@@ -105,6 +120,7 @@ async function runScan({ from, to }) {
             if (inserted.inserted) {
               summary.articlesAdded++;
               applyTags(inserted.id, article, analysis);
+              applyAnalytics(inserted.id, article);
             }
             logger.info(
               `Duplikat erkannt -> bestehend behalten: "${article.title}" (${dupHit.reason})`
@@ -114,6 +130,7 @@ async function runScan({ from, to }) {
             if (inserted.inserted) {
               summary.articlesAdded++;
               applyTags(inserted.id, article, analysis);
+              applyAnalytics(inserted.id, article);
             }
             database.markAsDuplicate(
               dupHit.duplicate.id,
@@ -136,6 +153,7 @@ async function runScan({ from, to }) {
           if (inserted.inserted) {
             summary.articlesAdded++;
             applyTags(inserted.id, article, analysis);
+            applyAnalytics(inserted.id, article);
             existing.push({
               id: inserted.id,
               url_normalized: article.urlNormalized,
