@@ -599,7 +599,26 @@ async function fetchFeed(feed, { etag, lastModified, allowAutoBrowserFallback = 
       if (browserRes && browserRes.status === 'ok') return browserRes;
     }
 
-    const res = await fetchText(feed.url, { etag, lastModified });
+    let res;
+    try {
+      res = await fetchText(feed.url, { etag, lastModified });
+    } catch (primaryErr) {
+      // Wenn Primary-Feed fehlschlaegt, versuche alternative Feeds von der Adapter-Config
+      const { tryAlternativeFeed } = require('./feed-adapters');
+      const altResult = await tryAlternativeFeed(feed.url || feed.name, fetchText);
+      if (altResult && altResult.status === 'ok') {
+        logger.info(`Feed ${feed.name} via Alternative-URL erfolgreich`);
+        res = {
+          status: 200,
+          headers: {},
+          buffer: Buffer.from(JSON.stringify(altResult.items)),
+          text: JSON.stringify(altResult.items),
+          contentType: 'application/json',
+        };
+      } else {
+        throw primaryErr;
+      }
+    }
     if (res.status === 304) {
       return {
         status: 'not-modified',

@@ -40,12 +40,21 @@ function applyAnalytics(articleId, article) {
 // Aktualisiert summary-Zaehler und die existing-Liste (fuer Dedup im selben
 // Lauf). Pro-Artikel-Fehler werden hier abgefangen, damit eine umgebende
 // Transaktion nicht zurueckgerollt wird.
+// Nach der Anreicherung werden hard-rejects vermieden (keine Relevanzgate mehr).
+// Stattdessen importieren wir angereicherte Artikel mit Score-Schwellen-Markierungen,
+// damit UI-Filtering und Ranking moeglich ist ohne valide Inhalte zu verlieren.
 function processArticle(raw, existing, summary) {
   try {
     const analysis = analyze(raw, raw.sourcePriority || 50);
-    if (!analysis.passes) {
-      logger.debug(`Verworfen: ${raw.title} (${analysis.rejectReason})`);
-      return;
+    // Nota: analysis.passes wird noch berechnet fuer Legacy-Logs/Metriken,
+    // aber nach Anreicherung wird es nicht mehr als hard-reject interpretiert.
+    // Stattdessen markieren wir mit dem Relevanzs-Score.
+    const isHighValue = analysis.relevanceScore >= (require('./config').keywords?.thresholds?.relevant || 50);
+    if (!isHighValue) {
+      logger.debug(`Low-Score-Artikel (${analysis.relevanceScore}): ${raw.title} (${analysis.category})`);
+      // Trotzdem importieren (nach Anreicherung), aber markieren.
+    } else {
+      logger.debug(`Angereichert & Value: ${raw.title} (Score: ${analysis.relevanceScore})`);
     }
 
     const article = {
