@@ -8,6 +8,46 @@ const analytics = require('./analytics');
 
 const router = express.Router();
 
+// Liest from/to aus Query (from/to/last) mit Default 30 Tage.
+function rangeFromQuery(req) {
+  const opts = { from: req.query.from, to: req.query.to, last: req.query.last };
+  if (!opts.from && !opts.to && !opts.last) opts.last = '30d';
+  return parseDateRange(opts);
+}
+
+// GET /api/analytics/top-entities - Schnelle Top-Entitaeten aus gespeicherten
+// Tabellen (article_entities), datums-gefiltert. Nutzt die im Scan befuellten
+// Daten statt erneuter Volltext-Extraktion.
+router.get('/top-entities', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const type = req.query.type || null;
+    const limit = Math.min(parseInt(req.query.limit || 25, 10) || 25, 200);
+    const rows = database.getTopEntities({ from, to, type, limit });
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      type: type || 'all',
+      entities: rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/event-counts - Aggregierte Ereigniszahlen aus
+// gespeicherter detected_events-Tabelle, datums-gefiltert.
+router.get('/event-counts', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      events: database.getEventCounts({ from, to }),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/analytics/entities - All extracted entities
 router.get('/entities', (req, res) => {
   try {

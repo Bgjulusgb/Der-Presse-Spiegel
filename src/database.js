@@ -608,6 +608,57 @@ function getEventsByType(eventType, limit = 100) {
     .all(eventType, limit);
 }
 
+// Schnelle, datums-gefilterte Top-Entitaeten direkt aus der gespeicherten
+// Tabelle (JOIN auf articles fuer published_date). Vermeidet das erneute
+// Extrahieren aus Volltexten bei jeder Abfrage.
+function getTopEntities({ from, to, type = null, limit = 25 } = {}) {
+  const params = { from: from.toISOString(), to: to.toISOString(), limit };
+  let typeClause = '';
+  if (type) {
+    typeClause = 'AND e.entity_type = @type';
+    params.type = type;
+  }
+  return db
+    .prepare(
+      `
+    SELECT e.entity_type, e.entity_value,
+           COUNT(DISTINCT e.article_id) AS articles,
+           SUM(e.mentions) AS mentions,
+           SUM(e.in_title) AS in_title,
+           AVG(e.confidence) AS avg_confidence
+    FROM article_entities e
+    JOIN articles a ON a.id = e.article_id
+    WHERE a.published_date >= @from AND a.published_date <= @to
+      AND a.duplicate_of IS NULL AND a.deleted_at IS NULL
+      ${typeClause}
+    GROUP BY e.entity_type, e.entity_value
+    ORDER BY mentions DESC, articles DESC
+    LIMIT @limit
+  `
+    )
+    .all(params);
+}
+
+// Datums-gefilterte Ereignis-Aggregation aus der gespeicherten Tabelle.
+function getEventCounts({ from, to } = {}) {
+  return db
+    .prepare(
+      `
+    SELECT ev.event_type,
+           COUNT(*) AS count,
+           AVG(ev.confidence) AS avg_confidence,
+           MAX(ev.event_date) AS latest_date
+    FROM detected_events ev
+    JOIN articles a ON a.id = ev.article_id
+    WHERE a.published_date >= @from AND a.published_date <= @to
+      AND a.duplicate_of IS NULL AND a.deleted_at IS NULL
+    GROUP BY ev.event_type
+    ORDER BY count DESC
+  `
+    )
+    .all({ from: from.toISOString(), to: to.toISOString() });
+}
+
 function transaction(fn) {
   return (...args) => {
     db.exec('BEGIN');
@@ -661,6 +712,8 @@ module.exports = {
   getDetectedEvents,
   getEntitiesByType,
   getEventsByType,
+  getTopEntities,
+  getEventCounts,
   getSavedSearches,
   deleteSavedSearch,
   transaction,
