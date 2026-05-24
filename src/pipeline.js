@@ -85,18 +85,14 @@ function processArticle(raw, existing, summary) {
         dupHit.duplicate
       );
       if (winner === dupHit.duplicate) {
-        const inserted = database.insertArticle(article);
-        database.markAsDuplicate(inserted.id, dupHit.duplicate.id, article.url);
+        // Bestehender Artikel ist besser: nur Duplikat-Beziehung speichern, nicht einfügen.
+        // Bei URL-Match würde der Insert mit UNIQUE-Constraint fehlschlagen.
         summary.duplicatesFound++;
-        if (inserted.inserted) {
-          summary.articlesAdded++;
-          applyTags(inserted.id, article, analysis);
-          applyAnalytics(inserted.id, article);
-        }
         logger.info(
           `Duplikat erkannt -> bestehend behalten: "${article.title}" (${dupHit.reason})`
         );
       } else {
+        // Neuer Artikel ist besser: einfügen und alten als Duplikat markieren.
         const inserted = database.insertArticle(article);
         if (inserted.inserted) {
           summary.articlesAdded++;
