@@ -339,4 +339,81 @@ router.get('/tonality', (req, res) => {
   }
 });
 
+// GET /api/analytics/resonance - Medienresonanz (Reichweite x Relevanz)
+router.get('/resonance', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      overall: analytics.mediaResonance.aggregateResonance(articles),
+      byProduction: analytics.mediaResonance.resonanceByProduction(articles).slice(0, 25),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/share-of-voice?dimension=production|person|source
+router.get('/share-of-voice', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const dimension = ['production', 'person', 'source'].includes(req.query.dimension)
+      ? req.query.dimension
+      : 'production';
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      dimension,
+      shareOfVoice: analytics.mediaResonance.shareOfVoice(articles, dimension).slice(0, 25),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/sentiment-timeline - Sentiment-Verlauf pro Tag
+router.get('/sentiment-timeline', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      timeline: analytics.mediaResonance.sentimentTimeline(articles),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/critic-consensus - Kritiker-Konsens je Produktion
+router.get('/critic-consensus', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      consensus: analytics.mediaResonance.criticConsensus(articles),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/quotes - Herausragende Zitate aus der Berichterstattung
+router.get('/quotes', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const limit = Math.min(parseInt(req.query.limit || 50, 10) || 50, 200);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      coverage: analytics.quotes.quoteCoverage(articles),
+      quotes: analytics.quotes.notableQuotes(articles, { limit }),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

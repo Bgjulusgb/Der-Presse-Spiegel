@@ -1251,9 +1251,19 @@ async function loadAnalytics() {
     const el = $(id);
     if (el) el.innerHTML = '<p class="muted">Lade…</p>';
   };
-  ['#an-people', '#an-productions', '#an-spikes', '#an-sources', '#an-tonality', '#an-events', '#an-clusters'].forEach(
-    setLoading
-  );
+  [
+    '#an-people',
+    '#an-productions',
+    '#an-spikes',
+    '#an-sources',
+    '#an-tonality',
+    '#an-events',
+    '#an-clusters',
+    '#an-resonance-prod',
+    '#an-sov',
+    '#an-consensus',
+    '#an-quotes',
+  ].forEach(setLoading);
 
   try {
     const [entities, trends, sources, tonality, events, clusters] = await Promise.all([
@@ -1358,9 +1368,84 @@ async function loadAnalytics() {
           )
           .join('')
       : '<p class="muted">Keine zusammengehörigen Story-Cluster gefunden.</p>';
+
+    await loadResonance(period);
   } catch (err) {
     handleApiError(err);
   }
+}
+
+const CONSENSUS_LABEL = {
+  ueberwiegend_positiv: 'überwiegend positiv',
+  ueberwiegend_negativ: 'überwiegend negativ',
+  neutral: 'neutral',
+  gemischt: 'gemischt',
+};
+
+async function loadResonance(period) {
+  const [resonance, sov, consensus, quotes] = await Promise.all([
+    api(`/api/analytics/resonance?last=${period}`).catch(() => null),
+    api(`/api/analytics/share-of-voice?dimension=production&last=${period}`).catch(() => null),
+    api(`/api/analytics/critic-consensus?last=${period}`).catch(() => null),
+    api(`/api/analytics/quotes?last=${period}&limit=15`).catch(() => null),
+  ]);
+
+  // Resonanz-Übersicht
+  const ov = (resonance && resonance.overall) || {};
+  $('#an-resonance-summary').innerHTML = `
+    <div><strong>${safeNum(ov.totalResonance)}</strong><small>Gesamt-Resonanz</small></div>
+    <div><strong>${safeNum(ov.avgResonance)}</strong><small>Ø je Artikel</small></div>
+    <div class="ok"><strong>${safeNum(ov.reviewResonance)}</strong><small>aus Kritiken</small></div>
+    <div><strong>${safeNum(ov.totalArticles)}</strong><small>Artikel</small></div>`;
+
+  const prods = (resonance && resonance.byProduction) || [];
+  const maxR = Math.max(1, ...prods.map((p) => safeNum(p.resonance)));
+  $('#an-resonance-prod').innerHTML = prods.length
+    ? prods
+        .slice(0, 15)
+        .map((p) => anBar(p.resonance, maxR, p.production, ` · ${safeNum(p.articles)} Art. · Ø ${safeNum(p.avgSentiment)}`))
+        .join('')
+    : '<p class="muted">Keine Produktionsresonanz im Zeitraum.</p>';
+
+  // Share of Voice
+  const sovList = (sov && sov.shareOfVoice) || [];
+  $('#an-sov').innerHTML = sovList.length
+    ? sovList.slice(0, 12).map((s) => anBar(s.share, 100, s.name, '%')).join('')
+    : '<p class="muted">Keine Daten.</p>';
+
+  // Kritiker-Konsens
+  const cons = (consensus && consensus.consensus) || [];
+  $('#an-consensus').innerHTML = cons.length
+    ? `<table class="an-table">
+        <thead><tr><th>Produktion</th><th>Kritiken</th><th>Ø</th><th>Konsens</th></tr></thead>
+        <tbody>${cons
+          .slice(0, 15)
+          .map(
+            (c) => `<tr>
+              <td>${escapeHtml(c.production)}</td>
+              <td>${safeNum(c.reviews)}</td>
+              <td>${safeNum(c.avgScore)}</td>
+              <td><span class="badge">${escapeHtml(CONSENSUS_LABEL[c.consensus] || c.consensus)}</span></td>
+            </tr>`
+          )
+          .join('')}</tbody>
+      </table>`
+    : '<p class="muted">Noch keine Rezensionen erfasst.</p>';
+
+  // Zitate
+  const qList = (quotes && quotes.quotes) || [];
+  const cov = (quotes && quotes.coverage) || {};
+  $('#an-quotes').innerHTML = qList.length
+    ? `<p class="muted">${safeNum(cov.withQuotes)} von ${safeNum(cov.total)} Artikeln mit Zitaten (${Math.round(safeNum(cov.ratio) * 100)}%)</p>` +
+      qList
+        .map(
+          (q) => `
+        <blockquote class="an-quote">„${escapeHtml(q.quote)}"
+          <cite>${escapeHtml(q.production || q.person || '')}${q.source ? ' — ' + escapeHtml(q.source) : ''}</cite>
+        </blockquote>`
+        )
+        .join('')
+    : '<p class="muted">Keine Zitate gefunden.</p>';
 }
 
 async function toggleBookmark(articleId, isBookmarked) {

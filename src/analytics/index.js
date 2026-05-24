@@ -8,6 +8,8 @@ const clustering = require('./clustering');
 const freshness = require('./freshness');
 const tonality = require('./tonality');
 const events = require('./events');
+const mediaResonance = require('./media-resonance');
+const quotes = require('./quotes');
 
 // Central analytics orchestrator
 // Runs after article is saved to database
@@ -67,4 +69,6 @@ module.exports = {
   freshness,
   tonality,
   events,
+  mediaResonance,
+  quotes,
 };

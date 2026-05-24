@@ -208,3 +208,36 @@ test('GET /api/analytics/event-counts liefert events-Array', async () => {
   assert.equal(status, 200);
   assert.ok(Array.isArray(json.events));
 });
+
+test('GET /api/analytics/resonance liefert overall + byProduction', async () => {
+  const { status, json } = await get('/api/analytics/resonance?last=30d');
+  assert.equal(status, 200);
+  assert.ok(json.overall && typeof json.overall === 'object');
+  assert.ok(Array.isArray(json.byProduction));
+});
+
+test('GET /api/analytics/share-of-voice liefert Array + dimension', async () => {
+  const { status, json } = await get('/api/analytics/share-of-voice?dimension=production&last=30d');
+  assert.equal(status, 200);
+  assert.equal(json.dimension, 'production');
+  assert.ok(Array.isArray(json.shareOfVoice));
+});
+
+test('GET /api/analytics/sentiment-timeline liefert timeline-Array', async () => {
+  const { status, json } = await get('/api/analytics/sentiment-timeline?last=30d');
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(json.timeline));
+});
+
+test('GET /api/analytics/critic-consensus liefert consensus-Array', async () => {
+  const { status, json } = await get('/api/analytics/critic-consensus?last=30d');
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(json.consensus));
+});
+
+test('GET /api/analytics/quotes liefert quotes + coverage', async () => {
+  const { status, json } = await get('/api/analytics/quotes?last=30d');
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(json.quotes));
+  assert.ok(json.coverage && typeof json.coverage === 'object');
+});

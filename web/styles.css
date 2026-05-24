@@ -945,3 +945,19 @@ body {
   color: var(--c-text-dim);
 }
 .cluster-list li { margin: 2px 0; }
+.an-quote {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--c-accent);
+  background: var(--c-surface-2);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  color: var(--c-text-dim);
+}
+.an-quote cite {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--c-text-muted);
+  font-style: normal;
+}
