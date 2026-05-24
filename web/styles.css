@@ -28,6 +28,7 @@
   --sidebar-w: 240px;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out, border-color 0.25s ease-in-out;
 }
 [data-theme="dark"] {
   --c-bg: #0b1120;
@@ -686,12 +687,52 @@ body {
   .article-item { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
 }
 
+@media (max-width: 1000px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .page-actions { flex-direction: column; }
+  .page-actions .btn { width: 100%; }
+}
+
+@media (max-width: 768px) {
+  .sidebar { width: 100%; height: auto; position: relative; }
+  .nav { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .nav-item {
+    flex: 0 1 calc(50% - 2px);
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+  .sidebar-footer { flex-direction: row; padding: 8px; }
+  .main { padding: 12px; }
+  .page-head { gap: 12px; margin-bottom: 12px; }
+  .page-actions { flex-direction: column; gap: 8px; }
+  .page-actions .btn { width: 100%; }
+  .chart-area { min-height: 150px; }
+  .article-item { padding: 8px; }
+  .article-title { font-size: 15px; }
+}
+
 @media (max-width: 720px) {
   body { flex-direction: column; }
   .sidebar { width: 100%; height: auto; position: relative; }
   .nav { flex-direction: row; flex-wrap: wrap; }
-  .nav-item { flex: 1 0 auto; }
-  .main { padding: 14px; }
+  .nav-item { flex: 1 0 calc(25% - 2px); font-size: 12px; padding: 8px 4px; }
+  .brand { margin: 8px 0; }
+  .brand-mark { width: 32px; height: 32px; font-size: 14px; }
+  .main { padding: 10px; }
+  .page-head { flex-direction: column; align-items: flex-start; }
+  .metrics { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .nav-item { flex: 1 0 calc(33.333% - 2px); font-size: 11px; padding: 6px 2px; }
+  .sidebar-footer { flex-direction: column; gap: 4px; }
+  .brand { margin: 4px; }
+  .main { padding: 8px; }
+  .page-head > div > h1 { font-size: 18px; }
+  .article-item { padding: 6px; }
+  .article-title { font-size: 13px; }
+  .btn { padding: 8px 12px; font-size: 13px; }
+  .search-help table { font-size: 12px; }
 }
 
 /* Feed-Health UI (Bereich 4a/4b/4c) */

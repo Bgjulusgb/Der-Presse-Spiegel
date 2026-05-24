@@ -224,6 +224,8 @@ async function loadTagsTab() {
       })
       .join('');
     document.querySelectorAll('#tags-by-category .word.tag').forEach((el) => {
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
       el.addEventListener('click', () => {
         document.getElementById('article-search').value = `tag:${el.dataset.tag}`;
         state.search = `tag:${el.dataset.tag}`;
@@ -234,6 +236,12 @@ async function loadTagsTab() {
           .querySelectorAll('.tab')
           .forEach((t) => t.classList.toggle('active', t.id === 'tab-articles'));
         loadArticles();
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          el.click();
+        }
       });
     });
   } catch (err) {
@@ -865,6 +873,13 @@ function initGlobalKeys() {
       }
       if (isInput && document.activeElement.id === 'article-search') {
         document.activeElement.blur();
+      }
+    }
+    if (e.key === '/') {
+      if (!isInput) {
+        e.preventDefault();
+        $('#article-search').focus();
+        return;
       }
     }
     if (isInput) return;

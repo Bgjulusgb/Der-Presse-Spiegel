@@ -16,28 +16,51 @@ const { hybridSearch, suggestQueries, didYouMean, topMentions, trends } = requir
 const textUtils = require('./text-utils');
 
 function computeFacets(articles) {
-  const counts = (key, getter) => {
-    const m = new Map();
-    for (const a of articles) {
-      const v = getter(a);
-      if (v === undefined || v === null || v === '') continue;
-      if (Array.isArray(v)) {
-        for (const x of v) m.set(x, (m.get(x) || 0) + 1);
-      } else {
-        m.set(v, (m.get(v) || 0) + 1);
-      }
-    }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count }));
+  // Single-pass computation instead of 7 passes
+  const result = {
+    category: new Map(),
+    sentiment: new Map(),
+    type: new Map(),
+    source: new Map(),
+    tag: new Map(),
+    language: new Map(),
+    paywall: new Map(),
+    image: new Map(),
   };
+
+  for (const a of articles) {
+    // Category
+    if (a.category) result.category.set(a.category, (result.category.get(a.category) || 0) + 1);
+    // Sentiment
+    if (a.sentiment) result.sentiment.set(a.sentiment, (result.sentiment.get(a.sentiment) || 0) + 1);
+    // Type
+    if (a.article_type) result.type.set(a.article_type, (result.type.get(a.article_type) || 0) + 1);
+    // Source
+    if (a.source) result.source.set(a.source, (result.source.get(a.source) || 0) + 1);
+    // Tags
+    for (const tag of (a.tags || [])) result.tag.set(tag, (result.tag.get(tag) || 0) + 1);
+    // Language
+    const lang = a.language || 'de';
+    result.language.set(lang, (result.language.get(lang) || 0) + 1);
+    // Paywall
+    const pw = a.paywall ? 'yes' : 'no';
+    result.paywall.set(pw, (result.paywall.get(pw) || 0) + 1);
+    // Image
+    const img = a.has_image ? 'yes' : 'no';
+    result.image.set(img, (result.image.get(img) || 0) + 1);
+  }
+
+  // Convert to sorted arrays
+  const convert = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count }));
   return {
-    category: counts('category', (a) => a.category),
-    sentiment: counts('sentiment', (a) => a.sentiment),
-    type: counts('type', (a) => a.article_type),
-    source: counts('source', (a) => a.source).slice(0, 25),
-    tag: counts('tag', (a) => a.tags || []).slice(0, 25),
-    language: counts('language', (a) => a.language || 'de'),
-    paywall: counts('paywall', (a) => (a.paywall ? 'yes' : 'no')),
-    image: counts('image', (a) => (a.has_image ? 'yes' : 'no')),
+    category: convert(result.category),
+    sentiment: convert(result.sentiment),
+    type: convert(result.type),
+    source: convert(result.source).slice(0, 25),
+    tag: convert(result.tag).slice(0, 25),
+    language: convert(result.language),
+    paywall: convert(result.paywall),
+    image: convert(result.image),
   };
 }
 
@@ -46,14 +69,23 @@ const WEB_DIR = path.resolve(__dirname, '..', 'web');
 const wsClients = new Set();
 function broadcast(type, payload) {
   const msg = JSON.stringify({ type, payload, ts: Date.now() });
+  const deadClients = [];
   for (const ws of wsClients) {
     if (ws.readyState === 1) {
       try {
         ws.send(msg);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        logger.debug('WS send failed', { error: e.message });
+        deadClients.push(ws);
       }
+    } else if (ws.readyState === 3) {
+      // CLOSED
+      deadClients.push(ws);
     }
+  }
+  // Cleanup dead connections
+  for (const ws of deadClients) {
+    wsClients.delete(ws);
   }
 }
 
@@ -74,8 +106,36 @@ function attachLogger() {
 
 function buildApp() {
   const app = express();
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+  // Input validation middleware
+  const validateInput = (fn) => (req, res, next) => {
+    try {
+      if (req.body && typeof req.body === 'object') {
+        const s = JSON.stringify(req.body);
+        if (s.length > 50000) return res.status(413).json({ error: 'Payload too large' });
+      }
+      fn(req, res, next);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Global error handler
+  app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+      return res.status(400).json({ error: 'Invalid JSON' });
+    }
+    const status = err.status || 500;
+    const message = process.env.NODE_ENV === 'production' ? 'Server error' : err.message;
+    logger.error(`Error on ${req.method} ${req.path}`, {
+      error: err.message,
+      status,
+      endpoint: `${req.method} ${req.path}`
+    });
+    res.status(status).json({ error: message });
+  });
 
   app.use(express.static(WEB_DIR));
 
@@ -364,6 +424,7 @@ function buildApp() {
         )
         .all();
       let added = 0;
+      const errors = [];
       for (const row of rows) {
         const analysis = { category: row.category, sentiment: row.sentiment };
         const tags = autoTag({ ...row, fullText: row.full_text }, analysis);
@@ -371,10 +432,13 @@ function buildApp() {
           try {
             database.addTag(row.id, tag);
             added++;
-          } catch {}
+          } catch (e) {
+            logger.debug(`Tag failed for article ${row.id}: ${tag}`, { error: e.message });
+            errors.push({ articleId: row.id, tag, error: e.message });
+          }
         }
       }
-      res.json({ ok: true, articles: rows.length, tags_added: added });
+      res.json({ ok: true, articles: rows.length, tags_added: added, errors: errors.length > 0 ? errors.slice(0, 10) : undefined });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -384,12 +448,20 @@ function buildApp() {
   });
   app.post('/api/article/:id/tags', (req, res) => {
     const { tag } = req.body || {};
-    if (!tag) return res.status(400).json({ error: 'tag erforderlich' });
-    database.addTag(parseInt(req.params.id, 10), tag);
+    if (!tag || typeof tag !== 'string') return res.status(400).json({ error: 'tag erforderlich' });
+    if (tag.length > 100) return res.status(400).json({ error: 'tag zu lang (max 100 Zeichen)' });
+    if (!/^[a-zA-Z0-9_:äöüß\-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
+    const articleId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(articleId)) return res.status(400).json({ error: 'Ungültige Article ID' });
+    database.addTag(articleId, tag);
     res.json({ ok: true });
   });
   app.delete('/api/article/:id/tags/:tag', (req, res) => {
-    database.removeTag(parseInt(req.params.id, 10), req.params.tag);
+    const articleId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(articleId)) return res.status(400).json({ error: 'Ungültige Article ID' });
+    const tag = req.params.tag;
+    if (!/^[a-zA-Z0-9_:äöüß\-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
+    database.removeTag(articleId, tag);
     res.json({ ok: true });
   });
 
@@ -492,7 +564,13 @@ function buildApp() {
   app.post('/api/sources/test', async (req, res) => {
     try {
       const { url, name } = req.body || {};
-      if (!url) return res.status(400).json({ error: 'url erforderlich' });
+      if (!url || typeof url !== 'string') return res.status(400).json({ error: 'url erforderlich' });
+      if (url.length > 2000) return res.status(400).json({ error: 'url zu lang' });
+      try {
+        new URL(url);
+      } catch {
+        return res.status(400).json({ error: 'Ungültige URL' });
+      }
       const { testFeed } = require('./scraper');
       const result = await testFeed(url, name);
       res.json(result);
