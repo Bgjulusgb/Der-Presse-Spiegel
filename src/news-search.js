@@ -4,6 +4,17 @@ const cheerio = require('cheerio');
 const logger = require('./logger');
 const { fetchText, parseFeedXml } = require('./feed-fetcher');
 
+// Detects whether a response body is actually a feed. News aggregators
+// (especially Bing) sometimes return an HTML page instead of RSS — parsing
+// that as XML throws a cryptic error, so we check up front and skip cleanly.
+function looksLikeFeed(text) {
+  if (!text) return false;
+  const head = text.slice(0, 2048).toLowerCase();
+  if (/^\s*\{/.test(text) && /jsonfeed\.org/.test(head)) return true;
+  if (/<!doctype html|<html[\s>]/.test(head) && !/<rss|<feed|<rdf:rdf/.test(head)) return false;
+  return /<rss[\s>]|<feed[\s>]|<rdf:rdf|<channel[\s>]/.test(head);
+}
+
 function buildGoogleNewsUrl(query, { hl = 'de', gl = 'DE', ceid = 'DE:de' } = {}) {
   const q = encodeURIComponent(query);
   return `https://news.google.com/rss/search?q=${q}&hl=${hl}&gl=${gl}&ceid=${ceid}`;
@@ -90,6 +101,10 @@ async function fetchGoogleNewsFeed(feed) {
     const url = buildGoogleNewsUrl(query);
     try {
       const res = await fetchText(url, { timeout: 20000 });
+      if (!looksLikeFeed(res.text)) {
+        logger.warn(`Google News Query "${query}": Antwort ist kein Feed (HTML?), uebersprungen`);
+        continue;
+      }
       const parsed = await parseFeedXml(res.text);
       for (const item of parsed.items) {
         if (!item.url) continue;
@@ -136,6 +151,10 @@ async function fetchBingNewsFeed(feed) {
     const url = buildBingNewsUrl(query);
     try {
       const res = await fetchText(url, { timeout: 20000 });
+      if (!looksLikeFeed(res.text)) {
+        logger.warn(`Bing News Query "${query}": Antwort ist kein Feed (HTML?), uebersprungen`);
+        continue;
+      }
       const parsed = await parseFeedXml(res.text);
       for (const item of parsed.items) {
         if (!item.url || allItems.has(item.url)) continue;
@@ -168,4 +187,5 @@ module.exports = {
   fetchBingNewsFeed,
   cleanGoogleNewsTitle,
   extractSourceFromGoogleTitle,
+  looksLikeFeed,
 };

@@ -15,29 +15,138 @@ const { parseDateRange } = require('./utils');
 const { hybridSearch, suggestQueries, didYouMean, topMentions, trends } = require('./search');
 const textUtils = require('./text-utils');
 
-function computeFacets(articles) {
-  const counts = (key, getter) => {
-    const m = new Map();
-    for (const a of articles) {
-      const v = getter(a);
-      if (v === undefined || v === null || v === '') continue;
-      if (Array.isArray(v)) {
-        for (const x of v) m.set(x, (m.get(x) || 0) + 1);
-      } else {
-        m.set(v, (m.get(v) || 0) + 1);
+// Simple rate limiter (in-memory, key: IP or user)
+class RateLimiter {
+  constructor(windowMs = 60000, maxRequests = 100) {
+    this.windowMs = windowMs;
+    this.maxRequests = maxRequests;
+    this.requests = new Map();
+  }
+
+  middleware() {
+    return (req, res, next) => {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      if (!this.requests.has(ip)) {
+        this.requests.set(ip, []);
       }
+      const reqs = this.requests.get(ip).filter((t) => now - t < this.windowMs);
+      if (reqs.length >= this.maxRequests) {
+        return res.status(429).json({ error: 'Rate limit überschritten' });
+      }
+      reqs.push(now);
+      this.requests.set(ip, reqs);
+      // Cleanup old entries every 10 requests
+      if (Math.random() < 0.1) {
+        for (const [k, v] of this.requests) {
+          if (v.length === 0) this.requests.delete(k);
+        }
+      }
+      next();
+    };
+  }
+}
+
+// Simple response cache (for GET endpoints, max 200 entries, 60s TTL)
+class ResponseCache {
+  constructor(maxEntries = 200, ttlMs = 60000) {
+    this.maxEntries = maxEntries;
+    this.ttlMs = ttlMs;
+    this.cache = new Map();
+  }
+
+  key(req) {
+    return `${req.path}?${new URLSearchParams(req.query).toString()}`;
+  }
+
+  get(req) {
+    const k = this.key(req);
+    const entry = this.cache.get(k);
+    if (!entry) return null;
+    if (Date.now() - entry.time > this.ttlMs) {
+      this.cache.delete(k);
+      return null;
     }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count }));
+    return entry.data;
+  }
+
+  set(req, data) {
+    if (this.cache.size >= this.maxEntries) {
+      const first = this.cache.keys().next().value;
+      this.cache.delete(first);
+    }
+    this.cache.set(this.key(req), { data, time: Date.now() });
+  }
+
+  middleware(method = 'GET') {
+    return (req, res, next) => {
+      if (req.method !== method) return next();
+      const cached = this.get(req);
+      if (cached) {
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(cached);
+      }
+      const originalJson = res.json;
+      res.json = function (data) {
+        cache.set(req, data);
+        res.setHeader('X-Cache', 'MISS');
+        res.setHeader('Cache-Control', 'private, max-age=60');
+        return originalJson.call(this, data);
+      };
+      next();
+    };
+  }
+}
+
+const limiter = new RateLimiter(60000, 100);
+const cache = new ResponseCache(200, 60000);
+
+function computeFacets(articles) {
+  // Single-pass computation instead of 7 passes
+  const result = {
+    category: new Map(),
+    sentiment: new Map(),
+    type: new Map(),
+    source: new Map(),
+    tag: new Map(),
+    language: new Map(),
+    paywall: new Map(),
+    image: new Map(),
   };
+
+  for (const a of articles) {
+    // Category
+    if (a.category) result.category.set(a.category, (result.category.get(a.category) || 0) + 1);
+    // Sentiment
+    if (a.sentiment) result.sentiment.set(a.sentiment, (result.sentiment.get(a.sentiment) || 0) + 1);
+    // Type
+    if (a.article_type) result.type.set(a.article_type, (result.type.get(a.article_type) || 0) + 1);
+    // Source
+    if (a.source) result.source.set(a.source, (result.source.get(a.source) || 0) + 1);
+    // Tags
+    for (const tag of (a.tags || [])) result.tag.set(tag, (result.tag.get(tag) || 0) + 1);
+    // Language
+    const lang = a.language || 'de';
+    result.language.set(lang, (result.language.get(lang) || 0) + 1);
+    // Paywall
+    const pw = a.paywall ? 'yes' : 'no';
+    result.paywall.set(pw, (result.paywall.get(pw) || 0) + 1);
+    // Image
+    const img = a.has_image ? 'yes' : 'no';
+    result.image.set(img, (result.image.get(img) || 0) + 1);
+  }
+
+  // Convert to sorted arrays
+  const convert = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count }));
   return {
-    category: counts('category', (a) => a.category),
-    sentiment: counts('sentiment', (a) => a.sentiment),
-    type: counts('type', (a) => a.article_type),
-    source: counts('source', (a) => a.source).slice(0, 25),
-    tag: counts('tag', (a) => a.tags || []).slice(0, 25),
-    language: counts('language', (a) => a.language || 'de'),
-    paywall: counts('paywall', (a) => (a.paywall ? 'yes' : 'no')),
-    image: counts('image', (a) => (a.has_image ? 'yes' : 'no')),
+    category: convert(result.category),
+    sentiment: convert(result.sentiment),
+    type: convert(result.type),
+    source: convert(result.source).slice(0, 25),
+    tag: convert(result.tag).slice(0, 25),
+    language: convert(result.language),
+    paywall: convert(result.paywall),
+    image: convert(result.image),
   };
 }
 
@@ -46,14 +155,23 @@ const WEB_DIR = path.resolve(__dirname, '..', 'web');
 const wsClients = new Set();
 function broadcast(type, payload) {
   const msg = JSON.stringify({ type, payload, ts: Date.now() });
+  const deadClients = [];
   for (const ws of wsClients) {
     if (ws.readyState === 1) {
       try {
         ws.send(msg);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        logger.debug('WS send failed', { error: e.message });
+        deadClients.push(ws);
       }
+    } else if (ws.readyState === 3) {
+      // CLOSED
+      deadClients.push(ws);
     }
+  }
+  // Cleanup dead connections
+  for (const ws of deadClients) {
+    wsClients.delete(ws);
   }
 }
 
@@ -74,8 +192,43 @@ function attachLogger() {
 
 function buildApp() {
   const app = express();
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+  // Security headers
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
+
+  // Rate limiting for API endpoints
+  app.use('/api/', limiter.middleware());
+
+  // Input validation middleware
+  const validateInput = (fn) => (req, res, next) => {
+    try {
+      if (req.body && typeof req.body === 'object') {
+        const s = JSON.stringify(req.body);
+        if (s.length > 50000) return res.status(413).json({ error: 'Payload too large' });
+      }
+      fn(req, res, next);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Cache middleware für GET /api endpoints (außer /health)
+  app.get('/api/articles', cache.middleware('GET'));
+  app.get('/api/article/:id', cache.middleware('GET'));
+  app.get('/api/tags', cache.middleware('GET'));
+  app.get('/api/trends', cache.middleware('GET'));
+  app.get('/api/mentions', cache.middleware('GET'));
+  app.get('/api/sources', cache.middleware('GET'));
+  app.get('/api/keywords', cache.middleware('GET'));
 
   app.use(express.static(WEB_DIR));
 
@@ -317,6 +470,44 @@ function buildApp() {
     }
   });
 
+  app.get('/api/analytics', (req, res) => {
+    try {
+      const now = new Date();
+      const last30 = database.getArticlesByRange(subDays(now, 30), now);
+      const last7 = database.getArticlesByRange(subDays(now, 7), now);
+      const today = database.getArticlesByRange(subDays(now, 1), now);
+
+      const computeMetrics = (articles) => ({
+        count: articles.length,
+        avgRelevance: articles.length ? Math.round(articles.reduce((sum, a) => sum + (a.relevance_score || 0), 0) / articles.length) : 0,
+        sentiments: {
+          positiv: articles.filter((a) => a.sentiment === 'positiv').length,
+          neutral: articles.filter((a) => a.sentiment === 'neutral').length,
+          negativ: articles.filter((a) => a.sentiment === 'negativ').length,
+        },
+        topSources: [...new Map(articles.map((a) => [a.source, a])).values()]
+          .map((a) => a.source)
+          .filter(Boolean)
+          .slice(0, 5),
+        paywallCount: articles.filter((a) => a.paywall).length,
+        avgReadingTime: articles.length ? Math.round(articles.reduce((sum, a) => sum + (a.word_count || 0), 0) / (articles.length * 200)) : 0,
+      });
+
+      res.json({
+        timestamp: now.toISOString(),
+        today: computeMetrics(today),
+        last7: computeMetrics(last7),
+        last30: computeMetrics(last30),
+        growth: {
+          daily: last7.length / 7,
+          weekly: last30.length / 4,
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/mentions', (req, res) => {
     try {
       const { from, to } = parseDateRange({
@@ -364,6 +555,7 @@ function buildApp() {
         )
         .all();
       let added = 0;
+      const errors = [];
       for (const row of rows) {
         const analysis = { category: row.category, sentiment: row.sentiment };
         const tags = autoTag({ ...row, fullText: row.full_text }, analysis);
@@ -371,10 +563,13 @@ function buildApp() {
           try {
             database.addTag(row.id, tag);
             added++;
-          } catch {}
+          } catch (e) {
+            logger.debug(`Tag failed for article ${row.id}: ${tag}`, { error: e.message });
+            errors.push({ articleId: row.id, tag, error: e.message });
+          }
         }
       }
-      res.json({ ok: true, articles: rows.length, tags_added: added });
+      res.json({ ok: true, articles: rows.length, tags_added: added, errors: errors.length > 0 ? errors.slice(0, 10) : undefined });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -384,12 +579,20 @@ function buildApp() {
   });
   app.post('/api/article/:id/tags', (req, res) => {
     const { tag } = req.body || {};
-    if (!tag) return res.status(400).json({ error: 'tag erforderlich' });
-    database.addTag(parseInt(req.params.id, 10), tag);
+    if (!tag || typeof tag !== 'string') return res.status(400).json({ error: 'tag erforderlich' });
+    if (tag.length > 100) return res.status(400).json({ error: 'tag zu lang (max 100 Zeichen)' });
+    if (!/^[a-zA-Z0-9_:äöüß\-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
+    const articleId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(articleId)) return res.status(400).json({ error: 'Ungültige Article ID' });
+    database.addTag(articleId, tag);
     res.json({ ok: true });
   });
   app.delete('/api/article/:id/tags/:tag', (req, res) => {
-    database.removeTag(parseInt(req.params.id, 10), req.params.tag);
+    const articleId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(articleId)) return res.status(400).json({ error: 'Ungültige Article ID' });
+    const tag = req.params.tag;
+    if (!/^[a-zA-Z0-9_:äöüß\-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
+    database.removeTag(articleId, tag);
     res.json({ ok: true });
   });
 
@@ -470,6 +673,53 @@ function buildApp() {
     }
   });
 
+  app.get('/api/export-with-metadata', (req, res) => {
+    try {
+      const opts = {
+        from: req.query.from,
+        to: req.query.to,
+        last: req.query.last,
+      };
+      if (!opts.from && !opts.to && !opts.last) opts.last = '30d';
+      const { from, to } = parseDateRange(opts);
+      const articles = database.getArticlesByRange(from, to);
+
+      const tagMap = new Map();
+      const allTagRows = database.db
+        .prepare(
+          `SELECT t.article_id, t.tag FROM article_tags t
+           JOIN articles a ON a.id = t.article_id
+           WHERE a.published_date >= @from AND a.published_date <= @to`
+        )
+        .all({ from: from.toISOString(), to: to.toISOString() });
+      for (const row of allTagRows) {
+        if (!tagMap.has(row.article_id)) tagMap.set(row.article_id, []);
+        tagMap.get(row.article_id).push(row.tag);
+      }
+
+      const enriched = articles.map((a) => ({
+        ...a,
+        tags: tagMap.get(a.id) || [],
+        has_image: textUtils.hasImage(a),
+        reading_time_min: textUtils.estimateReadingMinutes((a.full_text || a.summary || '').toString()),
+      }));
+
+      const metadata = {
+        exportDate: new Date().toISOString(),
+        range: { from: from.toISOString(), to: to.toISOString() },
+        totalArticles: enriched.length,
+        avgRelevance: enriched.length ? Math.round(enriched.reduce((sum, a) => sum + (a.relevance_score || 0), 0) / enriched.length) : 0,
+        facets: computeFacets(enriched),
+      };
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="pressespiegel-export-${Date.now()}.json"`);
+      res.send(JSON.stringify({ metadata, articles: enriched }, null, 2));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/sources', (req, res) => {
     try {
       const sources = loadJson('sources.json');
@@ -492,7 +742,13 @@ function buildApp() {
   app.post('/api/sources/test', async (req, res) => {
     try {
       const { url, name } = req.body || {};
-      if (!url) return res.status(400).json({ error: 'url erforderlich' });
+      if (!url || typeof url !== 'string') return res.status(400).json({ error: 'url erforderlich' });
+      if (url.length > 2000) return res.status(400).json({ error: 'url zu lang' });
+      try {
+        new URL(url);
+      } catch {
+        return res.status(400).json({ error: 'Ungültige URL' });
+      }
       const { testFeed } = require('./scraper');
       const result = await testFeed(url, name);
       res.json(result);
@@ -901,6 +1157,21 @@ function buildApp() {
 
   app.get('/', (req, res) => {
     res.sendFile(path.join(WEB_DIR, 'index.html'));
+  });
+
+  // Global error handler (muss nach allen routes sein)
+  app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+      return res.status(400).json({ error: 'Invalid JSON' });
+    }
+    const status = err.status || 500;
+    const message = process.env.NODE_ENV === 'production' ? 'Server error' : err.message;
+    logger.error(`Error on ${req.method} ${req.path}`, {
+      error: err.message,
+      status,
+      endpoint: `${req.method} ${req.path}`
+    });
+    res.status(status).json({ error: message });
   });
 
   return app;

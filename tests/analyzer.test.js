@@ -13,6 +13,7 @@ const {
   generateSummary,
   findContextualMatch,
   findFuzzyMatch,
+  articleBodyText,
 } = require('../src/analyzer');
 
 test('passesRequiredFilter akzeptiert Kammerspiele-Artikel', () => {
@@ -31,6 +32,40 @@ test('passesRequiredFilter lehnt irrelevante Artikel ab', () => {
   };
   const result = passesRequiredFilter(article);
   assert.equal(result.passes, false);
+});
+
+test('passesRequiredFilter findet Keyword im summary (RSS-only Fallback)', () => {
+  const article = {
+    title: 'Neue Inszenierung sorgt fuer Diskussion',
+    fullText: '',
+    summary: 'Die Muenchner Kammerspiele zeigen ein neues Stueck.',
+  };
+  const result = passesRequiredFilter(article);
+  assert.equal(result.passes, true);
+});
+
+test('passesRequiredFilter findet Keyword in firstParagraph', () => {
+  const article = {
+    title: 'Premiere am Wochenende',
+    firstParagraph: 'An den Kammerspielen beginnt die neue Spielzeit.',
+  };
+  const result = passesRequiredFilter(article);
+  assert.equal(result.passes, true);
+});
+
+test('articleBodyText vereint alle Textfelder', () => {
+  const text = articleBodyText({
+    fullText: 'A',
+    summary: 'B',
+    firstParagraph: 'C',
+    meta: { description: 'D' },
+  });
+  for (const part of ['A', 'B', 'C', 'D']) assert.ok(text.includes(part));
+});
+
+test('articleBodyText ist robust bei leerem Artikel', () => {
+  assert.equal(articleBodyText(null), '');
+  assert.equal(articleBodyText({}), '');
 });
 
 test('passesRequiredFilter respektiert exclude-Liste', () => {

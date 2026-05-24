@@ -40,17 +40,32 @@ async function api(path, opts = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const error = new Error(err.error || `HTTP ${res.status}`);
+    error.status = res.status;
+    error.endpoint = path;
+    throw error;
   }
   return res.json();
 }
 
 function toast(msg, type = '') {
   const t = $('#toast');
-  t.textContent = msg;
-  t.className = `toast show ${type}`;
+  t.textContent = msg || 'Fehler';
+  t.className = `toast show ${type || ''}`;
+  t.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove('show'), 3000);
+  const duration = type === 'error' ? 5000 : 3000;
+  toast._t = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function handleApiError(err) {
+  const msg = err.status === 429 ? 'Zu viele Anfragen. Bitte warten…' :
+              err.status === 413 ? 'Anfrage zu groß' :
+              err.status === 400 ? `Eingabefehler: ${err.message}` :
+              err.status === 500 ? 'Serverfehler' :
+              err.message || 'Fehler beim Laden';
+  toast(msg, 'error');
+  console.error('API Error:', { status: err.status, endpoint: err.endpoint, message: err.message });
 }
 
 function escapeHtml(s) {
@@ -224,6 +239,8 @@ async function loadTagsTab() {
       })
       .join('');
     document.querySelectorAll('#tags-by-category .word.tag').forEach((el) => {
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
       el.addEventListener('click', () => {
         document.getElementById('article-search').value = `tag:${el.dataset.tag}`;
         state.search = `tag:${el.dataset.tag}`;
@@ -234,6 +251,12 @@ async function loadTagsTab() {
           .querySelectorAll('.tab')
           .forEach((t) => t.classList.toggle('active', t.id === 'tab-articles'));
         loadArticles();
+      });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          el.click();
+        }
       });
     });
   } catch (err) {
@@ -867,6 +890,13 @@ function initGlobalKeys() {
         document.activeElement.blur();
       }
     }
+    if (e.key === '/') {
+      if (!isInput) {
+        e.preventDefault();
+        $('#article-search').focus();
+        return;
+      }
+    }
     if (isInput) return;
     if (e.key === '?') {
       e.preventDefault();
@@ -1004,7 +1034,7 @@ function initArticleFilters() {
         toast(`Suche "${name}" gespeichert`, 'success');
         loadSavedSearches();
       } catch (err) {
-        toast(err.message, 'error');
+        handleApiError(err);
       }
     });
   }
@@ -1125,7 +1155,7 @@ async function loadBookmarks() {
       });
     });
   } catch (err) {
-    toast(err.message, 'error');
+    handleApiError(err);
   }
 }
 
@@ -1184,7 +1214,7 @@ async function loadTrends() {
       })
     );
   } catch (err) {
-    toast(err.message, 'error');
+    handleApiError(err);
   }
 }
 
@@ -1198,7 +1228,7 @@ async function toggleBookmark(articleId, isBookmarked) {
       toast('Lesezeichen hinzugefügt', 'success');
     }
   } catch (err) {
-    toast(err.message, 'error');
+    handleApiError(err);
   }
 }
 
