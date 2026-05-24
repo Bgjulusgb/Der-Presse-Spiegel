@@ -574,7 +574,7 @@ function renderArticleItem(a, query) {
         <span class="sep">·</span>${fmtDate(a.published_date)}
         ${a.word_count ? `<span class="sep">·</span>${a.word_count} Worte` : ''}
       </div>
-      ${a.summary ? `<p class="article-summary">${highlight(a.summary, query)}</p>` : ''}
+      ${a.url ? `<a class="article-link" href="${escapeHtml(a.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Zum Volltext &rarr;</a>` : ''}
     </article>
   `;
 }
@@ -622,7 +622,6 @@ async function showArticleDetail(id) {
           ${tags.map((t) => `<span class="chip">${escapeHtml(t)}<span class="x" data-tag="${escapeHtml(t)}">×</span></span>`).join('')}
           <input class="chip-input" id="md-tag-input" placeholder="+ Tag, Enter">
         </div>
-        ${a.summary ? `<h3>Zusammenfassung</h3><p>${escapeHtml(a.summary)}</p>` : ''}
         ${reasons.length ? `<h3>Trefferbegründungen</h3><div class="reason-list">${reasons.map((r) => `<code>${escapeHtml(r)}</code>`).join('')}</div>` : ''}
         ${alsoOn.length ? `<h3>Auch erschienen in</h3><ul>${alsoOn.map((u) => `<li><a href="${escapeHtml(u)}" target="_blank">${escapeHtml(u)}</a></li>`).join('')}</ul>` : ''}
         ${a.full_text ? `<h3>Volltext</h3><pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;">${escapeHtml(a.full_text.slice(0, 5000))}</pre>` : ''}
