@@ -15,6 +15,92 @@ const { parseDateRange } = require('./utils');
 const { hybridSearch, suggestQueries, didYouMean, topMentions, trends } = require('./search');
 const textUtils = require('./text-utils');
 
+// Simple rate limiter (in-memory, key: IP or user)
+class RateLimiter {
+  constructor(windowMs = 60000, maxRequests = 100) {
+    this.windowMs = windowMs;
+    this.maxRequests = maxRequests;
+    this.requests = new Map();
+  }
+
+  middleware() {
+    return (req, res, next) => {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      if (!this.requests.has(ip)) {
+        this.requests.set(ip, []);
+      }
+      const reqs = this.requests.get(ip).filter((t) => now - t < this.windowMs);
+      if (reqs.length >= this.maxRequests) {
+        return res.status(429).json({ error: 'Rate limit überschritten' });
+      }
+      reqs.push(now);
+      this.requests.set(ip, reqs);
+      // Cleanup old entries every 10 requests
+      if (Math.random() < 0.1) {
+        for (const [k, v] of this.requests) {
+          if (v.length === 0) this.requests.delete(k);
+        }
+      }
+      next();
+    };
+  }
+}
+
+// Simple response cache (for GET endpoints, max 200 entries, 60s TTL)
+class ResponseCache {
+  constructor(maxEntries = 200, ttlMs = 60000) {
+    this.maxEntries = maxEntries;
+    this.ttlMs = ttlMs;
+    this.cache = new Map();
+  }
+
+  key(req) {
+    return `${req.path}?${new URLSearchParams(req.query).toString()}`;
+  }
+
+  get(req) {
+    const k = this.key(req);
+    const entry = this.cache.get(k);
+    if (!entry) return null;
+    if (Date.now() - entry.time > this.ttlMs) {
+      this.cache.delete(k);
+      return null;
+    }
+    return entry.data;
+  }
+
+  set(req, data) {
+    if (this.cache.size >= this.maxEntries) {
+      const first = this.cache.keys().next().value;
+      this.cache.delete(first);
+    }
+    this.cache.set(this.key(req), { data, time: Date.now() });
+  }
+
+  middleware(method = 'GET') {
+    return (req, res, next) => {
+      if (req.method !== method) return next();
+      const cached = this.get(req);
+      if (cached) {
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(cached);
+      }
+      const originalJson = res.json;
+      res.json = function (data) {
+        cache.set(req, data);
+        res.setHeader('X-Cache', 'MISS');
+        res.setHeader('Cache-Control', 'private, max-age=60');
+        return originalJson.call(this, data);
+      };
+      next();
+    };
+  }
+}
+
+const limiter = new RateLimiter(60000, 100);
+const cache = new ResponseCache(200, 60000);
+
 function computeFacets(articles) {
   // Single-pass computation instead of 7 passes
   const result = {
@@ -109,6 +195,19 @@ function buildApp() {
   app.use(express.json({ limit: '100kb' }));
   app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
+  // Security headers
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
+
+  // Rate limiting for API endpoints
+  app.use('/api/', limiter.middleware());
+
   // Input validation middleware
   const validateInput = (fn) => (req, res, next) => {
     try {
@@ -122,20 +221,14 @@ function buildApp() {
     }
   };
 
-  // Global error handler
-  app.use((err, req, res, next) => {
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-      return res.status(400).json({ error: 'Invalid JSON' });
-    }
-    const status = err.status || 500;
-    const message = process.env.NODE_ENV === 'production' ? 'Server error' : err.message;
-    logger.error(`Error on ${req.method} ${req.path}`, {
-      error: err.message,
-      status,
-      endpoint: `${req.method} ${req.path}`
-    });
-    res.status(status).json({ error: message });
-  });
+  // Cache middleware für GET /api endpoints (außer /health)
+  app.get('/api/articles', cache.middleware('GET'));
+  app.get('/api/article/:id', cache.middleware('GET'));
+  app.get('/api/tags', cache.middleware('GET'));
+  app.get('/api/trends', cache.middleware('GET'));
+  app.get('/api/mentions', cache.middleware('GET'));
+  app.get('/api/sources', cache.middleware('GET'));
+  app.get('/api/keywords', cache.middleware('GET'));
 
   app.use(express.static(WEB_DIR));
 
@@ -979,6 +1072,21 @@ function buildApp() {
 
   app.get('/', (req, res) => {
     res.sendFile(path.join(WEB_DIR, 'index.html'));
+  });
+
+  // Global error handler (muss nach allen routes sein)
+  app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+      return res.status(400).json({ error: 'Invalid JSON' });
+    }
+    const status = err.status || 500;
+    const message = process.env.NODE_ENV === 'production' ? 'Server error' : err.message;
+    logger.error(`Error on ${req.method} ${req.path}`, {
+      error: err.message,
+      status,
+      endpoint: `${req.method} ${req.path}`
+    });
+    res.status(status).json({ error: message });
   });
 
   return app;
