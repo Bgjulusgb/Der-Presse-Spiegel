@@ -263,3 +263,30 @@ test('analyze vollstaendiger Durchlauf', () => {
   assert.ok(result.relevanceScore > 50);
   assert.ok(['relevant', 'sehr_relevant'].includes(result.category));
 });
+
+test('calculateArticleDepth bewertet Artikel-Tiefe', () => {
+  const { calculateArticleDepth } = require('../src/analyzer');
+  const shallow = { fullText: 'Kurzer Text.' };
+  const deep = { fullText: 'Langer Text mit viel Inhalt. '.repeat(50) };
+  const shallowDepth = calculateArticleDepth(shallow);
+  const deepDepth = calculateArticleDepth(deep);
+  assert.ok(deepDepth > shallowDepth);
+});
+
+test('calculateMirrorRelevance bewertet Pressespiegel-Relevanz', () => {
+  const { calculateMirrorRelevance } = require('../src/analyzer');
+  const article = {
+    title: 'Kammerspiele zeigen Hamlet',
+    fullText: 'Die Muenchner Kammerspiele praesentieren Hamlet mit Ensemble.',
+  };
+  const score = calculateMirrorRelevance(article);
+  assert.ok(score > 0);
+  assert.ok(score <= 100);
+});
+
+test('analyzeSentiment berechnet Konfidenz', () => {
+  const { analyzeSentiment } = require('../src/analyzer');
+  const result = analyzeSentiment('Sehr sehr positiv und grossartig.');
+  assert.ok(result.confidence >= 0 && result.confidence <= 1);
+  assert.ok(result.hitCount >= 0);
+});
