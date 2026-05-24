@@ -144,7 +144,7 @@ function calculateRelevance(article, sourcePriority = 50) {
   let titleHasRequired = false;
   for (const req of KW.required) {
     if (title.includes(req)) {
-      score += w.title_exact_match || 80;
+      score += w.title_exact_match || 100;
       reasons.push(`Titel: "${req}"`);
       titleHasRequired = true;
       matches.required.push(req);
@@ -155,7 +155,7 @@ function calculateRelevance(article, sourcePriority = 50) {
     for (const req of KW.required) {
       if (text.includes(req)) {
         const count = countOccurrences(text, req);
-        const pts = (w.required_keyword || 10) * Math.min(count, 5);
+        const pts = (w.required_keyword || 15) * Math.min(count, 5);
         score += pts;
         reasons.push(`${count}x "${req}" im Text (+${pts})`);
         matches.required.push(req);
@@ -165,77 +165,101 @@ function calculateRelevance(article, sourcePriority = 50) {
   }
 
   let productionInTitle = false;
+  let productionCount = 0;
   for (const p of KW.productions) {
     if (!p || p.length < 3) continue;
     if (title.includes(p)) {
-      score += w.production_in_title || 50;
+      score += w.production_in_title || 60;
       reasons.push(`Produktion im Titel: ${p}`);
       matches.productions.push(p);
       productionInTitle = true;
+      productionCount++;
     } else if (text.includes(p)) {
       const isContextual = findContextualMatch(text, p, KW.required, 400);
       const pts = isContextual
-        ? w.production_match || 25
-        : Math.floor((w.production_match || 25) / 2);
+        ? w.production_match || 35
+        : Math.floor((w.production_match || 35) / 2);
       score += pts;
       reasons.push(`Produktion: ${p}${isContextual ? ' (Kontext OK)' : ''} (+${pts})`);
       matches.productions.push(p);
+      productionCount++;
     } else if (p.length >= 8 && findFuzzyMatch(haystack, p, 0.9)) {
-      score += w.fuzzy_title_match || 30;
+      score += w.fuzzy_title_match || 40;
       reasons.push(`Produktion (fuzzy): ${p}`);
       matches.productions.push(p);
+      productionCount++;
     }
   }
+
+  if (productionCount > 1) {
+    score += w.multiple_productions_bonus || 50;
+    reasons.push(`Mehrere Produktionen (+${w.multiple_productions_bonus || 50})`);
+  }
+
   if (productionInTitle && titleHasRequired) {
-    score += w.title_with_production || 100;
+    score += w.title_with_production || 120;
     reasons.push('Titel: Kammerspiele + Produktion');
   }
 
+  let personCount = 0;
   for (const person of KW.people) {
     if (!person || person.length < 4) continue;
     if (title.includes(person)) {
-      score += w.people_in_title || 40;
+      score += w.people_in_title || 50;
       reasons.push(`Person im Titel: ${person}`);
       matches.people.push(person);
+      personCount++;
     } else if (text.includes(person)) {
       const isContextual = findContextualMatch(text, person, KW.required, 400);
-      const pts = isContextual ? w.people_match || 20 : Math.floor((w.people_match || 20) / 2);
+      const pts = isContextual ? w.people_match || 25 : Math.floor((w.people_match || 25) / 2);
       score += pts;
       reasons.push(`Person: ${person}${isContextual ? ' (Kontext OK)' : ''} (+${pts})`);
       matches.people.push(person);
+      personCount++;
     }
+  }
+
+  if (personCount > 1) {
+    score += w.multiple_people_bonus || 30;
+    reasons.push(`Mehrere Personen erwähnt (+${w.multiple_people_bonus || 30})`);
   }
 
   for (const venue of KW.venues) {
     if (!venue || venue.length < 5) continue;
     if (text.includes(venue) || title.includes(venue)) {
-      score += w.venue_match || 10;
+      score += w.venue_match || 15;
       matches.venues.push(venue);
     }
   }
 
   const contextHits = KW.theaterContext.filter((c) => haystack.includes(c)).length;
   if (contextHits >= 2) {
-    score += w.theater_context_bonus || 8;
+    score += w.theater_context_bonus || 12;
     matches.theaterContext = true;
     reasons.push(`Theater-Kontext (${contextHits} Begriffe)`);
   }
 
   const type = detectArticleType(article);
   if (type === 'review') {
-    score += w.review || 30;
+    score += w.review || 40;
     reasons.push('Typ: Kritik');
   } else if (type === 'interview') {
-    score += w.interview || 25;
+    score += w.interview || 35;
     reasons.push('Typ: Interview');
   } else if (type === 'announcement') {
-    score += w.announcement || 20;
+    score += w.announcement || 25;
     reasons.push('Typ: Ankuendigung');
   }
 
   if (haystack.includes('premiere')) {
-    score += w.premiere_bonus || 20;
+    score += w.premiere_bonus || 30;
     reasons.push('Premiere erwaehnt');
+  }
+
+  // Exclusive/focused coverage bonus
+  if (titleHasRequired && productionInTitle) {
+    score += w.exclusive_mention_bonus || 25;
+    reasons.push('Fokussierte Berichterstattung');
   }
 
   const wordCount =
@@ -243,19 +267,25 @@ function calculateRelevance(article, sourcePriority = 50) {
   const minWords = keywords.thresholds.min_word_count || 50;
   const shortThreshold = keywords.thresholds.short_article_word_count || 100;
   if (wordCount > 0 && wordCount < minWords) {
-    score += w.very_short_article_penalty || -50;
+    score += w.very_short_article_penalty || -40;
     reasons.push('sehr kurz');
   } else if (wordCount > 0 && wordCount < shortThreshold) {
-    score += w.short_article_penalty || -20;
+    score += w.short_article_penalty || -15;
     reasons.push('kurz');
+  } else if (wordCount > 500) {
+    score += 10;
+    reasons.push('umfangreich (+10)');
   }
 
   if (sourcePriority >= 95) {
-    score += 15;
-    reasons.push('Top-Quelle (+15)');
+    score += 20;
+    reasons.push('Top-Quelle (+20)');
   } else if (sourcePriority >= 80) {
-    score += 8;
-    reasons.push('etablierte Quelle (+8)');
+    score += 12;
+    reasons.push('etablierte Quelle (+12)');
+  } else if (sourcePriority >= 60) {
+    score += 5;
+    reasons.push('zuverlässige Quelle (+5)');
   }
 
   const category = categorize(score);

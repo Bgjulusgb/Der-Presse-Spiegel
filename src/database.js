@@ -117,6 +117,33 @@ function migrate() {
       feed_type TEXT,
       enabled INTEGER DEFAULT 1
     );
+
+    CREATE TABLE IF NOT EXISTS article_entities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      article_id INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      entity_type TEXT NOT NULL,
+      entity_value TEXT NOT NULL,
+      mentions INTEGER DEFAULT 1,
+      in_title INTEGER DEFAULT 0,
+      confidence REAL DEFAULT 0.5,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_article_entities_article ON article_entities(article_id);
+    CREATE INDEX IF NOT EXISTS idx_article_entities_type ON article_entities(entity_type);
+    CREATE INDEX IF NOT EXISTS idx_article_entities_value ON article_entities(entity_value);
+
+    CREATE TABLE IF NOT EXISTS detected_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      article_id INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      event_date DATETIME,
+      details TEXT,
+      confidence REAL DEFAULT 0.5,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_detected_events_article ON detected_events(article_id);
+    CREATE INDEX IF NOT EXISTS idx_detected_events_type ON detected_events(event_type);
+    CREATE INDEX IF NOT EXISTS idx_detected_events_date ON detected_events(event_date);
   `);
 
   const cols = db
@@ -503,6 +530,77 @@ function deleteSavedSearch(name) {
   db.prepare('DELETE FROM saved_searches WHERE name = ?').run(name);
 }
 
+function insertArticleEntities(articleId, entities) {
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO article_entities (article_id, entity_type, entity_value, mentions, in_title, confidence)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const entity of entities) {
+    stmt.run(
+      articleId,
+      entity.type,
+      entity.value,
+      entity.mentions || 1,
+      entity.inTitle ? 1 : 0,
+      entity.confidence || 0.5
+    );
+  }
+}
+
+function insertDetectedEvents(articleId, events) {
+  const stmt = db.prepare(`
+    INSERT INTO detected_events (article_id, event_type, event_date, details, confidence)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  for (const event of events) {
+    stmt.run(
+      articleId,
+      event.type,
+      event.date,
+      JSON.stringify(event),
+      event.confidence || 0.5
+    );
+  }
+}
+
+function getArticleEntities(articleId) {
+  return db.prepare('SELECT * FROM article_entities WHERE article_id = ? ORDER BY mentions DESC').all(articleId);
+}
+
+function getDetectedEvents(articleId) {
+  return db.prepare('SELECT * FROM detected_events WHERE article_id = ? ORDER BY event_date DESC').all(articleId);
+}
+
+function getEntitiesByType(entityType, limit = 100) {
+  return db
+    .prepare(
+      `
+    SELECT entity_value, COUNT(*) as count, SUM(mentions) as total_mentions, AVG(confidence) as avg_confidence
+    FROM article_entities
+    WHERE entity_type = ?
+    GROUP BY entity_value
+    ORDER BY count DESC, total_mentions DESC
+    LIMIT ?
+  `
+    )
+    .all(entityType, limit);
+}
+
+function getEventsByType(eventType, limit = 100) {
+  return db
+    .prepare(
+      `
+    SELECT event_type, COUNT(*) as count, AVG(confidence) as avg_confidence, MAX(event_date) as latest_date
+    FROM detected_events
+    WHERE event_type = ?
+    GROUP BY event_type
+    ORDER BY count DESC
+    LIMIT ?
+  `
+    )
+    .all(eventType, limit);
+}
+
 function transaction(fn) {
   return (...args) => {
     db.exec('BEGIN');
@@ -550,6 +648,12 @@ module.exports = {
   isBookmarked,
   getBookmarks,
   saveSearch,
+  insertArticleEntities,
+  insertDetectedEvents,
+  getArticleEntities,
+  getDetectedEvents,
+  getEntitiesByType,
+  getEventsByType,
   getSavedSearches,
   deleteSavedSearch,
   transaction,

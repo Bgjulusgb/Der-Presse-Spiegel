@@ -14,6 +14,7 @@ const { generateReport, REPORTS_DIR } = require('./reporter');
 const { parseDateRange } = require('./utils');
 const { hybridSearch, suggestQueries, didYouMean, topMentions, trends } = require('./search');
 const textUtils = require('./text-utils');
+const analyticsRouter = require('./api-analytics');
 
 // Simple rate limiter (in-memory, key: IP or user)
 class RateLimiter {
@@ -229,6 +230,10 @@ function buildApp() {
   app.get('/api/mentions', cache.middleware('GET'));
   app.get('/api/sources', cache.middleware('GET'));
   app.get('/api/keywords', cache.middleware('GET'));
+
+  // Analytics endpoints with caching
+  app.use('/api/analytics/', cache.middleware('GET'));
+  app.use('/api/analytics/', analyticsRouter);
 
   app.use(express.static(WEB_DIR));
 
