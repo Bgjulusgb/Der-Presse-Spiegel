@@ -10,6 +10,7 @@ const { normalizeUrl } = require('./utils');
 const { autoTag } = require('./tagger');
 const ner = require('./analytics/ner');
 const events = require('./analytics/events');
+const heuristicIntegration = require('./analytics/heuristic-integration');
 
 function applyTags(articleId, article, analysis) {
   const tags = autoTag(article, analysis);
@@ -57,15 +58,24 @@ function processArticle(raw, existing, summary) {
       logger.debug(`Angereichert & Value: ${raw.title} (Score: ${analysis.relevanceScore})`);
     }
 
+    // Enhance with advanced heuristics (Bayesian, TF-IDF, temporal decay, etc.)
+    const enrichedAnalysis = heuristicIntegration.enrichArticleWithHeuristics(raw, analysis);
+
     const article = {
       ...raw,
-      summary: analysis.summary,
-      relevanceScore: analysis.relevanceScore,
-      sentiment: analysis.sentiment,
-      sentimentScore: analysis.sentimentScore,
-      category: analysis.category,
-      articleType: analysis.articleType,
-      meta: { ...raw.meta, reasons: analysis.relevanceReasons },
+      summary: enrichedAnalysis.summary,
+      relevanceScore: enrichedAnalysis.heuristics?.enhancedScore || enrichedAnalysis.relevanceScore,
+      relevanceScoreBaseline: analysis.relevanceScore,
+      sentiment: enrichedAnalysis.sentiment,
+      sentimentScore: enrichedAnalysis.sentimentScore,
+      category: enrichedAnalysis.category,
+      articleType: enrichedAnalysis.articleType,
+      meta: {
+        ...raw.meta,
+        reasons: enrichedAnalysis.relevanceReasons,
+        heuristics: enrichedAnalysis.heuristics,
+        sourceReputation: enrichedAnalysis.sourceHistory,
+      },
     };
 
     const candidate = {
