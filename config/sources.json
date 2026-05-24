@@ -65,62 +65,11 @@
       "category": "aggregator"
     },
     {
-      "name": "Bundesregierung",
-      "url": "https://www.bundesregierung.de/breg-de/service/rss-feed",
-      "priority": 80,
-      "type": "rss",
-      "category": "government"
-    },
-    {
-      "name": "EU-Parlament Pressemitteilungen",
-      "url": "https://www.europarl.europa.eu/rss/doc/pressreleases/de/rss.xml",
-      "priority": 80,
-      "type": "rss",
-      "category": "government"
-    },
-    {
-      "name": "Bundesregierung",
-      "url": "https://www.bundesregierung.de/service/rss/breg-de/1151242/feed.xml",
-      "priority": 75,
-      "type": "rss",
-      "category": "government"
-    },
-    {
-      "name": "Bundestag - Aktuelle Artikel",
-      "url": "https://www.bundestag.de/rss/aktuelle_artikel_rss",
-      "priority": 75,
-      "type": "rss",
-      "category": "government"
-    },
-    {
-      "name": "deutschland.de",
-      "url": "https://www.deutschland.de/de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "government",
-      "notes": "Offiziell"
-    },
-    {
-      "name": "Bundesfinanzministerium",
-      "url": "https://www.bundesfinanzministerium.de/SiteGlobals/Functions/RSSFeed/DE/RSSNewsfeed/RSS.xml",
-      "priority": 70,
-      "type": "rss",
-      "category": "government"
-    },
-    {
       "name": "Bundesregierung - Pressemitteilungen",
       "url": "https://www.bundesregierung.de/service/rss/breg-de/1151244/feed.xml",
       "priority": 70,
       "type": "rss",
       "category": "government"
-    },
-    {
-      "name": "deutschland.de",
-      "url": "https://www.deutschland.de/de/feed-news/rss.xml",
-      "priority": 70,
-      "type": "rss",
-      "category": "government",
-      "notes": "Offiziell"
     },
     {
       "name": "Deutsche Welle - Deutsch",
@@ -181,59 +130,6 @@
       "notes": "Englisch"
     },
     {
-      "name": "Augsburger Allgemeine",
-      "url": "https://www.augsburger-allgemeine.de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bayern"
-    },
-    {
-      "name": "Augsburger Allgemeine",
-      "url": "https://www.augsburger-allgemeine.de/Rss/ueberregional-feed.xml",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bayern",
-      "use_browser": true,
-      "retry_delay": 3000
-    },
-    {
-      "name": "Main-Post",
-      "url": "https://www.mainpost.de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bayern"
-    },
-    {
-      "name": "Main-Post",
-      "url": "https://www.mainpost.de/rss",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bayern",
-      "use_browser": true,
-      "retry_delay": 3000
-    },
-    {
-      "name": "Nuernberger Nachrichten",
-      "url": "https://www.nn.de/arc/outboundfeeds/rss/",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bayern"
-    },
-    {
-      "name": "MUH - Bayerische Aspekte",
-      "url": "https://muh.bayern/feed/",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-bayern"
-    },
-    {
-      "name": "Passauer Neue Presse",
-      "url": "https://www.pnp.de/rss",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-bayern"
-    },
-    {
       "name": "Tagesspiegel - Kultur",
       "url": "https://www.tagesspiegel.de/contentexport/feed/kultur",
       "priority": 85,
@@ -255,50 +151,6 @@
       "category": "lokal-berlin"
     },
     {
-      "name": "Berliner Morgenpost",
-      "url": "https://www.morgenpost.de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-berlin"
-    },
-    {
-      "name": "Berliner Morgenpost",
-      "url": "https://www.morgenpost.de/rss",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-berlin",
-      "use_browser": true,
-      "retry_delay": 3000
-    },
-    {
-      "name": "Berliner Zeitung",
-      "url": "https://www.berliner-zeitung.de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-berlin"
-    },
-    {
-      "name": "Berliner Zeitung",
-      "url": "https://www.berliner-zeitung.de/feed.xml",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-berlin"
-    },
-    {
-      "name": "Berliner Zeitung - Kultur",
-      "url": "https://www.berliner-zeitung.de/feed.id_kultur-vergnuegen.xml",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-berlin"
-    },
-    {
-      "name": "Berliner Zeitung - Kultur",
-      "url": "https://www.berliner-zeitung.de/kultur-vergnuegen/feed.xml",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-berlin"
-    },
-    {
       "name": "Tagesspiegel - Berlin",
       "url": "https://www.tagesspiegel.de/contentexport/feed/berlin",
       "priority": 75,
@@ -306,90 +158,11 @@
       "category": "lokal-berlin"
     },
     {
-      "name": "Badische Zeitung",
-      "url": "https://www.badische-zeitung.de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bw"
-    },
-    {
-      "name": "Stuttgarter Nachrichten",
-      "url": "https://www.stuttgarter-nachrichten.de/inhalt.feed.xml",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bw"
-    },
-    {
-      "name": "Stuttgarter Zeitung",
-      "url": "https://www.stuttgarter-zeitung.de/rss/topthemen",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-bw"
-    },
-    {
-      "name": "Pforzheimer Zeitung",
-      "url": "https://www.pz-news.de/feed",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-bw"
-    },
-    {
-      "name": "Stuttgart Journal",
-      "url": "https://stuttgart-journal.de/tp3/feed/",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-bw"
-    },
-    {
-      "name": "Suedkurier",
-      "url": "https://www.suedkurier.de/feed.rss",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-bw"
-    },
-    {
-      "name": "Hamburger Abendblatt",
-      "url": "https://www.abendblatt.de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-hamburg"
-    },
-    {
-      "name": "Hamburger Abendblatt",
-      "url": "https://www.abendblatt.de/rss-feed/",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-hamburg",
-      "use_browser": true,
-      "retry_delay": 3000
-    },
-    {
-      "name": "Hamburger Abendblatt - Kultur",
-      "url": "https://www.abendblatt.de/kultur-live/index.rss",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-hamburg"
-    },
-    {
       "name": "Hamburger Morgenpost",
       "url": "https://www.mopo.de/feed/",
       "priority": 75,
       "type": "rss",
       "category": "lokal-hamburg"
-    },
-    {
-      "name": "Frankfurter Neue Presse",
-      "url": "https://www.fnp.de/feed.rss",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-hessen"
-    },
-    {
-      "name": "Oberhessische Presse",
-      "url": "https://www.op-marburg.de/arc/outboundfeeds/rss/",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-hessen"
     },
     {
       "name": "BR24 - Nachrichten",
@@ -488,22 +261,6 @@
       "category": "lokal-nord"
     },
     {
-      "name": "Braunschweiger Zeitung",
-      "url": "https://www.braunschweiger-zeitung.de/feed",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-nord"
-    },
-    {
-      "name": "Braunschweiger Zeitung",
-      "url": "https://www.braunschweiger-zeitung.de/rss",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-nord",
-      "use_browser": true,
-      "retry_delay": 3000
-    },
-    {
       "name": "Kieler Nachrichten",
       "url": "https://www.kn-online.de/arc/outboundfeeds/rss/",
       "priority": 70,
@@ -532,20 +289,6 @@
       "category": "lokal-nrw"
     },
     {
-      "name": "Aachener Zeitung",
-      "url": "https://www.aachener-zeitung.de/feed.rss",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-nrw"
-    },
-    {
-      "name": "Ruhr Nachrichten",
-      "url": "https://www.ruhrnachrichten.de/feed/",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-nrw"
-    },
-    {
       "name": "WAZ Westdeutsche Allgemeine",
       "url": "https://www.waz.de/rss/feed.rss",
       "priority": 75,
@@ -560,34 +303,11 @@
       "category": "lokal-nrw"
     },
     {
-      "name": "Leipziger Volkszeitung",
-      "url": "https://www.lvz.de/arc/outboundfeeds/rss/",
-      "priority": 75,
-      "type": "rss",
-      "category": "lokal-ostdeutschland"
-    },
-    {
       "name": "Freie Presse",
       "url": "https://www.freiepresse.de/rss/rss_chemnitz.php",
       "priority": 70,
       "type": "rss",
       "category": "lokal-ostdeutschland"
-    },
-    {
-      "name": "Saechsische Zeitung",
-      "url": "https://www.saechsische.de/feed",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-ostdeutschland"
-    },
-    {
-      "name": "Saechsische Zeitung",
-      "url": "https://www.saechsische.de/rss/feed",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-ostdeutschland",
-      "use_browser": true,
-      "retry_delay": 3000
     },
     {
       "name": "kreuzer Leipzig",
@@ -599,13 +319,6 @@
     {
       "name": "DIE RHEINPFALZ",
       "url": "https://www.rheinpfalz.de/feed",
-      "priority": 70,
-      "type": "rss",
-      "category": "lokal-rheinland-pfalz"
-    },
-    {
-      "name": "General-Anzeiger Bonn",
-      "url": "https://ga.de/feed.rss",
       "priority": 70,
       "type": "rss",
       "category": "lokal-rheinland-pfalz"
@@ -988,21 +701,6 @@
       "category": "politik-parteien"
     },
     {
-      "name": "German Brief",
-      "url": "https://www.germanbrief.de/feed",
-      "priority": 70,
-      "type": "rss",
-      "category": "spezial"
-    },
-    {
-      "name": "Squirrel News",
-      "url": "https://squirrel-news.net/feed/",
-      "priority": 65,
-      "type": "rss",
-      "category": "spezial",
-      "notes": "Kurierte News"
-    },
-    {
       "name": "nachtkritik.de",
       "url": "https://www.nachtkritik.de/index.php?format=feed&type=rss",
       "priority": 100,
@@ -1034,57 +732,6 @@
       "name": "Neue Musikzeitung",
       "url": "https://www.nmz.de/rss.xml",
       "priority": 75,
-      "type": "rss",
-      "category": "theater-fachpresse"
-    },
-    {
-      "name": "VAN Magazin (Klassik)",
-      "url": "https://van-magazin.de/mag/feed/",
-      "priority": 75,
-      "type": "rss",
-      "category": "theater-fachpresse"
-    },
-    {
-      "name": "VAN Magazin (Klassik)",
-      "url": "https://van-magazin.de/feed",
-      "priority": 75,
-      "type": "rss",
-      "category": "theater-fachpresse"
-    },
-    {
-      "name": "Theaterkompass",
-      "url": "https://www.theaterkompass.de/rss.php",
-      "priority": 70,
-      "type": "rss",
-      "category": "theater-fachpresse"
-    },
-    {
-      "name": "Theaterkompass",
-      "url": "https://feeds.feedburner.com/Theaterkompass",
-      "priority": 70,
-      "type": "rss",
-      "category": "theater-fachpresse"
-    },
-    {
-      "name": "BackstagePRO",
-      "url": "https://www.backstagepro.de/news/rss",
-      "priority": 65,
-      "type": "rss",
-      "category": "theater-fachpresse"
-    },
-    {
-      "name": "BackstagePRO",
-      "url": "https://www.backstagepro.de/feed",
-      "priority": 65,
-      "type": "rss",
-      "category": "theater-fachpresse",
-      "use_browser": true,
-      "retry_delay": 3000
-    },
-    {
-      "name": "Kultur4all",
-      "url": "https://www.kultur4all.de/feed",
-      "priority": 65,
       "type": "rss",
       "category": "theater-fachpresse"
     },
@@ -1241,28 +888,6 @@
       "category": "ueberregional"
     },
     {
-      "name": "taz - Kultur",
-      "url": "https://taz.de/!T5;rss/",
-      "priority": 85,
-      "type": "rss",
-      "category": "ueberregional",
-      "notes": "Feuilleton/Kultur"
-    },
-    {
-      "name": "taz - Kultur",
-      "url": "https://taz.de/!s=feuilleton/?ressort=t1;rss",
-      "priority": 85,
-      "type": "rss",
-      "category": "ueberregional"
-    },
-    {
-      "name": "taz - Nachrichten",
-      "url": "https://taz.de/!p4608;rss/",
-      "priority": 85,
-      "type": "rss",
-      "category": "ueberregional"
-    },
-    {
       "name": "WELT - Kultur",
       "url": "https://www.welt.de/feeds/section/kultur.rss",
       "priority": 85,
@@ -1384,27 +1009,6 @@
       "name": "t-online",
       "url": "https://www.t-online.de/feed.rss",
       "priority": 75,
-      "type": "rss",
-      "category": "ueberregional"
-    },
-    {
-      "name": "Freitag",
-      "url": "https://www.freitag.de/rss-kanaele/rss-tags/Kultur.xml",
-      "priority": 70,
-      "type": "rss",
-      "category": "ueberregional"
-    },
-    {
-      "name": "Freitag",
-      "url": "https://www.freitag.de/rss.xml",
-      "priority": 70,
-      "type": "rss",
-      "category": "ueberregional"
-    },
-    {
-      "name": "Freitag - Politik",
-      "url": "https://www.freitag.de/rss-kanaele/rss-tags/Politik.xml",
-      "priority": 70,
       "type": "rss",
       "category": "ueberregional"
     },
