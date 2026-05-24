@@ -470,6 +470,44 @@ function buildApp() {
     }
   });
 
+  app.get('/api/analytics', (req, res) => {
+    try {
+      const now = new Date();
+      const last30 = database.getArticlesByRange(subDays(now, 30), now);
+      const last7 = database.getArticlesByRange(subDays(now, 7), now);
+      const today = database.getArticlesByRange(subDays(now, 1), now);
+
+      const computeMetrics = (articles) => ({
+        count: articles.length,
+        avgRelevance: articles.length ? Math.round(articles.reduce((sum, a) => sum + (a.relevance_score || 0), 0) / articles.length) : 0,
+        sentiments: {
+          positiv: articles.filter((a) => a.sentiment === 'positiv').length,
+          neutral: articles.filter((a) => a.sentiment === 'neutral').length,
+          negativ: articles.filter((a) => a.sentiment === 'negativ').length,
+        },
+        topSources: [...new Map(articles.map((a) => [a.source, a])).values()]
+          .map((a) => a.source)
+          .filter(Boolean)
+          .slice(0, 5),
+        paywallCount: articles.filter((a) => a.paywall).length,
+        avgReadingTime: articles.length ? Math.round(articles.reduce((sum, a) => sum + (a.word_count || 0), 0) / (articles.length * 200)) : 0,
+      });
+
+      res.json({
+        timestamp: now.toISOString(),
+        today: computeMetrics(today),
+        last7: computeMetrics(last7),
+        last30: computeMetrics(last30),
+        growth: {
+          daily: last7.length / 7,
+          weekly: last30.length / 4,
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/mentions', (req, res) => {
     try {
       const { from, to } = parseDateRange({
@@ -630,6 +668,53 @@ function buildApp() {
         return res.send(JSON.stringify(articles, null, 2));
       }
       res.status(400).json({ error: 'Unbekanntes Format' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/export-with-metadata', (req, res) => {
+    try {
+      const opts = {
+        from: req.query.from,
+        to: req.query.to,
+        last: req.query.last,
+      };
+      if (!opts.from && !opts.to && !opts.last) opts.last = '30d';
+      const { from, to } = parseDateRange(opts);
+      const articles = database.getArticlesByRange(from, to);
+
+      const tagMap = new Map();
+      const allTagRows = database.db
+        .prepare(
+          `SELECT t.article_id, t.tag FROM article_tags t
+           JOIN articles a ON a.id = t.article_id
+           WHERE a.published_date >= @from AND a.published_date <= @to`
+        )
+        .all({ from: from.toISOString(), to: to.toISOString() });
+      for (const row of allTagRows) {
+        if (!tagMap.has(row.article_id)) tagMap.set(row.article_id, []);
+        tagMap.get(row.article_id).push(row.tag);
+      }
+
+      const enriched = articles.map((a) => ({
+        ...a,
+        tags: tagMap.get(a.id) || [],
+        has_image: textUtils.hasImage(a),
+        reading_time_min: textUtils.estimateReadingMinutes((a.full_text || a.summary || '').toString()),
+      }));
+
+      const metadata = {
+        exportDate: new Date().toISOString(),
+        range: { from: from.toISOString(), to: to.toISOString() },
+        totalArticles: enriched.length,
+        avgRelevance: enriched.length ? Math.round(enriched.reduce((sum, a) => sum + (a.relevance_score || 0), 0) / enriched.length) : 0,
+        facets: computeFacets(enriched),
+      };
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="pressespiegel-export-${Date.now()}.json"`);
+      res.send(JSON.stringify({ metadata, articles: enriched }, null, 2));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
