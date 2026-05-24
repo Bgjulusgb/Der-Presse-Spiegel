@@ -22,16 +22,25 @@ router.get('/entities', (req, res) => {
     const articles = database.getArticlesByRange(from, to);
     const entityStats = analytics.ner.getEntityStats(articles);
 
+    // Auf eindeutige Singular-Schluessel abbilden (passend zu entity.type:
+    // person/production/venue/keyword), damit Clients verlaesslich zugreifen.
+    const keyMap = {
+      people: 'person',
+      productions: 'production',
+      venues: 'venue',
+      keywords: 'keyword',
+    };
+
     const result = {
       dateRange: { from: from.toISOString(), to: to.toISOString() },
       entities: {},
     };
 
     for (const [type, map] of Object.entries(entityStats)) {
-      result.entities[type.replace('s', '')] = Array.from(map.entries()).map(([value, stats]) => ({
-        value,
-        ...stats,
-      }));
+      const key = keyMap[type] || type;
+      result.entities[key] = Array.from(map.entries())
+        .map(([value, stats]) => ({ value, ...stats }))
+        .sort((a, b) => (b.mentions || 0) - (a.mentions || 0));
     }
 
     res.json(result);

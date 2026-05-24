@@ -26,6 +26,7 @@
     <button class="nav-item" data-tab="sources" aria-label="Zum Quellen Tab">Quellen</button>
     <button class="nav-item" data-tab="bookmarks" aria-label="Zum Lesezeichen Tab">Lesezeichen</button>
     <button class="nav-item" data-tab="trends" aria-label="Zum Trends Tab">Trends</button>
+    <button class="nav-item" data-tab="analytics" aria-label="Zum Analytik Tab">Analytik</button>
     <button class="nav-item" data-tab="duplicates" aria-label="Zum Duplikate Tab">Duplikate</button>
     <button class="nav-item" data-tab="settings" aria-label="Zum Einstellungen Tab">Einstellungen</button>
     <button class="nav-item" data-tab="logs" aria-label="Zum Logs Tab">Logs</button>
@@ -358,6 +359,61 @@
     <div class="card">
       <h2>Tag-Wolke</h2>
       <div id="all-tags" class="word-cloud"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-analytics">
+    <header class="page-head">
+      <div>
+        <h1>Analytik</h1>
+        <p class="subtitle">Entitäten, Quellen-Qualität, Ereignisse &amp; Tonalität</p>
+      </div>
+      <div class="page-actions">
+        <select id="analytics-period" aria-label="Zeitraum">
+          <option value="7d">Letzte 7 Tage</option>
+          <option value="30d" selected>Letzte 30 Tage</option>
+          <option value="90d">Letzte 90 Tage</option>
+          <option value="365d">Letzte 12 Monate</option>
+        </select>
+        <button class="btn-secondary" id="analytics-refresh">Aktualisieren</button>
+      </div>
+    </header>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Top Personen</h2>
+        <div id="an-people"><p class="muted">Lade…</p></div>
+      </div>
+      <div class="card">
+        <h2>Top Produktionen</h2>
+        <div id="an-productions"><p class="muted">Lade…</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Mention-Spitzen (Aufsteiger)</h2>
+      <div id="an-spikes"><p class="muted">Lade…</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Quellen-Qualität &amp; Bias</h2>
+      <div id="an-sources"><p class="muted">Lade…</p></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Tonalität</h2>
+        <div id="an-tonality"><p class="muted">Lade…</p></div>
+      </div>
+      <div class="card">
+        <h2>Erkannte Ereignisse</h2>
+        <div id="an-events"><p class="muted">Lade…</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Story-Cluster (zusammengehörige Artikel)</h2>
+      <div id="an-clusters"><p class="muted">Lade…</p></div>
     </div>
   </section>
 

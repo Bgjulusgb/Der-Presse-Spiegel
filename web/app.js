@@ -171,6 +171,9 @@ function onTabActivate(tab) {
     case 'trends':
       loadTrends();
       break;
+    case 'analytics':
+      loadAnalytics();
+      break;
     case 'settings':
       loadSettingsTab();
       break;
@@ -1218,6 +1221,148 @@ async function loadTrends() {
   }
 }
 
+function anBar(value, max, label, extra = '') {
+  const pct = max > 0 ? Math.round((safeNum(value) / max) * 100) : 0;
+  return `
+    <div class="an-row">
+      <span class="an-label">${escapeHtml(label)}</span>
+      <span class="an-track"><span class="an-fill" style="width:${pct}%"></span></span>
+      <span class="an-value">${safeNum(value)}${extra}</span>
+    </div>`;
+}
+
+const BIAS_LABEL = {
+  positive_bias: 'positiv geneigt',
+  negative_bias: 'negativ geneigt',
+  neutral_bias: 'überwiegend neutral',
+  balanced: 'ausgewogen',
+};
+const TONALITY_LABEL = {
+  critical: 'kritisch',
+  enthusiastic: 'enthusiastisch',
+  cautious: 'zurückhaltend',
+  neutral_reporting: 'neutral berichtend',
+  neutral: 'neutral',
+};
+
+async function loadAnalytics() {
+  const period = $('#analytics-period') ? $('#analytics-period').value : '30d';
+  const setLoading = (id) => {
+    const el = $(id);
+    if (el) el.innerHTML = '<p class="muted">Lade…</p>';
+  };
+  ['#an-people', '#an-productions', '#an-spikes', '#an-sources', '#an-tonality', '#an-events', '#an-clusters'].forEach(
+    setLoading
+  );
+
+  try {
+    const [entities, trends, sources, tonality, events, clusters] = await Promise.all([
+      api(`/api/analytics/entities?last=${period}`).catch(() => null),
+      api(`/api/analytics/mention-trends?last=${period}`).catch(() => null),
+      api(`/api/analytics/source-quality?last=${period}`).catch(() => null),
+      api(`/api/analytics/tonality?last=${period}`).catch(() => null),
+      api(`/api/analytics/events?last=${period}`).catch(() => null),
+      api(`/api/analytics/clusters?last=${period}`).catch(() => null),
+    ]);
+
+    // Top Personen
+    const people = (entities && entities.entities && entities.entities.person) || [];
+    people.sort((a, b) => safeNum(b.mentions) - safeNum(a.mentions));
+    const topPeople = people.slice(0, 12);
+    const maxPeople = Math.max(1, ...topPeople.map((p) => safeNum(p.mentions)));
+    $('#an-people').innerHTML = topPeople.length
+      ? topPeople.map((p) => anBar(p.mentions, maxPeople, p.value, ` (${safeNum(p.articles)} Art.)`)).join('')
+      : '<p class="muted">Keine Personen erkannt.</p>';
+
+    // Top Produktionen
+    const prods = (entities && entities.entities && entities.entities.production) || [];
+    prods.sort((a, b) => safeNum(b.mentions) - safeNum(a.mentions));
+    const topProds = prods.slice(0, 12);
+    const maxProds = Math.max(1, ...topProds.map((p) => safeNum(p.mentions)));
+    $('#an-productions').innerHTML = topProds.length
+      ? topProds.map((p) => anBar(p.mentions, maxProds, p.value, ` (${safeNum(p.articles)} Art.)`)).join('')
+      : '<p class="muted">Keine Produktionen erkannt.</p>';
+
+    // Mention-Spitzen
+    const spikes = (trends && trends.spikes) || [];
+    $('#an-spikes').innerHTML = spikes.length
+      ? spikes
+          .slice(0, 15)
+          .map(
+            (s) => `
+        <div class="trend-row">
+          <span class="trend-term">${escapeHtml(s.entity)} <span class="muted">(${escapeHtml(s.type)})</span></span>
+          <span class="trend-change">×${escapeHtml(String(s.spikeRatio))}</span>
+          <span class="trend-count">${safeNum(s.recentMentions)}</span>
+        </div>`
+          )
+          .join('')
+      : '<p class="muted">Keine auffälligen Anstiege im Zeitraum.</p>';
+
+    // Quellen-Qualität
+    const srcList = (sources && sources.sources) || [];
+    $('#an-sources').innerHTML = srcList.length
+      ? `<table class="an-table">
+          <thead><tr><th>Quelle</th><th>Artikel</th><th>Ø Relevanz</th><th>Qualität</th><th>Tendenz</th></tr></thead>
+          <tbody>${srcList
+            .slice(0, 20)
+            .map(
+              (s) => `<tr>
+                <td>${escapeHtml(s.source)}</td>
+                <td>${safeNum(s.totalArticles)}</td>
+                <td>${safeNum(s.avgRelevanceScore)}</td>
+                <td><span class="an-score">${safeNum(s.qualityScore)}</span></td>
+                <td><span class="badge">${escapeHtml(BIAS_LABEL[s.bias] || s.bias || '–')}</span></td>
+              </tr>`
+            )
+            .join('')}</tbody>
+        </table>`
+      : '<p class="muted">Keine Quellendaten.</p>';
+
+    // Tonalität
+    const tDist = (tonality && tonality.tonalityDistribution) || {};
+    const tEntries = Object.entries(tDist).sort((a, b) => b[1] - a[1]);
+    const tMax = Math.max(1, ...tEntries.map((e) => safeNum(e[1])));
+    $('#an-tonality').innerHTML = tEntries.length
+      ? tEntries.map(([k, v]) => anBar(v, tMax, TONALITY_LABEL[k] || k)).join('')
+      : '<p class="muted">Keine Tonalitätsdaten.</p>';
+
+    // Ereignisse
+    const evTypes = (events && events.eventTypes) || [];
+    const timeline = (events && events.timeline) || [];
+    const evCounts = {};
+    for (const e of timeline) evCounts[e.type] = (evCounts[e.type] || 0) + 1;
+    const evEntries = Object.entries(evCounts).sort((a, b) => b[1] - a[1]);
+    const evMax = Math.max(1, ...evEntries.map((e) => e[1]));
+    $('#an-events').innerHTML = evEntries.length
+      ? evEntries.map(([k, v]) => anBar(v, evMax, k)).join('')
+      : evTypes.length
+        ? '<p class="muted">Ereignistypen: ' + evTypes.map(escapeHtml).join(', ') + '</p>'
+        : '<p class="muted">Keine Ereignisse erkannt.</p>';
+
+    // Cluster
+    const cl = (clusters && clusters.clusters) || [];
+    $('#an-clusters').innerHTML = cl.length
+      ? cl
+          .slice(0, 10)
+          .map(
+            (c) => `
+        <div class="cluster">
+          <div class="cluster-head"><strong>${escapeHtml(c.mainTheme || 'Cluster')}</strong>
+            <span class="badge">${safeNum(c.size)} Artikel · Kohärenz ${safeNum(c.coherence)}</span></div>
+          <ul class="cluster-list">${(c.articles || [])
+            .slice(0, 5)
+            .map((a) => `<li>${escapeHtml(a.title)} <span class="muted">— ${escapeHtml(a.source || '')}</span></li>`)
+            .join('')}</ul>
+        </div>`
+          )
+          .join('')
+      : '<p class="muted">Keine zusammengehörigen Story-Cluster gefunden.</p>';
+  } catch (err) {
+    handleApiError(err);
+  }
+}
+
 async function toggleBookmark(articleId, isBookmarked) {
   try {
     if (isBookmarked) {
@@ -1913,6 +2058,13 @@ function initTrendsTab() {
   $('#trends-period').addEventListener('change', loadTrends);
 }
 
+function initAnalyticsTab() {
+  const sel = $('#analytics-period');
+  if (sel) sel.addEventListener('change', loadAnalytics);
+  const btn = $('#analytics-refresh');
+  if (btn) btn.addEventListener('click', loadAnalytics);
+}
+
 function initTagsTab() {
   const btn = document.getElementById('tag-retag-all');
   if (btn) {
@@ -1948,6 +2100,7 @@ function init() {
   initLogsTab();
   initDuplicatesTab();
   initTrendsTab();
+  initAnalyticsTab();
   initTagsTab();
   initGlobalKeys();
   loadDashboard();

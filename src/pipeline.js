@@ -36,6 +36,97 @@ function applyAnalytics(articleId, article) {
   }
 }
 
+// Verarbeitet einen angereicherten Roh-Artikel: Analyse -> Dedup -> Insert.
+// Aktualisiert summary-Zaehler und die existing-Liste (fuer Dedup im selben
+// Lauf). Pro-Artikel-Fehler werden hier abgefangen, damit eine umgebende
+// Transaktion nicht zurueckgerollt wird.
+function processArticle(raw, existing, summary) {
+  try {
+    const analysis = analyze(raw, raw.sourcePriority || 50);
+    if (!analysis.passes) {
+      logger.debug(`Verworfen: ${raw.title} (${analysis.rejectReason})`);
+      return;
+    }
+
+    const article = {
+      ...raw,
+      summary: analysis.summary,
+      relevanceScore: analysis.relevanceScore,
+      sentiment: analysis.sentiment,
+      sentimentScore: analysis.sentimentScore,
+      category: analysis.category,
+      articleType: analysis.articleType,
+      meta: { ...raw.meta, reasons: analysis.relevanceReasons },
+    };
+
+    const candidate = {
+      id: null,
+      url: article.url,
+      url_normalized: article.urlNormalized,
+      title: article.title,
+      first_paragraph: article.firstParagraph,
+      source: article.source,
+    };
+    const dupHit = findDuplicate(candidate, existing);
+
+    const trackExisting = (id) =>
+      existing.push({
+        id,
+        url_normalized: article.urlNormalized,
+        title: article.title,
+        first_paragraph: article.firstParagraph,
+        source: article.source,
+        published_date: article.publishedDate ? article.publishedDate.toISOString() : null,
+      });
+
+    if (dupHit) {
+      const winner = chooseWinner(
+        { ...candidate, published_date: article.publishedDate },
+        dupHit.duplicate
+      );
+      if (winner === dupHit.duplicate) {
+        const inserted = database.insertArticle(article);
+        database.markAsDuplicate(inserted.id, dupHit.duplicate.id, article.url);
+        summary.duplicatesFound++;
+        if (inserted.inserted) {
+          summary.articlesAdded++;
+          applyTags(inserted.id, article, analysis);
+          applyAnalytics(inserted.id, article);
+        }
+        logger.info(
+          `Duplikat erkannt -> bestehend behalten: "${article.title}" (${dupHit.reason})`
+        );
+      } else {
+        const inserted = database.insertArticle(article);
+        if (inserted.inserted) {
+          summary.articlesAdded++;
+          applyTags(inserted.id, article, analysis);
+          applyAnalytics(inserted.id, article);
+        }
+        database.markAsDuplicate(
+          dupHit.duplicate.id,
+          inserted.id,
+          dupHit.duplicate.url || normalizeUrl(dupHit.duplicate.url_normalized)
+        );
+        summary.duplicatesFound++;
+        trackExisting(inserted.id);
+        logger.info(`Duplikat erkannt -> neuer Artikel wird Sieger: "${article.title}"`);
+      }
+    } else {
+      const inserted = database.insertArticle(article);
+      if (inserted.inserted) {
+        summary.articlesAdded++;
+        applyTags(inserted.id, article, analysis);
+        applyAnalytics(inserted.id, article);
+        trackExisting(inserted.id);
+      }
+    }
+  } catch (err) {
+    summary.errors++;
+    logger.error(`Fehler bei Artikel-Verarbeitung: ${raw.url}`, { error: err.message });
+  }
+}
+
 function summariseFeedHealth() {
   const all = database.getSourceHealth();
   const summary = { ok: 0, degraded: 0, blocked: 0, dead: 0, unknown: 0, total: all.length };
@@ -79,94 +170,34 @@ async function runScan({ from, to }) {
     lookbackFrom.setDate(lookbackFrom.getDate() - 30);
     const existing = database.getRecentForDedup(lookbackFrom);
 
-    for (const raw of enriched) {
+    // Verarbeitung in Transaktions-Chunks: massiv schnellere Inserts (ein
+    // fsync pro Chunk statt pro Artikel), aber ein fehlerhafter Chunk reisst
+    // nicht den ganzen Scan mit. Pro-Artikel-Fehler werden innerhalb der
+    // Transaktion abgefangen, damit COMMIT die uebrigen Inserts behaelt.
+    const CHUNK = 200;
+    for (let i = 0; i < enriched.length; i += CHUNK) {
+      const slice = enriched.slice(i, i + CHUNK);
+      const runChunk = database.transaction(() => {
+        for (const raw of slice) {
+          processArticle(raw, existing, summary);
+        }
+      });
       try {
-        const analysis = analyze(raw, raw.sourcePriority || 50);
-        if (!analysis.passes) {
-          logger.debug(`Verworfen: ${raw.title} (${analysis.rejectReason})`);
-          continue;
-        }
-
-        const article = {
-          ...raw,
-          summary: analysis.summary,
-          relevanceScore: analysis.relevanceScore,
-          sentiment: analysis.sentiment,
-          sentimentScore: analysis.sentimentScore,
-          category: analysis.category,
-          articleType: analysis.articleType,
-          meta: { ...raw.meta, reasons: analysis.relevanceReasons },
-        };
-
-        const candidate = {
-          id: null,
-          url: article.url,
-          url_normalized: article.urlNormalized,
-          title: article.title,
-          first_paragraph: article.firstParagraph,
-          source: article.source,
-        };
-        const dupHit = findDuplicate(candidate, existing);
-
-        if (dupHit) {
-          const winner = chooseWinner(
-            { ...candidate, published_date: article.publishedDate },
-            dupHit.duplicate
-          );
-          if (winner === dupHit.duplicate) {
-            const inserted = database.insertArticle(article);
-            database.markAsDuplicate(inserted.id, dupHit.duplicate.id, article.url);
-            summary.duplicatesFound++;
-            if (inserted.inserted) {
-              summary.articlesAdded++;
-              applyTags(inserted.id, article, analysis);
-              applyAnalytics(inserted.id, article);
-            }
-            logger.info(
-              `Duplikat erkannt -> bestehend behalten: "${article.title}" (${dupHit.reason})`
-            );
-          } else {
-            const inserted = database.insertArticle(article);
-            if (inserted.inserted) {
-              summary.articlesAdded++;
-              applyTags(inserted.id, article, analysis);
-              applyAnalytics(inserted.id, article);
-            }
-            database.markAsDuplicate(
-              dupHit.duplicate.id,
-              inserted.id,
-              dupHit.duplicate.url || normalizeUrl(dupHit.duplicate.url_normalized)
-            );
-            summary.duplicatesFound++;
-            existing.push({
-              id: inserted.id,
-              url_normalized: article.urlNormalized,
-              title: article.title,
-              first_paragraph: article.firstParagraph,
-              source: article.source,
-              published_date: article.publishedDate ? article.publishedDate.toISOString() : null,
-            });
-            logger.info(`Duplikat erkannt -> neuer Artikel wird Sieger: "${article.title}"`);
-          }
-        } else {
-          const inserted = database.insertArticle(article);
-          if (inserted.inserted) {
-            summary.articlesAdded++;
-            applyTags(inserted.id, article, analysis);
-            applyAnalytics(inserted.id, article);
-            existing.push({
-              id: inserted.id,
-              url_normalized: article.urlNormalized,
-              title: article.title,
-              first_paragraph: article.firstParagraph,
-              source: article.source,
-              published_date: article.publishedDate ? article.publishedDate.toISOString() : null,
-            });
-          }
-        }
+        runChunk();
       } catch (err) {
-        summary.errors++;
-        logger.error(`Fehler bei Artikel-Verarbeitung: ${raw.url}`, { error: err.message });
+        // Transaktion fehlgeschlagen (Rollback) -> Chunk einzeln nachfahren,
+        // damit ein einzelner Problemartikel nicht den ganzen Chunk verwirft.
+        logger.warn(`Chunk-Transaktion fehlgeschlagen, einzeln: ${err.message}`);
+        for (const raw of slice) {
+          try {
+            processArticle(raw, existing, summary);
+          } catch (innerErr) {
+            summary.errors++;
+            logger.error(`Fehler bei Artikel-Verarbeitung: ${raw.url}`, {
+              error: innerErr.message,
+            });
+          }
+        }
       }
     }
 
