@@ -1,7 +1,5 @@
 'use strict';
 
-const { sentiment: sentimentConfig } = require('../config');
-
 function normalize(text) {
   return String(text || '')
     .toLowerCase()

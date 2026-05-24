@@ -1,7 +1,5 @@
 'use strict';
 
-const { keywords } = require('../config');
-
 function normalize(text) {
   return String(text || '')
     .toLowerCase()

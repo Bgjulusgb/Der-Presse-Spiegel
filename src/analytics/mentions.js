@@ -8,6 +8,7 @@ function analyzeMentionTrends(articles) {
   const entities = new Map();
 
   // Group by published date
+  const { format } = require('date-fns');
   for (const article of articles) {
     if (!article.published_date) continue;
     const dateKey = format(new Date(article.published_date), 'yyyy-MM-dd');
@@ -85,7 +86,7 @@ function getMentionSpikes(articles, windowDays = 7) {
 
 function getTopMentions(articles, entityType = null, limit = 10) {
   const ent = ner.getEntityStats(articles);
-  let candidates = [];
+  const candidates = [];
 
   if (entityType) {
     const map = ent[entityType + 's'];

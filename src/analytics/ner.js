@@ -15,7 +15,6 @@ function extractEntities(article) {
   const entities = [];
   const title = normalize(article.title || '');
   const text = normalize([article.fullText, article.summary, article.firstParagraph].filter(Boolean).join(' '));
-  const combined = `${title} ${text}`;
 
   // Extract people
   for (const person of keywords.people) {

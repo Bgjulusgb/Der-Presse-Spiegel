@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { subDays, format } = require('date-fns');
+const { subDays } = require('date-fns');
 const database = require('./database');
 const { parseDateRange } = require('./utils');
 const analytics = require('./analytics');

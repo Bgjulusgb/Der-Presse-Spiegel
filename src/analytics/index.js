@@ -12,23 +12,16 @@ const events = require('./events');
 // Central analytics orchestrator
 // Runs after article is saved to database
 
-async function analyzeArticle(articleId, articleData, database) {
+async function analyzeArticle(articleId, articleData) {
   try {
     const analysis = {};
 
     // Named entity recognition
     analysis.entities = ner.extractEntities(articleData);
 
-    // Store extracted entities
-    if (analysis.entities.length > 0) {
-      database.insertArticleEntities(articleId, analysis.entities);
-    }
-
+    // Store extracted entities (caller should handle DB insert)
     // Event detection
     analysis.events = events.detectEvents(articleData, analysis.entities);
-    if (analysis.events.length > 0) {
-      database.insertDetectedEvents(articleId, analysis.events);
-    }
 
     // Advanced tonality analysis
     analysis.tonality = tonality.analyzeTonality(articleData);
