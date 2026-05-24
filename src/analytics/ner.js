@@ -14,7 +14,17 @@ function normalize(text) {
 function extractEntities(article) {
   const entities = [];
   const title = normalize(article.title || '');
-  const text = normalize([article.fullText, article.summary, article.firstParagraph].filter(Boolean).join(' '));
+  const text = normalize(
+    [
+      article.fullText,
+      article.full_text,
+      article.summary,
+      article.firstParagraph,
+      article.first_paragraph,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
 
   // Extract people
   for (const person of keywords.people) {

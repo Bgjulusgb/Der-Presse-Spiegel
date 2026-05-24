@@ -15,10 +15,10 @@
     "request_timeout_ms": 15000,
     "max_retries": 2,
     "retry_backoff_ms": 1500,
-    "max_concurrent_requests": 8,
+    "max_concurrent_requests": 10,
     "rate_limit_per_domain_ms": 800,
     "auto_disable_after_failures": 6,
-    "max_articles_per_scan": 1500,
+    "max_articles_per_scan": 3000,
     "puppeteer_fallback": true,
     "puppeteer": {
       "headless": true,

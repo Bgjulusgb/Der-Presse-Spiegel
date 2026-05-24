@@ -27,7 +27,9 @@ function preparedKeywords() {
     people: keywords.people.map(normalize),
     venues: (keywords.venues || []).map(normalize),
     theaterContext: (keywords.theater_context || []).map(normalize),
-    exclude: keywords.exclude.map(normalize),
+    exclude: (keywords.exclude || []).map(normalize),
+    excludeTitle: (keywords.exclude_title || []).map(normalize),
+    munichSpecific: (keywords.munich_specific || []).map(normalize),
   };
 }
 
@@ -144,11 +146,51 @@ function passesRequiredFilter(article) {
   const title = normalize(article.title || '');
   const text = normalize(articleBodyText(article));
   const haystack = `${title} ${text}`;
+
   const hasRequired = KW.required.some((k) => haystack.includes(k));
   if (!hasRequired) return { passes: false, reason: 'no-required-keyword' };
-  const excludeHit = KW.exclude.find((k) => haystack.includes(k));
-  if (excludeHit) return { passes: false, reason: `exclude:${excludeHit}` };
+
+  // Strukturelle Ausschluesse (Stellenanzeige, Leserbrief etc.) nur im Titel
+  // pruefen. Diese Begriffe tauchen sonst als UI-Labels (Cookie-Banner,
+  // Werbeflaechen) im gescrapten Volltext auf und filtern valide Artikel raus.
+  const firstPara = normalize(article.firstParagraph || '');
+  const titleScope = `${title} ${firstPara}`;
+  const titleExcludeHit = KW.excludeTitle.find((k) => titleScope.includes(k));
+  if (titleExcludeHit) return { passes: false, reason: `exclude:${titleExcludeHit}` };
+
+  // Orts-Disambiguierung (Hamburger/Berliner Kammerspiele etc.): nur dann
+  // ausschliessen, wenn der Artikel nicht eindeutig die Muenchner Kammerspiele
+  // benennt. So bleiben Vergleichs-/Uebersichtsartikel erhalten.
+  const mentionsMunich = KW.munichSpecific.some((k) => haystack.includes(k));
+  if (!mentionsMunich) {
+    const excludeHit = KW.exclude.find((k) => haystack.includes(k));
+    if (excludeHit) return { passes: false, reason: `exclude:${excludeHit}` };
+  }
+
   return { passes: true };
+}
+
+// Leichtgewichtiger Vorfilter fuer RSS-Items VOR dem teuren Volltext-Fetch.
+// Ziel: tausende offensichtlich irrelevante Artikel gar nicht erst anreichern.
+// Konservativ: nur ueberspringen, wenn genug Text vorliegt UND kein
+// Pflicht-Keyword vorkommt. Items mit wenig Text werden angereichert (im
+// Zweifel fuer den Artikel), da das Keyword erst im Volltext stehen koennte.
+function rssLikelyRelevant(item) {
+  if (!item) return false;
+  const title = normalize(item.title || '');
+  const body = normalize(
+    [item.summary, item.content, item.contentSnippet, item.description].filter(Boolean).join(' ')
+  );
+  const haystack = `${title} ${body}`;
+
+  // Pflicht-Keyword direkt vorhanden -> sicher relevant.
+  if (KW.required.some((k) => haystack.includes(k))) return true;
+
+  // Zu wenig Beschreibungstext, um sicher zu urteilen -> anreichern.
+  if (body.length < 120) return true;
+
+  // Genug Text, aber kein Pflicht-Keyword -> ueberspringen.
+  return false;
 }
 
 function detectArticleType(article) {
@@ -533,4 +575,5 @@ module.exports = {
   articleBodyText,
   calculateArticleDepth,
   calculateMirrorRelevance,
+  rssLikelyRelevant,
 };

@@ -78,6 +78,49 @@ test('passesRequiredFilter respektiert exclude-Liste', () => {
   assert.ok(result.reason.startsWith('exclude:'));
 });
 
+test('passesRequiredFilter laesst Werbe-Label im gescrapten Volltext durch', () => {
+  // Regression: gescrapter Volltext enthaelt UI-Labels wie "Werbung"/"Anzeige"
+  // (Cookie-Banner, Werbeflaechen). Diese duerfen valide Artikel NICHT mehr
+  // ausschliessen, solange Kammerspiele im Titel/Text steht.
+  const article = {
+    title: 'Premiere an den Muenchner Kammerspielen gefeiert',
+    fullText:
+      'Die Muenchner Kammerspiele zeigen eine grandiose Inszenierung. ANZEIGE Newsletter abonnieren. Werbung. Mehr aus dem Ressort.',
+  };
+  const result = passesRequiredFilter(article);
+  assert.equal(result.passes, true);
+});
+
+test('passesRequiredFilter behaelt Vergleichsartikel mit Muenchner Bezug', () => {
+  const article = {
+    title: 'Theater-Vergleich',
+    fullText: 'Die Muenchner Kammerspiele und die Hamburger Kammerspiele im Vergleich.',
+  };
+  const result = passesRequiredFilter(article);
+  assert.equal(result.passes, true);
+});
+
+test('rssLikelyRelevant Vorfilter: Keyword vorhanden -> true', () => {
+  const { rssLikelyRelevant } = require('../src/analyzer');
+  assert.equal(
+    rssLikelyRelevant({ title: 'Muenchner Kammerspiele Premiere', summary: 'x'.repeat(200) }),
+    true
+  );
+});
+
+test('rssLikelyRelevant Vorfilter: viel Text ohne Keyword -> false', () => {
+  const { rssLikelyRelevant } = require('../src/analyzer');
+  assert.equal(
+    rssLikelyRelevant({ title: 'Fussball heute', summary: 'Bayern Muenchen gewinnt das Spiel. '.repeat(20) }),
+    false
+  );
+});
+
+test('rssLikelyRelevant Vorfilter: wenig Text -> true (im Zweifel anreichern)', () => {
+  const { rssLikelyRelevant } = require('../src/analyzer');
+  assert.equal(rssLikelyRelevant({ title: 'Theater News', summary: 'kurz' }), true);
+});
+
 test('calculateRelevance gibt Titel-Match mehr Punkte', () => {
   const titleMatch = calculateRelevance(
     {

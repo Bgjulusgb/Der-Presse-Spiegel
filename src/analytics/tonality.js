@@ -10,7 +10,9 @@ function normalize(text) {
 }
 
 function analyzeTonality(article) {
-  const text = normalize(`${article.title || ''} ${article.fullText || ''}`);
+  const text = normalize(
+    `${article.title || ''} ${article.fullText || article.full_text || article.summary || ''}`
+  );
   const tokens = text.split(/[^a-z0-9]+/).filter(Boolean);
 
   const tonalities = {

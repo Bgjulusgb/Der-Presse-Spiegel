@@ -11,7 +11,10 @@ function normalize(text) {
 
 function detectEvents(article, entities = []) {
   const events = [];
-  const text = normalize(`${article.title || ''} ${article.fullText || ''}`);
+  // Robust gegenueber camelCase (Pipeline) und snake_case (DB-Zeilen).
+  const bodyText = article.fullText || article.full_text || article.summary || '';
+  const eventDate = article.published_date || article.publishedDate || null;
+  const text = normalize(`${article.title || ''} ${bodyText}`);
 
   // Premiere detection
   if (text.includes('premiere')) {
@@ -21,7 +24,7 @@ function detectEvents(article, entities = []) {
         type: 'premiere',
         production: productionMatches[0].value,
         confidence: productionMatches[0].confidence,
-        date: article.published_date,
+        date: eventDate,
       });
     }
   }
@@ -34,7 +37,7 @@ function detectEvents(article, entities = []) {
         type: 'casting',
         person: personMatches[0].value,
         confidence: 0.7,
-        date: article.published_date,
+        date: eventDate,
       });
     }
   }
@@ -44,7 +47,7 @@ function detectEvents(article, entities = []) {
     events.push({
       type: 'festival_or_tour',
       confidence: 0.6,
-      date: article.published_date,
+      date: eventDate,
     });
   }
 
@@ -58,7 +61,7 @@ function detectEvents(article, entities = []) {
     events.push({
       type: 'milestone',
       confidence: 0.5,
-      date: article.published_date,
+      date: eventDate,
     });
   }
 

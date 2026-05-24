@@ -8,6 +8,46 @@ const analytics = require('./analytics');
 
 const router = express.Router();
 
+// Liest from/to aus Query (from/to/last) mit Default 30 Tage.
+function rangeFromQuery(req) {
+  const opts = { from: req.query.from, to: req.query.to, last: req.query.last };
+  if (!opts.from && !opts.to && !opts.last) opts.last = '30d';
+  return parseDateRange(opts);
+}
+
+// GET /api/analytics/top-entities - Schnelle Top-Entitaeten aus gespeicherten
+// Tabellen (article_entities), datums-gefiltert. Nutzt die im Scan befuellten
+// Daten statt erneuter Volltext-Extraktion.
+router.get('/top-entities', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const type = req.query.type || null;
+    const limit = Math.min(parseInt(req.query.limit || 25, 10) || 25, 200);
+    const rows = database.getTopEntities({ from, to, type, limit });
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      type: type || 'all',
+      entities: rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/event-counts - Aggregierte Ereigniszahlen aus
+// gespeicherter detected_events-Tabelle, datums-gefiltert.
+router.get('/event-counts', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      events: database.getEventCounts({ from, to }),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/analytics/entities - All extracted entities
 router.get('/entities', (req, res) => {
   try {
@@ -22,16 +62,25 @@ router.get('/entities', (req, res) => {
     const articles = database.getArticlesByRange(from, to);
     const entityStats = analytics.ner.getEntityStats(articles);
 
+    // Auf eindeutige Singular-Schluessel abbilden (passend zu entity.type:
+    // person/production/venue/keyword), damit Clients verlaesslich zugreifen.
+    const keyMap = {
+      people: 'person',
+      productions: 'production',
+      venues: 'venue',
+      keywords: 'keyword',
+    };
+
     const result = {
       dateRange: { from: from.toISOString(), to: to.toISOString() },
       entities: {},
     };
 
     for (const [type, map] of Object.entries(entityStats)) {
-      result.entities[type.replace('s', '')] = Array.from(map.entries()).map(([value, stats]) => ({
-        value,
-        ...stats,
-      }));
+      const key = keyMap[type] || type;
+      result.entities[key] = Array.from(map.entries())
+        .map(([value, stats]) => ({ value, ...stats }))
+        .sort((a, b) => (b.mentions || 0) - (a.mentions || 0));
     }
 
     res.json(result);
@@ -284,6 +333,83 @@ router.get('/tonality', (req, res) => {
       dateRange: { from: from.toISOString(), to: to.toISOString() },
       tonalityDistribution: tonalityStats,
       contrasts: contrasts.slice(0, 20),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/resonance - Medienresonanz (Reichweite x Relevanz)
+router.get('/resonance', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      overall: analytics.mediaResonance.aggregateResonance(articles),
+      byProduction: analytics.mediaResonance.resonanceByProduction(articles).slice(0, 25),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/share-of-voice?dimension=production|person|source
+router.get('/share-of-voice', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const dimension = ['production', 'person', 'source'].includes(req.query.dimension)
+      ? req.query.dimension
+      : 'production';
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      dimension,
+      shareOfVoice: analytics.mediaResonance.shareOfVoice(articles, dimension).slice(0, 25),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/sentiment-timeline - Sentiment-Verlauf pro Tag
+router.get('/sentiment-timeline', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      timeline: analytics.mediaResonance.sentimentTimeline(articles),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/critic-consensus - Kritiker-Konsens je Produktion
+router.get('/critic-consensus', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      consensus: analytics.mediaResonance.criticConsensus(articles),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/quotes - Herausragende Zitate aus der Berichterstattung
+router.get('/quotes', (req, res) => {
+  try {
+    const { from, to } = rangeFromQuery(req);
+    const limit = Math.min(parseInt(req.query.limit || 50, 10) || 50, 200);
+    const articles = database.getArticlesByRange(from, to);
+    res.json({
+      dateRange: { from: from.toISOString(), to: to.toISOString() },
+      coverage: analytics.quotes.quoteCoverage(articles),
+      quotes: analytics.quotes.notableQuotes(articles, { limit }),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

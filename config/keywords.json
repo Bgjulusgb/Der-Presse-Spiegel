@@ -172,11 +172,6 @@
     "Debut"
   ],
   "exclude": [
-    "Stellenanzeige",
-    "Stellenangebot",
-    "Anzeige -",
-    "Werbung",
-    "Leserbrief",
     "Hamburger Kammerspiele",
     "Berliner Kammerspiele",
     "Wiener Kammerspiele",
@@ -184,6 +179,18 @@
     "Kammerspiele Paderborn",
     "Schlosspark-Kammerspiele",
     "Kleine Komoedie am Max II"
+  ],
+  "exclude_title": [
+    "Stellenanzeige",
+    "Stellenangebot",
+    "Anzeige -",
+    "Leserbrief"
+  ],
+  "munich_specific": [
+    "Muenchner Kammerspiele",
+    "Münchner Kammerspiele",
+    "Kammerspiele München",
+    "Kammerspiele Muenchen"
   ],
   "scoring_weights": {
     "title_match": 60,

@@ -8,6 +8,7 @@ const logger = require('./logger');
 const { settings, sources } = require('./config');
 const { normalizeUrl } = require('./utils');
 const { extractFirstParagraph } = require('./deduplicator');
+const { rssLikelyRelevant } = require('./analyzer');
 const database = require('./database');
 const { fetchFeed, fetchText, testFeed } = require('./feed-fetcher');
 
@@ -282,11 +283,34 @@ const REMOVE_SELECTORS = [
   'amp-ad',
 ];
 
+// Eine stille VirtualConsole verhindert, dass JSDOM CSS-Parse-Fehler
+// ("Could not parse CSS stylesheet") und aehnliche Warnungen aus fremdem
+// Seiten-Markup in unsere Logs spuelt. Wird einmalig wiederverwendet.
+let _silentVirtualConsole = null;
+function getSilentVirtualConsole() {
+  if (_silentVirtualConsole) return _silentVirtualConsole;
+  const { VirtualConsole } = require('jsdom');
+  const vc = new VirtualConsole();
+  // Alle JSDOM-Ereignisse (error/warn/jsdomError) bewusst verschlucken.
+  vc.on('jsdomError', () => {});
+  vc.on('error', () => {});
+  vc.on('warn', () => {});
+  _silentVirtualConsole = vc;
+  return vc;
+}
+
 function tryReadability(html, url) {
+  let dom = null;
   try {
     const { Readability } = require('@mozilla/readability');
     const { JSDOM } = require('jsdom');
-    const dom = new JSDOM(html, { url });
+    dom = new JSDOM(html, {
+      url,
+      virtualConsole: getSilentVirtualConsole(),
+      // Keine externen Ressourcen/Skripte laden — wir brauchen nur das DOM.
+      resources: undefined,
+      runScripts: undefined,
+    });
     const reader = new Readability(dom.window.document, { charThreshold: 200 });
     const article = reader.parse();
     if (!article || !article.textContent) return null;
@@ -299,6 +323,16 @@ function tryReadability(html, url) {
     };
   } catch {
     return null;
+  } finally {
+    // DOM-Fenster schliessen, um Speicher/Timer freizugeben (wichtig bei
+    // tausenden Artikeln pro Scan).
+    if (dom && dom.window && typeof dom.window.close === 'function') {
+      try {
+        dom.window.close();
+      } catch {
+        /* ignore */
+      }
+    }
   }
 }
 
@@ -714,6 +748,19 @@ async function enrichItems(items, { from, to, onProgress } = {}) {
     logger.info(`Anreicherung: ${fresh.length} neu, ${existing.size} schon in DB`);
   } else {
     logger.info(`Anreicherung: ${fresh.length} von ${items.length} Items im Zeitraum`);
+  }
+
+  // Vorfilter: offensichtlich irrelevante Items (genug Beschreibungstext, aber
+  // kein Pflicht-Keyword) gar nicht erst volltextlich anreichern. Das
+  // beschleunigt den Scan massiv und schafft Platz fuer mehr relevante Artikel
+  // unter dem maxEnrich-Limit.
+  const beforePrefilter = fresh.length;
+  fresh = fresh.filter((item) => rssLikelyRelevant(item));
+  const skipped = beforePrefilter - fresh.length;
+  if (skipped > 0) {
+    logger.info(
+      `Vorfilter: ${skipped} eindeutig irrelevante Items uebersprungen, ${fresh.length} werden angereichert`
+    );
   }
 
   if (fresh.length > maxEnrich) {

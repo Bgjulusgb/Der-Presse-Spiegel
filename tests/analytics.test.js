@@ -10,6 +10,8 @@ const clustering = require('../src/analytics/clustering');
 const freshness = require('../src/analytics/freshness');
 const tonality = require('../src/analytics/tonality');
 const events = require('../src/analytics/events');
+const mediaResonance = require('../src/analytics/media-resonance');
+const quotes = require('../src/analytics/quotes');
 
 // Sample test articles
 const sampleArticles = [
@@ -225,4 +227,84 @@ test('events.groupEventsByType gruppiert nach Typ', () => {
 test('events.getEventTimeline erstellt Zeitleiste', () => {
   const timeline = events.getEventTimeline(sampleArticles);
   assert.ok(Array.isArray(timeline));
+});
+
+// --- Media Resonance ---
+test('mediaResonance.articleResonance gewichtet Reichweite und Typ', () => {
+  const review = {
+    source: 'Süddeutsche Zeitung',
+    relevanceScore: 90,
+    articleType: 'review',
+    wordCount: 600,
+  };
+  const shortNews = { source: 'Unbekannt', relevanceScore: 30, articleType: 'news', wordCount: 40 };
+  assert.ok(mediaResonance.articleResonance(review) > mediaResonance.articleResonance(shortNews));
+});
+
+test('mediaResonance.reachWeight skaliert mit Prioritaet', () => {
+  assert.ok(mediaResonance.reachWeight(100) > mediaResonance.reachWeight(50));
+  assert.ok(mediaResonance.reachWeight(50) > mediaResonance.reachWeight(0));
+});
+
+test('mediaResonance.shareOfVoice summiert auf ~100%', () => {
+  const arts = [
+    { title: 'Wokey Wokey', fullText: 'Wokey Wokey an den Kammerspielen.', relevanceScore: 80, articleType: 'review', wordCount: 300 },
+    { title: 'Pinocchio', fullText: 'Pinocchio an den Kammerspielen.', relevanceScore: 60, articleType: 'news', wordCount: 200 },
+  ];
+  const sov = mediaResonance.shareOfVoice(arts, 'production');
+  const sum = sov.reduce((s, x) => s + x.share, 0);
+  assert.ok(Math.abs(sum - 100) < 2, `Summe ${sum} sollte ~100 sein`);
+});
+
+test('mediaResonance.criticConsensus aggregiert nur Reviews', () => {
+  const arts = [
+    { title: 'Wokey Wokey', fullText: 'Wokey Wokey grossartig.', sentiment: 'positiv', sentimentScore: 5, articleType: 'review' },
+    { title: 'Wokey Wokey', fullText: 'Wokey Wokey News.', sentiment: 'neutral', sentimentScore: 0, articleType: 'news' },
+  ];
+  const cons = mediaResonance.criticConsensus(arts);
+  const wokey = cons.find((c) => c.production === 'Wokey Wokey');
+  assert.ok(wokey);
+  assert.equal(wokey.reviews, 1);
+  assert.equal(wokey.consensus, 'ueberwiegend_positiv');
+});
+
+test('mediaResonance.sentimentTimeline gruppiert nach Tag', () => {
+  const arts = [
+    { published_date: new Date('2026-05-20'), sentiment: 'positiv', sentimentScore: 4 },
+    { published_date: new Date('2026-05-20'), sentiment: 'negativ', sentimentScore: -2 },
+  ];
+  const tl = mediaResonance.sentimentTimeline(arts);
+  assert.equal(tl.length, 1);
+  assert.equal(tl[0].count, 2);
+});
+
+// --- Quotes ---
+test('quotes.extractQuotes erkennt typografische Anfuehrungszeichen', () => {
+  const q = quotes.extractQuotes('Die Kritik schreibt: „Ein grandioser Abend voller Witz" und mehr.');
+  assert.ok(q.some((x) => x.includes('grandioser Abend')));
+});
+
+test('quotes.extractQuotes ignoriert zu kurze Fragmente', () => {
+  const q = quotes.extractQuotes('Er sagte "ja" dazu.');
+  assert.equal(q.length, 0);
+});
+
+test('quotes.quoteCoverage berechnet Anteil', () => {
+  const arts = [
+    { fullText: 'Sie sagt: „Das ist wirklich beeindruckend gemacht worden".' },
+    { fullText: 'Kein Zitat hier.' },
+  ];
+  const cov = quotes.quoteCoverage(arts);
+  assert.equal(cov.total, 2);
+  assert.equal(cov.withQuotes, 1);
+  assert.equal(cov.ratio, 0.5);
+});
+
+test('quotes.notableQuotes ordnet Produktion zu', () => {
+  const arts = [
+    { id: 1, source: 'SZ', title: 'Premiere', fullText: 'Wokey Wokey an den Kammerspielen. „Ein wirklich starker Theaterabend".' },
+  ];
+  const nq = quotes.notableQuotes(arts);
+  assert.ok(nq.length > 0);
+  assert.equal(nq[0].production, 'Wokey Wokey');
 });
