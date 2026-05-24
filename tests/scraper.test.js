@@ -3,7 +3,54 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { extractArticleDate, extractArticleContent } = require('../src/scraper');
+const { extractArticleDate, extractArticleContent, tryRelativeDate } = require('../src/scraper');
+
+test('tryRelativeDate: "vor 2 Stunden"', () => {
+  const now = new Date('2026-05-24T12:00:00Z');
+  const d = tryRelativeDate('Aktualisiert vor 2 Stunden', now);
+  assert.ok(d);
+  assert.equal(d.getTime(), new Date('2026-05-24T10:00:00Z').getTime());
+});
+
+test('tryRelativeDate: "vor 3 Tagen"', () => {
+  const now = new Date('2026-05-24T12:00:00Z');
+  const d = tryRelativeDate('vor 3 Tagen veroeffentlicht', now);
+  assert.ok(d);
+  assert.equal(d.getUTCDate(), 21);
+});
+
+test('tryRelativeDate: "vor 1 Woche"', () => {
+  const now = new Date('2026-05-24T12:00:00Z');
+  const d = tryRelativeDate('vor 1 Woche', now);
+  assert.ok(d);
+  assert.equal(d.getUTCDate(), 17);
+});
+
+test('tryRelativeDate: "gestern" verschiebt um einen Tag', () => {
+  const now = new Date('2026-05-24T12:00:00Z');
+  const d = tryRelativeDate('Gestern, 09:30 Uhr', now);
+  assert.ok(d);
+  assert.equal(d.getDate(), new Date('2026-05-23T09:30:00').getDate());
+});
+
+test('tryRelativeDate: "heute" bleibt am selben Tag', () => {
+  const now = new Date('2026-05-24T12:00:00Z');
+  const d = tryRelativeDate('Heute', now);
+  assert.ok(d);
+  assert.equal(d.getDate(), now.getDate());
+});
+
+test('tryRelativeDate: kein Treffer liefert null', () => {
+  assert.equal(tryRelativeDate('Ein normaler Satz ohne Datum.'), null);
+  assert.equal(tryRelativeDate(''), null);
+  assert.equal(tryRelativeDate(null), null);
+});
+
+test('extractArticleDate nutzt relatives Datum aus time-Element', () => {
+  const html = `<html><body><time>vor 5 Stunden</time><p>Inhalt</p></body></html>`;
+  const date = extractArticleDate(html, 'https://example.com/artikel-ohne-datum');
+  assert.ok(date instanceof Date && !isNaN(date.getTime()));
+});
 
 test('extractArticleDate findet meta article:published_time', () => {
   const html = `

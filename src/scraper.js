@@ -77,9 +77,25 @@ function extractArticleDate(html, url) {
   const urlDate = tryUrlDate(url);
   if (urlDate) return urlDate;
 
+  // Relative timestamps usually sit in dedicated date elements near the top.
+  const dateContext = [
+    $('time').first().text(),
+    $('[class*="date" i]').first().text(),
+    $('[class*="time" i]').first().text(),
+    $('[class*="published" i]').first().text(),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .slice(0, 200);
+  const relFromContext = tryRelativeDate(dateContext);
+  if (relFromContext) return relFromContext;
+
   const bodyText = $('body').text().slice(0, 4000);
   const textDate = tryTextDate(bodyText);
   if (textDate) return textDate;
+
+  const relFromBody = tryRelativeDate(bodyText.slice(0, 400));
+  if (relFromBody) return relFromBody;
 
   return null;
 }
@@ -127,6 +143,50 @@ const MONTHS = {
   dez: 11,
   dec: 11,
 };
+
+// German news sites frequently render relative timestamps ("vor 2 Stunden",
+// "Heute, 14:30", "gestern"). Without this, extractArticleDate returns null and
+// the article gets dropped from historical scans or stamped with a wrong date.
+function tryRelativeDate(text, now = new Date()) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+
+  const rel = t.match(/vor\s+(\d{1,3})\s+(minute|minuten|stunde|stunden|tag|tagen|woche|wochen)/);
+  if (rel) {
+    const n = parseInt(rel[1], 10);
+    const unit = rel[2];
+    const d = new Date(now.getTime());
+    if (unit.startsWith('minute')) d.setMinutes(d.getMinutes() - n);
+    else if (unit.startsWith('stunde')) d.setHours(d.getHours() - n);
+    else if (unit.startsWith('tag')) d.setDate(d.getDate() - n);
+    else if (unit.startsWith('woche')) d.setDate(d.getDate() - n * 7);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  const timeMatch = t.match(/(\d{1,2}):(\d{2})/);
+  const applyTime = (d) => {
+    if (timeMatch) {
+      d.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+    } else {
+      d.setHours(0, 0, 0, 0);
+    }
+    return d;
+  };
+  if (/\bvorgestern\b/.test(t)) {
+    const d = new Date(now.getTime());
+    d.setDate(d.getDate() - 2);
+    return applyTime(d);
+  }
+  if (/\bgestern\b/.test(t)) {
+    const d = new Date(now.getTime());
+    d.setDate(d.getDate() - 1);
+    return applyTime(d);
+  }
+  if (/\bheute\b|\bvor\s+wenigen\b|\bgerade\s+eben\b|\bsoeben\b/.test(t)) {
+    return applyTime(new Date(now.getTime()));
+  }
+  return null;
+}
 
 function tryTextDate(text) {
   if (!text) return null;
@@ -737,4 +797,5 @@ module.exports = {
   extractArticleContent,
   gatherFromFeeds,
   enrichItems,
+  tryRelativeDate,
 };

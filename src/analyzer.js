@@ -71,9 +71,26 @@ function findFuzzyMatch(haystack, needle, threshold = 0.88) {
   return false;
 }
 
+// Builds the full searchable body text from all available fields. When the
+// full-text fetch fails (paywall/403/timeout), fullText is only the short RSS
+// snippet — pulling in summary/firstParagraph/description recovers articles
+// whose required keyword lives in those fallback fields.
+function articleBodyText(article) {
+  if (!article) return '';
+  return [
+    article.fullText,
+    article.summary,
+    article.firstParagraph,
+    article.content,
+    article.meta && article.meta.description,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 function passesRequiredFilter(article) {
   const title = normalize(article.title || '');
-  const text = normalize(article.fullText || '');
+  const text = normalize(articleBodyText(article));
   const haystack = `${title} ${text}`;
   const hasRequired = KW.required.some((k) => haystack.includes(k));
   if (!hasRequired) return { passes: false, reason: 'no-required-keyword' };
@@ -83,7 +100,7 @@ function passesRequiredFilter(article) {
 }
 
 function detectArticleType(article) {
-  const text = normalize(`${article.title || ''} ${article.fullText || ''}`);
+  const text = normalize(`${article.title || ''} ${articleBodyText(article)}`);
   const indicators = (list) => list.filter((w) => text.includes(normalize(w))).length;
   const review = indicators(sentiment.review_indicators || []);
   const interview = indicators(sentiment.interview_indicators || []);
@@ -112,7 +129,7 @@ function findContextualMatch(text, keyword, contextWords, windowChars = 200) {
 function calculateRelevance(article, sourcePriority = 50) {
   const w = keywords.scoring_weights;
   const title = normalize(article.title || '');
-  const text = normalize(article.fullText || '');
+  const text = normalize(articleBodyText(article));
   const haystack = `${title} ${text}`;
   let score = 0;
   const reasons = [];
@@ -378,4 +395,5 @@ module.exports = {
   findContextualMatch,
   findFuzzyMatch,
   normalize,
+  articleBodyText,
 };
