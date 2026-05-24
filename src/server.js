@@ -14,6 +14,7 @@ const { generateReport, REPORTS_DIR } = require('./reporter');
 const { parseDateRange } = require('./utils');
 const { hybridSearch, suggestQueries, didYouMean, topMentions, trends } = require('./search');
 const textUtils = require('./text-utils');
+const analyticsRouter = require('./api-analytics');
 
 // Simple rate limiter (in-memory, key: IP or user)
 class RateLimiter {
@@ -229,6 +230,10 @@ function buildApp() {
   app.get('/api/mentions', cache.middleware('GET'));
   app.get('/api/sources', cache.middleware('GET'));
   app.get('/api/keywords', cache.middleware('GET'));
+
+  // Analytics endpoints with caching
+  app.use('/api/analytics/', cache.middleware('GET'));
+  app.use('/api/analytics/', analyticsRouter);
 
   app.use(express.static(WEB_DIR));
 
@@ -581,7 +586,7 @@ function buildApp() {
     const { tag } = req.body || {};
     if (!tag || typeof tag !== 'string') return res.status(400).json({ error: 'tag erforderlich' });
     if (tag.length > 100) return res.status(400).json({ error: 'tag zu lang (max 100 Zeichen)' });
-    if (!/^[a-zA-Z0-9_:äöüß\-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
+    if (!/^[a-zA-Z0-9_:äöüß-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
     const articleId = parseInt(req.params.id, 10);
     if (!Number.isInteger(articleId)) return res.status(400).json({ error: 'Ungültige Article ID' });
     database.addTag(articleId, tag);
@@ -591,7 +596,7 @@ function buildApp() {
     const articleId = parseInt(req.params.id, 10);
     if (!Number.isInteger(articleId)) return res.status(400).json({ error: 'Ungültige Article ID' });
     const tag = req.params.tag;
-    if (!/^[a-zA-Z0-9_:äöüß\-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
+    if (!/^[a-zA-Z0-9_:äöüß-]{1,100}$/.test(tag)) return res.status(400).json({ error: 'tag hat ungültige Zeichen' });
     database.removeTag(articleId, tag);
     res.json({ ok: true });
   });
