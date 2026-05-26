@@ -97,6 +97,52 @@ npm run build:linux # AppImage + deb
 npm run build:mac   # dmg + zip
 ```
 
+## Python-Scraper (schnell & parallel)
+
+Zusaetzlich zum Node-Scraper gibt es `pyscraper/` — einen eigenstaendigen,
+asynchronen Scraper (asyncio + aiohttp), der **dieselbe SQLite-DB**
+(`data/pressespiegel.db`) befuellt. Ergebnisse erscheinen damit sofort in der
+bestehenden Web-/Desktop-UI und in den Reports; es ist kein Importschritt
+noetig.
+
+```
+npm run py:install        # einmalig: pip install -r requirements.txt
+npm run py:scan -- --last 7d
+npm run py:selftest       # Offline-Rauchtest, kein Netzwerk
+npm run py:test           # Python-Unit-Tests
+
+# direkt ohne npm:
+python3 -m pyscraper scan --last 14d --concurrency 20
+python3 -m pyscraper scan --from 2026-01-01 --to 2026-01-31
+python3 -m pyscraper scan --last 24h --no-enrich    # nur Feed-Ebene
+python3 -m pyscraper scan --last 7d --db /pfad/zur.db
+```
+
+Eigenschaften:
+
+- **Echtes async I/O**: alle Feeds und Artikel werden hochparallel geladen,
+  begrenzt nur durch eine globale Parallelitaets-Schranke
+  (`scraping.max_concurrent_requests`) und ein faires Pro-Domain-Rate-Limit
+  (`scraping.rate_limit_per_domain_ms`).
+- **Gleiches Schema**: Spalten, `published_date`-Format (ISO mit `Z`),
+  `url_normalized`, Tags, `scan_runs` und `source_health` sind identisch zur
+  Node-App. Conditional GET (ETag / Last-Modified) wird aus `source_health`
+  gelesen und 304-Antworten werden korrekt behandelt.
+- **Multi-Format-Parser**: RSS 2.0, Atom, RDF (RSS 1.0) und JSON Feed; Google-
+  und Bing-News-Backbone inkl. Redirect-Aufloesung.
+- **Relevanz-gestufte Anreicherung**: klare Treffer (Pflicht-Keyword, Person,
+  Produktion bereits im RSS-Text) werden beim Anreicherungs-Budget *zuerst*
+  bedient — neue, aber irrelevante Kurzmeldungen verdraengen so nicht mehr die
+  eigentlich relevanten Artikel.
+- **Deterministische Analyse**: Relevanz-Scoring, Sentiment (mit Negations- und
+  Verstaerker-Fenster sowie staerker gewichteter Schlagzeilen-Wertung),
+  Artikeltyp, Tiefe und Auto-Tagging — ohne generierte Zusammenfassungen.
+- **Dreistufige Dedup** (URL / Titel-Levenshtein / Cosine des ersten Absatzes)
+  gegen die DB und innerhalb des Laufs.
+
+Voraussetzung: **Python 3.11+** und `pip install -r requirements.txt`
+(`aiohttp`, `beautifulsoup4`). Alles bleibt wie gehabt lokal.
+
 ## Bedienoberflaeche
 
 Die Web-/Desktop-UI hat zwoelf Tabs:
