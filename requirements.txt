@@ -2,3 +2,6 @@
 # Installation:  python3 -m pip install -r requirements.txt
 aiohttp>=3.9,<4
 beautifulsoup4>=4.12
+# trafilatura: hochwertige, mehrsprachige Hauptinhalts-/Metadaten-Extraktion
+# (bestes F1 im Vergleich zu newspaper3k/readability, aktiv gepflegt).
+trafilatura>=2.0

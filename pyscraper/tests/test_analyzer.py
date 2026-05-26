@@ -60,6 +60,30 @@ class TestAnalyzer(unittest.TestCase):
             self.analyzer.calculate_relevance(without)["score"],
         )
 
+    def test_aggregator_item_is_tier2(self):
+        # Aggregator-Herkunft ist das Relevanzsignal, auch ohne Keyword im Text.
+        item = {"title": "Mundel über die Spielzeit", "summary": "Ein Gespräch.",
+                "aggregator": True, "search_query": "Barbara Mundel Intendantin"}
+        self.assertEqual(self.analyzer.rss_relevance_tier(item), 2)
+
+    def test_aggregator_passes_required_filter(self):
+        # Artikel ohne wörtliches "Kammerspiele", aber aus kuratierter Query.
+        article = {"title": "Neue Spielzeit angekündigt",
+                   "full_text": "Die Intendantin stellt das Programm vor. " * 10,
+                   "first_paragraph": "Die Intendantin stellt das Programm vor.",
+                   "from_aggregator": True}
+        passes, reason = self.analyzer.passes_required_filter(article)
+        self.assertTrue(passes, reason)
+
+    def test_aggregator_still_excludes_competitor(self):
+        # Wettbewerber-Theater wird trotz Aggregator-Herkunft ausgeschlossen.
+        article = {"title": "Premiere an den Hamburger Kammerspielen",
+                   "full_text": "Ein Abend an den Hamburger Kammerspielen. " * 10,
+                   "first_paragraph": "Ein Abend an den Hamburger Kammerspielen.",
+                   "from_aggregator": True}
+        passes, reason = self.analyzer.passes_required_filter(article)
+        self.assertFalse(passes)
+
     def test_auto_tag(self):
         article = {"title": "Wallenstein an den Kammerspielen",
                    "full_text": "Eine Kritik der Inszenierung Wallenstein an den Kammerspielen.",

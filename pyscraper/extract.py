@@ -16,6 +16,13 @@ from bs4 import BeautifulSoup
 
 from .textutils import collapse_ws, first_paragraph
 
+try:  # trafilatura ist die primäre, qualitativ beste Extraktions-Engine.
+    import trafilatura  # type: ignore
+
+    _HAS_TRAFILATURA = True
+except Exception:  # pragma: no cover - optionaler Schwergewichts-Dep
+    _HAS_TRAFILATURA = False
+
 REMOVE_SELECTORS = [
     "script", "style", "noscript", "iframe", "embed", "object", "nav",
     "header", "footer", "aside", "form",
@@ -215,9 +222,39 @@ def extract_article_date(html: str, url: str) -> datetime | None:
     return try_relative_date(body_text[:400])
 
 
+def _trafilatura_extract(html: str, url: str) -> dict | None:
+    """Hauptinhalt + Metadaten via trafilatura (beste Extraktionsqualität,
+    mehrsprachig). Gibt None zurück, wenn nichts Brauchbares gefunden wird."""
+    if not _HAS_TRAFILATURA:
+        return None
+    try:
+        raw = trafilatura.extract(
+            html, url=url, output_format="json", with_metadata=True,
+            favor_recall=True, include_comments=False, include_tables=False,
+        )
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    text = (data.get("text") or "").strip()
+    if not text:
+        return None
+    return {
+        "title": (data.get("title") or "").strip(),
+        "author": (data.get("author") or "").strip() or None,
+        "text": text,
+        "excerpt": (data.get("excerpt") or "").strip(),
+        "date": data.get("date"),
+    }
+
+
 def extract_article_content(html: str, url: str) -> dict:
     empty = {"title": "", "author": None, "description": "", "text": "",
-             "first_paragraph": "", "paywall": False}
+             "first_paragraph": "", "paywall": False, "date": None}
     if not html:
         return empty
 
@@ -287,7 +324,20 @@ def extract_article_content(html: str, url: str) -> dict:
         fallback = collapse_ws(best_container.get_text(" "))
         if fallback:
             paragraphs.append(fallback)
-    text = "\n\n".join(paragraphs)
+    bs4_text = "\n\n".join(paragraphs)
+
+    # trafilatura bevorzugen, wenn es spürbar mehr/saubereren Text liefert.
+    text, date = bs4_text, None
+    traf = _trafilatura_extract(html, url)
+    if traf and len(traf["text"]) >= max(200, int(len(bs4_text) * 0.8)):
+        text = traf["text"]
+        if traf["title"] and len(traf["title"]) > 5:
+            title = re.split(r"\s[-–|·]\s", traf["title"])[0].strip() or traf["title"]
+        if traf["author"] and not author:
+            author = traf["author"]
+        if traf["excerpt"] and not description:
+            description = traf["excerpt"]
+        date = traf["date"]
 
     return {
         "title": title,
@@ -296,6 +346,7 @@ def extract_article_content(html: str, url: str) -> dict:
         "text": text,
         "first_paragraph": first_paragraph(text),
         "paywall": paywall,
+        "date": date,
     }
 
 

@@ -130,18 +130,48 @@ Eigenschaften:
   gelesen und 304-Antworten werden korrekt behandelt.
 - **Multi-Format-Parser**: RSS 2.0, Atom, RDF (RSS 1.0) und JSON Feed; Google-
   und Bing-News-Backbone inkl. Redirect-Aufloesung.
-- **Relevanz-gestufte Anreicherung**: klare Treffer (Pflicht-Keyword, Person,
-  Produktion bereits im RSS-Text) werden beim Anreicherungs-Budget *zuerst*
-  bedient — neue, aber irrelevante Kurzmeldungen verdraengen so nicht mehr die
-  eigentlich relevanten Artikel.
+- **Hochwertige Extraktion via [trafilatura](https://github.com/adbar/trafilatura)**:
+  beste Hauptinhalts- und Metadaten-Erkennung (Titel, Autor, Datum) im
+  Vergleich zu newspaper3k/readability, mehrsprachig und aktiv gepflegt. Der
+  BeautifulSoup-Heuristik bleibt als Fallback erhalten.
+- **Aggregator-Herkunft zaehlt als Relevanz**: Items aus den kuratierten
+  Google-/Bing-News-Abfragen (Spielplan, Ensemble, Produktionen) werden
+  zugelassen, auch wenn der gescrapte Volltext (Paywall/Cookie-Wall) das Wort
+  „Kammerspiele" nicht woertlich enthaelt. Das Verwerfen dieser Herkunft hatte
+  die Ausbeute zuvor auf wenige Artikel pro Woche gedrueckt. Die Wettbewerber-
+  Ausschluesse (Hamburger/Berliner/Wiener Kammerspiele ohne Muenchen-Bezug)
+  greifen weiterhin.
+- **Relevanz-gestufte Anreicherung**: klare Treffer werden beim
+  Anreicherungs-Budget *zuerst* bedient — neue, aber irrelevante Kurzmeldungen
+  verdraengen so nicht mehr die eigentlich relevanten Artikel.
 - **Deterministische Analyse**: Relevanz-Scoring, Sentiment (mit Negations- und
   Verstaerker-Fenster sowie staerker gewichteter Schlagzeilen-Wertung),
   Artikeltyp, Tiefe und Auto-Tagging — ohne generierte Zusammenfassungen.
 - **Dreistufige Dedup** (URL / Titel-Levenshtein / Cosine des ersten Absatzes)
   gegen die DB und innerhalb des Laufs.
 
+### Mehr Artikel: Zeitfenster & Backfill
+
+Fuer ein einzelnes Theater ist ein 7-Tage-Fenster oft sehr duenn — die meiste
+Berichterstattung (Kritiken, Portraets) erscheint ueber Wochen verteilt. Die
+Aggregatoren liefern hunderte relevante Treffer, von denen aber nur ein
+Bruchteil in die letzten 7 Tage faellt. **Das groesste Stellrad fuer mehr
+Artikel ist daher das Zeitfenster:**
+
+```
+# Einmaliger Backfill (holt den historischen Bestand):
+python3 -m pyscraper scan --last 6m
+python3 -m pyscraper scan --from 2025-09-01 --to 2026-05-31
+
+# Danach regelmaessig, z. B. taeglich/woechentlich:
+python3 -m pyscraper scan --last 30d
+```
+
+Wiederholte Laeufe sind unbedenklich: bereits vorhandene Artikel werden ueber
+`url_normalized` und die Dedup erkannt und nicht doppelt eingefuegt.
+
 Voraussetzung: **Python 3.11+** und `pip install -r requirements.txt`
-(`aiohttp`, `beautifulsoup4`). Alles bleibt wie gehabt lokal.
+(`aiohttp`, `beautifulsoup4`, `trafilatura`). Alles bleibt wie gehabt lokal.
 
 ## Bedienoberflaeche
 
