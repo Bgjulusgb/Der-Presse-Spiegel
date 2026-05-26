@@ -1,0 +1,4 @@
+# Python-Scraper (pyscraper) — Laufzeit-Abhängigkeiten.
+# Installation:  python3 -m pip install -r requirements.txt
+aiohttp>=3.9,<4
+beautifulsoup4>=4.12

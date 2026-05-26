@@ -27,7 +27,11 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{js,json,md,yml,yaml}\"",
-    "doctor": "node scripts/doctor.js"
+    "doctor": "node scripts/doctor.js",
+    "py:install": "python3 -m pip install -r requirements.txt",
+    "py:scan": "python3 -m pyscraper scan",
+    "py:selftest": "python3 -m pyscraper selftest",
+    "py:test": "python3 -m unittest discover -s pyscraper/tests -p \"test_*.py\""
   },
   "engines": {
     "node": ">=24.0.0"
