@@ -76,19 +76,22 @@ class Analyzer:
     def rss_relevance_tier(self, item: dict) -> int:
         """Bewertet ein RSS-Item VOR dem teuren Volltext-Fetch.
 
-        2 = klarer Treffer (Pflicht-Keyword / Person / Produktion im RSS-Text),
+        2 = klarer Treffer (Aggregator-Herkunft oder Keyword/Person/Produktion
+            bereits im RSS-Text),
         1 = zu wenig Text für ein sicheres Urteil (im Zweifel anreichern),
         0 = genug Text, aber kein Treffer → überspringen.
 
-        Verbesserung ggü. JS: Statt nur True/False zurückzugeben, erlaubt die
-        Stufung der Pipeline, klare Treffer beim Anreicherungs-Budget *zuerst*
-        zu bedienen — so verdrängen neue, aber irrelevante Kurzmeldungen nicht
-        die eigentlich relevanten Artikel.
+        Aggregator-Items (Google/Bing-News) stammen aus kuratierten Kammerspiele-
+        Abfragen — ihre Herkunft IST das Relevanzsignal, daher Tier 2. Genau das
+        Verwerfen dieser Herkunft hat die Ausbeute zuvor auf ~2 Artikel/Woche
+        gedrückt.
         """
+        if item.get("aggregator"):
+            return 2
         title = normalize(item.get("title", ""))
         body = normalize(" ".join(
             str(p) for p in (item.get("summary"), item.get("content"),
-                             item.get("description")) if p
+                             item.get("description"), item.get("search_query")) if p
         ))
         haystack = f"{title} {body}"
         if (any(k in haystack for k in self.required)
@@ -107,10 +110,14 @@ class Analyzer:
         text = normalize(self._body_text(article))
         haystack = f"{title} {text}"
 
+        # Aggregator-Herkunft zählt als Treffer: die kuratierte Such-Query hat
+        # den Artikel bereits gezielt für die Kammerspiele gefunden, auch wenn
+        # der gescrapte Volltext (Paywall/Cookie-Wall) das Wort nicht enthält.
+        from_aggregator = bool(article.get("from_aggregator"))
         has_required = any(k in haystack for k in self.required)
         has_person = any(p in haystack for p in self.people if len(p) >= 6)
         has_prod = any(p in haystack for p in self.productions if len(p) >= 8)
-        if not (has_required or has_person or has_prod):
+        if not (from_aggregator or has_required or has_person or has_prod):
             return False, "no-required-keyword"
 
         first_para = normalize(article.get("first_paragraph", ""))

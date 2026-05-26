@@ -19,7 +19,7 @@ from .extract import extract_article_content, extract_article_date
 from .feedparse import looks_like_feed, parse_feed
 from .fetcher import AsyncFetcher
 from .newssearch import fetch_bing_news, fetch_google_news, resolve_google_news_url
-from .textutils import collapse_ws, first_paragraph, normalize_url
+from .textutils import collapse_ws, first_paragraph, normalize_url, parse_date
 
 log = logging.getLogger("pyscraper")
 
@@ -184,8 +184,15 @@ class ScanPipeline:
                 return None
             if not res.ok or not res.text:
                 return self._from_rss(item)
-            content = extract_article_content(res.text, target)
-            published = item.get("published") or extract_article_date(res.text, target)
+            # Extraktion (trafilatura/BeautifulSoup) ist CPU-lastig und blockiert
+            # sonst den Event-Loop — daher in einen Worker-Thread auslagern, damit
+            # die Netzwerk-Anreicherung weiter hochparallel laeuft.
+            content = await asyncio.to_thread(extract_article_content, res.text, target)
+            published = item.get("published")
+            if not published and content.get("date"):
+                published = parse_date(content["date"])
+            if not published:
+                published = await asyncio.to_thread(extract_article_date, res.text, target)
             title = collapse_ws(item.get("title") or content["title"])
             full_text = content["text"] or item.get("content") or item.get("summary") or ""
             return {
@@ -200,6 +207,8 @@ class ScanPipeline:
                 "first_paragraph": content["first_paragraph"] or first_paragraph(full_text),
                 "paywall": content["paywall"],
                 "word_count": len([w for w in full_text.split() if w]),
+                "from_aggregator": bool(item.get("aggregator")),
+                "search_query": item.get("search_query"),
                 "meta": {"fetched_at": datetime.now(timezone.utc).isoformat(),
                          "description": content["description"]},
             }
@@ -223,6 +232,8 @@ class ScanPipeline:
             "first_paragraph": first_paragraph(text),
             "paywall": False,
             "word_count": len([w for w in text.split() if w]),
+            "from_aggregator": bool(item.get("aggregator")),
+            "search_query": item.get("search_query"),
             "meta": {"fallback": "rss-only",
                      "fetched_at": datetime.now(timezone.utc).isoformat()},
         }

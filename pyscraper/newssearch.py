@@ -69,6 +69,8 @@ async def fetch_google_news(fetcher: AsyncFetcher, feed: dict) -> dict:
                 "source": f"{source_name} (via Google News)",
                 "source_priority": feed.get("priority", 80),
                 "google_news_redirect": True,
+                "aggregator": True,
+                "search_query": query,
             }
     return {"status": "ok" if seen else "error", "items": list(seen.values())}
 
@@ -98,6 +100,8 @@ async def fetch_bing_news(fetcher: AsyncFetcher, feed: dict) -> dict:
                 "author": item.author,
                 "source": feed.get("name", "Bing News"),
                 "source_priority": feed.get("priority", 70),
+                "aggregator": True,
+                "search_query": query,
             }
     return {"status": "ok" if seen else "error", "items": list(seen.values())}
 
