@@ -25,6 +25,38 @@ def build_bing_news_url(query: str, mkt="de-DE") -> str:
     return f"https://www.bing.com/news/search?q={quote(query)}&format=rss&mkt={mkt}"
 
 
+def expand_feed_queries(feed: dict, keywords: dict | None = None) -> list[str]:
+    """Generiert Aggregator-Queries aus keywords.json (Feld ``queries_from``).
+
+    Identische Logik wie ``expandFeedQueries`` in src/news-search.js: neue
+    Produktionen/Ensemble-Mitglieder landen automatisch im Backbone, ohne
+    dass sources.json gepflegt werden muss.
+    """
+    queries = list(feed.get("queries") or [])
+    keywords = keywords or {}
+    for set_name in feed.get("queries_from") or []:
+        for raw in keywords.get(set_name) or []:
+            term = str(raw or "").strip()
+            if len(term) < 3:
+                continue
+            # Personen nur mit vollem Namen — blanke Nachnamen sind zu unscharf
+            if set_name == "people" and " " not in term:
+                continue
+            queries.append(f'"{term}" Kammerspiele')
+    seen: set[str] = set()
+    result: list[str] = []
+    for q in queries:
+        key = q.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(q)
+    max_queries = feed.get("max_queries")
+    if not isinstance(max_queries, int):
+        max_queries = 24
+    return result[:max_queries]
+
+
 def extract_source_from_google_title(title: str) -> str | None:
     if not title:
         return None
@@ -38,8 +70,12 @@ def clean_google_news_title(title: str) -> str:
     return re.sub(r"\s+-\s+[^-]+$", "", title).strip()
 
 
-async def fetch_google_news(fetcher: AsyncFetcher, feed: dict) -> dict:
-    queries = feed.get("queries") or [feed.get("query", "Münchner Kammerspiele")]
+async def fetch_google_news(
+    fetcher: AsyncFetcher, feed: dict, keywords: dict | None = None
+) -> dict:
+    queries = expand_feed_queries(feed, keywords) or [
+        feed.get("query", "Münchner Kammerspiele")
+    ]
     seen: dict[str, dict] = {}
     for query in queries:
         url = build_google_news_url(query)
@@ -75,8 +111,12 @@ async def fetch_google_news(fetcher: AsyncFetcher, feed: dict) -> dict:
     return {"status": "ok" if seen else "error", "items": list(seen.values())}
 
 
-async def fetch_bing_news(fetcher: AsyncFetcher, feed: dict) -> dict:
-    queries = feed.get("queries") or [feed.get("query", "Münchner Kammerspiele")]
+async def fetch_bing_news(
+    fetcher: AsyncFetcher, feed: dict, keywords: dict | None = None
+) -> dict:
+    queries = expand_feed_queries(feed, keywords) or [
+        feed.get("query", "Münchner Kammerspiele")
+    ]
     seen: dict[str, dict] = {}
     for query in queries:
         url = build_bing_news_url(query)

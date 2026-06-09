@@ -664,6 +664,38 @@ function buildApp() {
         );
         return res.send(JSON.stringify(articles, null, 2));
       }
+      if (format === 'md' || format === 'markdown') {
+        // Weitergebbare Linkliste (E-Mail/Chat): der Spiegel als Markdown,
+        // nach Datum absteigend, mit "auch erschienen in"-Links
+        const fmtDate = (d) => (d ? String(d).slice(0, 10) : 'ohne Datum');
+        // eckige Klammern wuerden das [Titel](URL)-Linkformat brechen
+        const mdLabel = (s) => String(s || '').replace(/[[\]]/g, ' ').trim();
+        const lines = [
+          `# Pressespiegel Muenchner Kammerspiele`,
+          ``,
+          `Zeitraum: ${fmtDate(from.toISOString())} bis ${fmtDate(to.toISOString())} — ${articles.length} Artikel`,
+          ``,
+        ];
+        for (const a of articles) {
+          const badges = [a.category, a.sentiment, a.article_type]
+            .filter(Boolean)
+            .join(' · ');
+          lines.push(`- **[${mdLabel(a.title) || a.url}](${a.url})**`);
+          lines.push(
+            `  ${a.source || 'Unbekannt'} · ${fmtDate(a.published_date)}${a.author ? ` · ${a.author}` : ''}${badges ? ` · ${badges}` : ''}`
+          );
+          const alsoOn = Array.isArray(a.also_on) ? a.also_on : [];
+          if (alsoOn.length > 0) {
+            lines.push(`  auch erschienen in: ${alsoOn.join(', ')}`);
+          }
+        }
+        res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="pressespiegel-${Date.now()}.md"`
+        );
+        return res.send(lines.join('\n') + '\n');
+      }
       res.status(400).json({ error: 'Unbekanntes Format' });
     } catch (err) {
       res.status(500).json({ error: err.message });

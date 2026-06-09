@@ -221,4 +221,54 @@ async function runScan({ from, to }) {
   }
 }
 
-module.exports = { runScan, summariseFeedHealth };
+// Wendet das aktuelle Scoring/Sentiment/Tagging auf Bestandsartikel an.
+// Noetig nach jeder Pflege von keywords.json/settings.json, damit der
+// Alt-Bestand nicht mit veralteten Scores im Spiegel steht.
+function reanalyzeArticles({ from, to }) {
+  const { getSourcePriority } = require('./deduplicator');
+  const articles = database.getArticlesByRange(from, to, { includeDuplicates: true });
+  let updated = 0;
+  let tagsAdded = 0;
+  const errors = [];
+
+  for (const row of articles) {
+    try {
+      const input = {
+        title: row.title,
+        fullText: row.full_text,
+        summary: row.summary,
+        url: row.url,
+        source: row.source,
+        author: row.author,
+        publishedDate: row.published_date,
+        wordCount: row.word_count,
+        paywall: !!row.paywall,
+      };
+      const analysis = analyze(input, getSourcePriority(row.source));
+      database.updateArticleAnalysis(row.id, analysis);
+      const tags = autoTag(
+        { ...input, category: analysis.category, sentiment: analysis.sentiment },
+        analysis
+      );
+      for (const tag of tags) {
+        try {
+          database.addTag(row.id, tag);
+          tagsAdded++;
+        } catch (e) {
+          logger.debug(`Tag-Fehler ${tag}: ${e.message}`);
+        }
+      }
+      updated++;
+    } catch (err) {
+      errors.push({ id: row.id, error: err.message });
+      logger.warn(`Re-Analyse fehlgeschlagen fuer Artikel ${row.id}: ${err.message}`);
+    }
+  }
+
+  logger.info(`Re-Analyse abgeschlossen: ${updated} Artikel, ${tagsAdded} Tags`, {
+    errors: errors.length,
+  });
+  return { updated, tagsAdded, errors };
+}
+
+module.exports = { runScan, summariseFeedHealth, reanalyzeArticles };

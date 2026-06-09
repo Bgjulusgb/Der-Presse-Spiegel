@@ -12,7 +12,8 @@ bleiben auf dem eigenen Rechner.
 - Boolesche Suchsyntax mit Phrasen, Feld-, Datums-, Score- und Tag-Filtern
 - Auto-Tagging in 8 Kategorien (Produktion, Person, Venue, Ereignis, Thema,
   Tonalitaet, Relevanz, Form)
-- Lesezeichen, gespeicherte Suchen, CSV- und JSON-Export, OPML-Import/Export
+- Lesezeichen, gespeicherte Suchen, CSV-/JSON-/Markdown-Export
+  („Linkliste kopieren"), OPML-Import/Export
 - Webserver mit REST-API und WebSocket, Electron-Desktop-App,
   packbar als .exe, .dmg, .AppImage, .deb
 
@@ -268,7 +269,10 @@ has:image lang:de site:nachtkritik words:>=400
 
 80 vorkonfigurierte Feeds:
 
-- **Aggregatoren**: Google News, Bing News (mit jeweils mehreren Queries)
+- **Aggregatoren**: Google News, Bing News — Queries werden zusaetzlich
+  automatisch aus `keywords.json` generiert (`queries_from`-Feld pro Feed,
+  z. B. `["productions"]`; Limit via `max_queries`), neue Produktionen und
+  Ensemble-Mitglieder landen ohne Pflege von `sources.json` im Backbone
 - **Theater-Fachpresse**: nachtkritik.de
 - **Oeffentlich-rechtlich**: tagesschau, BR24, Deutschlandfunk Kultur,
   Deutschlandfunk, 3sat Kulturzeit, ARD Mediathek, Deutsche Welle
@@ -376,6 +380,7 @@ pressespiegel health                            Feed-Gesundheit
 pressespiegel test-feed <url>                   einzelnen Feed testen
 pressespiegel test-all-feeds                    alle Feeds pruefen
 pressespiegel dedupe --dry-run                  Duplikate suchen
+pressespiegel reanalyze --last 90d              Bestand neu scoren/taggen
 
 pressespiegel config list                       Konfiguration
 pressespiegel config add-keyword "..." --type productions
@@ -415,7 +420,7 @@ pressespiegel schedule                          Cron-Modus
 | /api/did-you-mean         | GET             | Tippfehler-Korrektur           |
 | /api/suggest              | GET             | Autocomplete-Vorschlaege       |
 | /api/duplicates/check     | GET             | Duplikat-Pruefung              |
-| /api/export               | GET             | CSV oder JSON Export           |
+| /api/export               | GET             | CSV, JSON oder Markdown (`format=md`) |
 | /api/logs                 | GET             | letzte Log-Eintraege           |
 
 ## Tech-Stack

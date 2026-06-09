@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from .analyzer import Analyzer
 from .database import Database
 from .dedup import Deduplicator
-from .extract import extract_article_content, extract_article_date
+from .extract import extract_article_content, extract_article_date, find_amp_url
 from .feedparse import looks_like_feed, parse_feed
 from .fetcher import AsyncFetcher
 from .newssearch import fetch_bing_news, fetch_google_news, resolve_google_news_url
@@ -79,11 +79,11 @@ class ScanPipeline:
         name = feed["name"]
         kind = feed.get("kind")
         if kind == "google-news":
-            res = await fetch_google_news(fetcher, feed)
+            res = await fetch_google_news(fetcher, feed, self.config.keywords)
             self._record_aggregator(name, res, "google-news")
             return res["items"]
         if kind == "bing-news":
-            res = await fetch_bing_news(fetcher, feed)
+            res = await fetch_bing_news(fetcher, feed, self.config.keywords)
             self._record_aggregator(name, res, "bing-news")
             return res["items"]
 
@@ -188,6 +188,23 @@ class ScanPipeline:
             # sonst den Event-Loop — daher in einen Worker-Thread auslagern, damit
             # die Netzwerk-Anreicherung weiter hochparallel laeuft.
             content = await asyncio.to_thread(extract_article_content, res.text, target)
+            # AMP-Fallback: liefert die Hauptseite kaum Text (Consent-/Paywall-
+            # HTML), hat die AMP-Version oft den vollen Artikel
+            if content["paywall"] or len(content["text"] or "") < 500:
+                amp_url = find_amp_url(res.text, target)
+                if amp_url and amp_url != target:
+                    try:
+                        amp_res = await fetcher.fetch(amp_url, timeout_ms=timeout)
+                        if amp_res.ok and amp_res.text:
+                            amp_content = await asyncio.to_thread(
+                                extract_article_content, amp_res.text, amp_url)
+                            if len(amp_content["text"] or "") > len(content["text"] or ""):
+                                amp_content["paywall"] = (
+                                    content["paywall"] and amp_content["paywall"])
+                                content = amp_content
+                                log.debug("AMP-Fallback erfolgreich: %s", amp_url)
+                    except Exception as exc:  # noqa: BLE001
+                        log.debug("AMP-Fallback fehlgeschlagen: %s (%s)", amp_url, exc)
             published = item.get("published")
             if not published and content.get("date"):
                 published = parse_date(content["date"])

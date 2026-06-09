@@ -594,6 +594,21 @@ async function fetchRssFeed(feed) {
     .filter((it) => it.url);
 }
 
+// Findet die AMP-Version einer Seite (<link rel="amphtml">) — schlankes
+// Markup, oft ohne Cookie-/Consent-Wall; billiger als der Puppeteer-Fallback.
+function findAmpUrl(html, baseUrl) {
+  if (!html) return null;
+  const link = html.match(/<link[^>]+rel=["']amphtml["'][^>]*>/i);
+  if (!link) return null;
+  const href = link[0].match(/href=["']([^"']+)["']/i);
+  if (!href) return null;
+  try {
+    return new URL(href[1], baseUrl).href;
+  } catch {
+    return null;
+  }
+}
+
 function buildFromRss(item, originalUrl) {
   const fallbackText = item.content || item.summary || '';
   return {
@@ -648,7 +663,25 @@ async function fetchArticleDetails(item) {
     ]);
     if (res.status === 304) return null;
     const html = res.text;
-    const content = extractArticleContent(html, targetUrl);
+    let content = extractArticleContent(html, targetUrl);
+
+    // AMP-Fallback: liefert die Hauptseite kaum Text (Consent-/Paywall-HTML),
+    // hat die AMP-Version derselben Seite oft den vollen Artikel
+    if (content.paywall || (content.text || '').length < 500) {
+      const ampUrl = findAmpUrl(html, targetUrl);
+      if (ampUrl && ampUrl !== targetUrl) {
+        try {
+          const ampRes = await fetchText(ampUrl, { timeout: fetchTimeout });
+          const ampContent = extractArticleContent(ampRes.text, ampUrl);
+          if ((ampContent.text || '').length > (content.text || '').length) {
+            content = { ...ampContent, paywall: content.paywall && ampContent.paywall };
+            logger.debug(`AMP-Fallback erfolgreich: ${ampUrl}`);
+          }
+        } catch (err) {
+          logger.debug(`AMP-Fallback fehlgeschlagen: ${ampUrl} (${err.message})`);
+        }
+      }
+    }
     let publishedDate = item.publishedDate;
     if (!publishedDate) {
       publishedDate = extractArticleDate(html, item.url);
@@ -846,6 +879,7 @@ module.exports = {
   testFeed,
   extractArticleDate,
   extractArticleContent,
+  findAmpUrl,
   gatherFromFeeds,
   enrichItems,
   tryRelativeDate,

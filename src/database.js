@@ -191,6 +191,15 @@ const stmts = {
   appendAlsoOn: db.prepare(`
     UPDATE articles SET also_on = @also_on WHERE id = @id
   `),
+  updateAnalysis: db.prepare(`
+    UPDATE articles SET
+      relevance_score = @relevance_score,
+      sentiment = @sentiment,
+      sentiment_score = @sentiment_score,
+      category = @category,
+      article_type = @article_type
+    WHERE id = @id
+  `),
   byDateRange: db.prepare(`
     SELECT * FROM articles
     WHERE published_date >= @from AND published_date <= @to
@@ -340,6 +349,17 @@ function markAsDuplicate(articleId, originalId, additionalUrl) {
 
 function findByNormalizedUrl(urlNormalized) {
   return stmts.findByNormalizedUrl.get(urlNormalized);
+}
+
+function updateArticleAnalysis(id, analysis) {
+  stmts.updateAnalysis.run({
+    id,
+    relevance_score: analysis.relevanceScore,
+    sentiment: analysis.sentiment,
+    sentiment_score: analysis.sentimentScore,
+    category: analysis.category,
+    article_type: analysis.articleType,
+  });
 }
 
 function getArticlesByRange(from, to, { includeDuplicates = false } = {}) {
@@ -690,6 +710,7 @@ module.exports = {
   insertArticle,
   markAsDuplicate,
   findByNormalizedUrl,
+  updateArticleAnalysis,
   getArticlesByRange,
   getRecentForDedup,
   getHighRelevanceSince,

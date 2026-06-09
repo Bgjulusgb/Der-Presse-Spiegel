@@ -9,6 +9,7 @@ const {
   extractSourceFromGoogleTitle,
   buildGoogleNewsUrl,
   buildBingNewsUrl,
+  expandFeedQueries,
 } = require('../src/news-search');
 
 test('looksLikeFeed erkennt RSS', () => {
@@ -55,4 +56,39 @@ test('buildBingNewsUrl kodiert Query', () => {
   const url = buildBingNewsUrl('Kammerspiele');
   assert.ok(url.includes('bing.com/news/search'));
   assert.ok(url.includes('format=rss'));
+});
+
+test('expandFeedQueries generiert Queries aus keywords-Sets', () => {
+  const feed = { queries: ['"Münchner Kammerspiele"'], queries_from: ['productions'] };
+  const kw = { productions: ['Wokey Wokey', 'Wallenstein'] };
+  const queries = expandFeedQueries(feed, kw);
+  assert.deepEqual(queries, [
+    '"Münchner Kammerspiele"',
+    '"Wokey Wokey" Kammerspiele',
+    '"Wallenstein" Kammerspiele',
+  ]);
+});
+
+test('expandFeedQueries: Personen nur mit vollem Namen', () => {
+  const feed = { queries_from: ['people'] };
+  const kw = { people: ['Barbara Mundel', 'Mundel'] };
+  assert.deepEqual(expandFeedQueries(feed, kw), ['"Barbara Mundel" Kammerspiele']);
+});
+
+test('expandFeedQueries dedupliziert case-insensitiv und respektiert max_queries', () => {
+  const feed = {
+    queries: ['"wallenstein" kammerspiele'],
+    queries_from: ['productions'],
+    max_queries: 2,
+  };
+  const kw = { productions: ['Wallenstein', 'Pinocchio', 'Mephisto'] };
+  const queries = expandFeedQueries(feed, kw);
+  assert.equal(queries.length, 2);
+  assert.equal(queries[0], '"wallenstein" kammerspiele');
+  assert.equal(queries[1], '"Pinocchio" Kammerspiele');
+});
+
+test('expandFeedQueries ohne queries_from laesst Queries unveraendert', () => {
+  const feed = { queries: ['a b c'] };
+  assert.deepEqual(expandFeedQueries(feed, {}), ['a b c']);
 });

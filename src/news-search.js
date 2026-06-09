@@ -2,7 +2,38 @@
 
 const cheerio = require('cheerio');
 const logger = require('./logger');
+const { keywords } = require('./config');
 const { fetchText, parseFeedXml } = require('./feed-fetcher');
+
+// Generiert Aggregator-Queries aus keywords.json (Feld "queries_from" am
+// Feed, z. B. ["productions", "people"]). Neue Stuecke/Ensemble-Mitglieder
+// landen damit automatisch im Backbone, ohne sources.json zu pflegen.
+function expandFeedQueries(feed, kw = keywords) {
+  const queries = [...(feed.queries || [])];
+  const sets = Array.isArray(feed.queries_from) ? feed.queries_from : [];
+  for (const setName of sets) {
+    const list = Array.isArray(kw && kw[setName]) ? kw[setName] : [];
+    for (const raw of list) {
+      const term = String(raw || '').trim();
+      if (term.length < 3) continue;
+      // Personen nur mit vollem Namen — blanke Nachnamen sind zu unscharf
+      if (setName === 'people' && !term.includes(' ')) continue;
+      queries.push(`"${term}" Kammerspiele`);
+    }
+  }
+  // Dedupe (case-insensitiv, stabile Reihenfolge) + Limit gegen
+  // Query-Explosion: jede Query ist ein eigener HTTP-Abruf pro Scan
+  const seen = new Set();
+  const result = [];
+  for (const q of queries) {
+    const key = q.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(q);
+  }
+  const max = Number.isInteger(feed.max_queries) ? feed.max_queries : 24;
+  return result.slice(0, max);
+}
 
 // Detects whether a response body is actually a feed. News aggregators
 // (especially Bing) sometimes return an HTML page instead of RSS — parsing
@@ -94,7 +125,8 @@ function cleanGoogleNewsTitle(title) {
 
 async function fetchGoogleNewsFeed(feed) {
   const start = Date.now();
-  const queries = feed.queries || [feed.query || 'Münchner Kammerspiele'];
+  const queries = expandFeedQueries(feed);
+  if (queries.length === 0) queries.push(feed.query || 'Münchner Kammerspiele');
   const allItems = new Map();
 
   for (const query of queries) {
@@ -144,7 +176,8 @@ async function fetchGoogleNewsFeed(feed) {
 
 async function fetchBingNewsFeed(feed) {
   const start = Date.now();
-  const queries = feed.queries || [feed.query || 'Münchner Kammerspiele'];
+  const queries = expandFeedQueries(feed);
+  if (queries.length === 0) queries.push(feed.query || 'Münchner Kammerspiele');
   const allItems = new Map();
 
   for (const query of queries) {
@@ -182,6 +215,7 @@ async function fetchBingNewsFeed(feed) {
 module.exports = {
   buildGoogleNewsUrl,
   buildBingNewsUrl,
+  expandFeedQueries,
   resolveGoogleNewsUrl,
   fetchGoogleNewsFeed,
   fetchBingNewsFeed,

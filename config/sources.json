@@ -32,7 +32,10 @@
       ],
       "priority": 95,
       "type": "rss",
-      "category": "aggregator"
+      "category": "aggregator",
+      "queries_from": [
+        "productions"
+      ]
     },
     {
       "name": "Google News - Ensemble",
@@ -50,7 +53,10 @@
       ],
       "priority": 90,
       "type": "rss",
-      "category": "aggregator"
+      "category": "aggregator",
+      "queries_from": [
+        "people"
+      ]
     },
     {
       "name": "Bing News - Muenchner Kammerspiele",
@@ -62,7 +68,11 @@
       ],
       "priority": 85,
       "type": "rss",
-      "category": "aggregator"
+      "category": "aggregator",
+      "queries_from": [
+        "productions"
+      ],
+      "max_queries": 12
     },
     {
       "name": "Bundesregierung",
@@ -1006,6 +1016,27 @@
       "name": "nachtkritik.de",
       "url": "https://www.nachtkritik.de/index.php?format=feed&type=rss",
       "priority": 100,
+      "type": "rss",
+      "category": "theater-fachpresse"
+    },
+    {
+      "name": "Muenchner Feuilleton",
+      "url": "https://muenchner-feuilleton.de/feed/",
+      "priority": 90,
+      "type": "rss",
+      "category": "muenchen"
+    },
+    {
+      "name": "concerti",
+      "url": "https://www.concerti.de/feed/",
+      "priority": 70,
+      "type": "rss",
+      "category": "theater-fachpresse"
+    },
+    {
+      "name": "crescendo",
+      "url": "https://crescendo.de/feed/",
+      "priority": 70,
       "type": "rss",
       "category": "theater-fachpresse"
     },

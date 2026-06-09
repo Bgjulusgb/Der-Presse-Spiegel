@@ -3,7 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { extractArticleDate, extractArticleContent, tryRelativeDate } = require('../src/scraper');
+const {
+  extractArticleDate,
+  extractArticleContent,
+  tryRelativeDate,
+  findAmpUrl,
+} = require('../src/scraper');
 
 test('tryRelativeDate: "vor 2 Stunden"', () => {
   const now = new Date('2026-05-24T12:00:00Z');
@@ -154,4 +159,14 @@ test('extractArticleContent entfernt Script-Tags', () => {
   const content = extractArticleContent(html, 'https://example.com/x');
   assert.ok(!content.text.includes('alert'));
   assert.ok(content.text.includes('Echter Inhalt'));
+});
+
+test('findAmpUrl findet AMP-Link und loest relative URLs auf', () => {
+  const html = '<html><head><link rel="amphtml" href="/amp/artikel-1"></head></html>';
+  assert.equal(
+    findAmpUrl(html, 'https://example.com/artikel-1'),
+    'https://example.com/amp/artikel-1'
+  );
+  assert.equal(findAmpUrl('<html></html>', 'https://example.com/'), null);
+  assert.equal(findAmpUrl(null, 'https://example.com/'), null);
 });

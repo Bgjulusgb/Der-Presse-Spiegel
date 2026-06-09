@@ -98,6 +98,29 @@ def _try_parse(value: str) -> datetime | None:
         return None
 
 
+_AMP_LINK = re.compile(r'<link[^>]+rel=["\']amphtml["\'][^>]*>', re.I)
+_HREF = re.compile(r'href=["\']([^"\']+)["\']', re.I)
+
+
+def find_amp_url(html: str, base_url: str) -> str | None:
+    """AMP-Version einer Seite (<link rel="amphtml">) — schlankes Markup,
+    oft ohne Cookie-/Consent-Wall; billiger als ein Browser-Fallback."""
+    if not html:
+        return None
+    link = _AMP_LINK.search(html)
+    if not link:
+        return None
+    href = _HREF.search(link.group(0))
+    if not href:
+        return None
+    from urllib.parse import urljoin
+
+    try:
+        return urljoin(base_url, href.group(1))
+    except ValueError:
+        return None
+
+
 def try_url_date(url: str) -> datetime | None:
     if not url:
         return None
