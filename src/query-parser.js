@@ -274,6 +274,10 @@ function articleMatchesStructured(article, parsed) {
     if (text.includes(not.value.toLowerCase())) return false;
   }
 
+  // Bewusst lockere Semantik: dies ist ein Pre-Filter vor dem BM25-Ranking.
+  // Bare Terme (must) und OR-Terme (should) entschaerfen sich gegenseitig —
+  // "foo bar OR baz" laesst auch Artikel durch, die nur baz enthalten; das
+  // Ranking sortiert danach. Nur Phrasen ("...") und -Ausschluesse sind hart.
   for (const must of parsed.must) {
     if (must.type === 'phrase') {
       if (!text.includes(must.value.toLowerCase())) return false;

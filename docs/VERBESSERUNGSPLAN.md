@@ -47,26 +47,23 @@ dokumentiert, damit kuenftige Audits sie nicht erneut anfassen:
 - **`feed-fetcher.js` `[^]` im Regex**: valides JavaScript ("beliebiges
   Zeichen inkl. Newline").
 
-## 3. Offene Korrekturen (kurzfristig, P1)
+## 3. Offene Korrekturen (kurzfristig, P1) — ✓ alle umgesetzt (2026-06-09)
 
-1. **`src/scheduler.js` — Monatsbericht scannt nicht.** `weeklyReport()`
-   ruft vor dem Report `runScan()` auf, `monthlyReport()` nicht.
-   Entweder vereinheitlichen (Scan mit kleinem Lookback vor dem Report)
-   oder die Absicht im Code dokumentieren.
-2. **`also_on`-Merge beim Gewinnerwechsel** (Node + Python): verliert ein
-   bereits gespeicherter Artikel gegen einen neuen, wird sein eigenes
-   `also_on` auf `NULL` gesetzt statt in den Gewinner gemerged —
-   "auch erschienen in"-Eintraege gehen verloren.
-3. **URL-Datums-Heuristik zu breit** (`src/scraper.js` + `pyscraper/extract.py`):
-   `(\d{4})[/\-_](\d{1,2})[/\-_](\d{1,2})` matcht auch Versions-/ID-Muster
-   in URLs. Plausibilitaetsfenster (z. B. Jahr 2000–heute+1) und Pfad-Position
-   pruefen.
-4. **`query-parser.js` MUST-Semantik dokumentieren**: ein `+term` wird bei
-   vorhandenen OR-Termen nicht erzwungen (`must` greift nur, wenn `should`
-   leer ist). Falls gewollt (Pre-Filter vor BM25-Ranking), als Kommentar
-   festhalten; sonst strikt machen + Tests anpassen.
-5. **`pyscraper/extract.py`**: verschluckte Selector-Exceptions zumindest
-   per `log.debug` sichtbar machen.
+1. ✓ **`src/scheduler.js` — Monatsbericht scannt jetzt** vor dem Report
+   (`runScan()` wie beim Wochenbericht).
+2. ✓ **`also_on`-Merge beim Gewinnerwechsel** (Node + Python): die
+   "auch erschienen in"-Liste des Verlierers wird jetzt in den Gewinner
+   gemerged statt verworfen (`markAsDuplicate`/`mark_as_duplicate`,
+   Test `test_mark_duplicate_merges_also_on`).
+3. ✓ **URL-Datums-Heuristik verschaerft** (`src/scraper.js` +
+   `pyscraper/extract.py`): Zukunftsdaten (> heute + 2 Tage) werden
+   verworfen — Versions-/ID-Muster in URLs erzeugen keine falschen
+   Publikationsdaten mehr.
+4. ✓ **`query-parser.js` MUST-Semantik dokumentiert**: die lockere
+   must/should-Wechselwirkung ist beabsichtigt (Pre-Filter vor dem
+   BM25-Ranking) und jetzt als Kommentar im Code festgehalten.
+5. ✓ **`pyscraper/extract.py`**: verschluckte Selector-Exceptions werden
+   per `log.debug` sichtbar gemacht.
 
 ## 4. Wartung & Dependencies (P1–P2)
 

@@ -322,9 +322,13 @@ function insertArticle(article) {
 
 function markAsDuplicate(articleId, originalId, additionalUrl) {
   const original = stmts.findById.get(originalId);
+  const loser = stmts.findById.get(articleId);
   const existing = safeJsonParse(original.also_on, []) || [];
-  if (additionalUrl && !existing.includes(additionalUrl)) {
-    existing.push(additionalUrl);
+  // "auch erschienen in"-Liste des Verlierers mit uebernehmen, sonst gehen
+  // dessen bereits gesammelte Fundstellen beim Gewinnerwechsel verloren
+  const inherited = loser ? safeJsonParse(loser.also_on, []) || [] : [];
+  for (const url of [...inherited, additionalUrl]) {
+    if (url && !existing.includes(url)) existing.push(url);
   }
   stmts.appendAlsoOn.run({ id: originalId, also_on: JSON.stringify(existing) });
   stmts.markDuplicate.run({

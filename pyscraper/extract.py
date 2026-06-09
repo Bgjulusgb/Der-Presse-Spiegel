@@ -9,6 +9,7 @@ bekannten Markern erkennen und das Veröffentlichungsdatum mehrstufig auflösen
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -22,6 +23,8 @@ try:  # trafilatura ist die primäre, qualitativ beste Extraktions-Engine.
     _HAS_TRAFILATURA = True
 except Exception:  # pragma: no cover - optionaler Schwergewichts-Dep
     _HAS_TRAFILATURA = False
+
+log = logging.getLogger("pyscraper")
 
 REMOVE_SELECTORS = [
     "script", "style", "noscript", "iframe", "embed", "object", "nav",
@@ -102,12 +105,17 @@ def try_url_date(url: str) -> datetime | None:
     if not m:
         return None
     year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    if not (1990 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31):
+    if not (1990 <= year and 1 <= month <= 12 and 1 <= day <= 31):
         return None
     try:
-        return datetime(year, month, day, tzinfo=timezone.utc)
+        d = datetime(year, month, day, tzinfo=timezone.utc)
     except ValueError:
         return None
+    # Zukunftsdaten sind keine plausiblen Publikationsdaten (URL-Muster wie
+    # Versions-/ID-Nummern); kleine Toleranz fuer Zeitzonen-Versatz
+    if d > datetime.now(timezone.utc) + timedelta(days=2):
+        return None
+    return d
 
 
 def try_relative_date(text: str, now: datetime | None = None) -> datetime | None:
@@ -266,7 +274,8 @@ def extract_article_content(html: str, url: str) -> dict:
         try:
             for el in soup.select(sel):
                 el.decompose()
-        except Exception:
+        except Exception as exc:
+            log.debug("REMOVE_SELECTOR %r fehlgeschlagen: %s", sel, exc)
             continue
 
     title = (
@@ -300,7 +309,8 @@ def extract_article_content(html: str, url: str) -> dict:
     for sel in ARTICLE_SELECTORS:
         try:
             els = soup.select(sel)
-        except Exception:
+        except Exception as exc:
+            log.debug("ARTICLE_SELECTOR %r fehlgeschlagen: %s", sel, exc)
             continue
         for el in els:
             text = el.get_text(" ", strip=True)

@@ -108,11 +108,15 @@ function tryUrlDate(url) {
   const year = parseInt(m[1], 10);
   const month = parseInt(m[2], 10);
   const day = parseInt(m[3], 10);
-  if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+  if (year < 1990 || month < 1 || month > 12 || day < 1 || day > 31) {
     return null;
   }
   const d = new Date(Date.UTC(year, month - 1, day));
-  return isNaN(d.getTime()) ? null : d;
+  if (isNaN(d.getTime())) return null;
+  // Zukunftsdaten sind keine plausiblen Publikationsdaten (URL-Muster wie
+  // Versions-/ID-Nummern); kleine Toleranz fuer Zeitzonen-Versatz
+  if (d.getTime() > Date.now() + 2 * 24 * 3600 * 1000) return null;
+  return d;
 }
 
 const MONTHS = {

@@ -187,17 +187,23 @@ class Database:
         )
 
     def mark_as_duplicate(self, article_id: int, original_id: int, additional_url: str | None):
-        original = self.conn.execute(
-            "SELECT also_on FROM articles WHERE id = ?", (original_id,)
-        ).fetchone()
-        existing = []
-        if original and original["also_on"]:
+        def _also_on(row_id: int) -> list:
+            row = self.conn.execute(
+                "SELECT also_on FROM articles WHERE id = ?", (row_id,)
+            ).fetchone()
+            if not row or not row["also_on"]:
+                return []
             try:
-                existing = json.loads(original["also_on"]) or []
+                return json.loads(row["also_on"]) or []
             except (ValueError, TypeError):
-                existing = []
-        if additional_url and additional_url not in existing:
-            existing.append(additional_url)
+                return []
+
+        existing = _also_on(original_id)
+        # "auch erschienen in"-Liste des Verlierers mit uebernehmen, sonst gehen
+        # dessen bereits gesammelte Fundstellen beim Gewinnerwechsel verloren
+        for url in [*_also_on(article_id), additional_url]:
+            if url and url not in existing:
+                existing.append(url)
         self.conn.execute(
             "UPDATE articles SET also_on = ? WHERE id = ?",
             (json.dumps(existing), original_id),

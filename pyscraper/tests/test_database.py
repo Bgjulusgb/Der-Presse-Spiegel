@@ -56,6 +56,25 @@ class TestDatabase(unittest.TestCase):
         row = self.db.find_by_normalized_url("https://example.com/dup")
         self.assertEqual(row["duplicate_of"], winner)
 
+    def test_mark_duplicate_merges_also_on(self):
+        import json as _json
+
+        winner, _ = self.db.insert_article(self._article("https://example.com/orig"))
+        loser, _ = self.db.insert_article(self._article("https://example.com/dup"))
+        # Der Verlierer hat bereits eigene "auch erschienen in"-Fundstellen
+        self.db.conn.execute(
+            "UPDATE articles SET also_on = ? WHERE id = ?",
+            (_json.dumps(["https://mirror.example/a"]), loser),
+        )
+        self.db.mark_as_duplicate(loser, winner, "https://example.com/dup")
+        row = self.db.find_by_normalized_url("https://example.com/orig")
+        merged = _json.loads(row["also_on"])
+        self.assertIn("https://mirror.example/a", merged)
+        self.assertIn("https://example.com/dup", merged)
+        # Verlierer traegt selbst keine also_on-Liste mehr
+        dup_row = self.db.find_by_normalized_url("https://example.com/dup")
+        self.assertIsNone(dup_row["also_on"])
+
     def test_scan_run_and_health(self):
         rid = self.db.start_scan_run(
             datetime(2026, 5, 1, tzinfo=timezone.utc),
