@@ -47,6 +47,8 @@ async function monthlyReport() {
   const from = startOfDay(subMonths(to, 1));
   logger.info('[Cron] Monatsbericht');
   try {
+    // Wie beim Wochenbericht: erst frische Daten holen, dann berichten
+    await runScan({ from, to });
     const articles = database.getArticlesByRange(from, to);
     const result = await generateReport({
       from,
