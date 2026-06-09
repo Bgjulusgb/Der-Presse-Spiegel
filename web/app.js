@@ -334,8 +334,6 @@ function showScanSummary(s) {
   const target =
     document.getElementById('dashboard-scan-summary') || document.getElementById('scan-status');
   if (target) {
-    const box = document.createElement('div');
-    box.innerHTML = html;
     if (target.id === 'dashboard-scan-summary') {
       target.innerHTML = html;
     } else {

@@ -5,6 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung:
 
 ## [Unreleased]
 
+### Fixed — Code-Audit Juni 2026
+
+- **CI-brechender ESLint-Fehler behoben**: `assessAuthorCredibility()` in
+  `src/analytics/scoring.js` verwarf einen berechneten Score; eine
+  konsistente Byline zaehlt jetzt als `moderate`-Credibility.
+- **Content-Scoring repariert**: `calculateBaseScore()` in
+  `src/analytics/weighting.js` pruefte nur den Titel — eine
+  Kammerspiele-Erwaehnung im Artikeltext gibt jetzt +20.
+- **Response-Cache entkoppelt**: `ResponseCache.middleware()` schrieb in
+  die modulglobale Cache-Variable statt in die eigene Instanz; Cache-Writes
+  sind jetzt zusaetzlich gegen Exceptions abgesichert.
+- **API-Haertung**: Obergrenzen fuer `limit`/`period`
+  (`/api/articles` ≤ 2000, `/api/trends` ≤ 730 Tage, `/api/logs` ≤ 2000);
+  `/api/reports/:filename` akzeptiert nur noch `.html`/`.pdf`.
+- **Aufgeraeumt**: tote `validateInput`-Middleware (server.js), nie
+  eingehaengtes DOM-Element in `showScanSummary()` (web/app.js) sowie alle
+  ESLint-Warnungen (ungenutzte Imports/Variablen in `src/analytics/*`).
+- **Security**: `npm audit fix` fuer `ip-address` (GHSA-v2v4-37r5-5v8g,
+  transitiv via puppeteer) — 0 verbleibende Vulnerabilities.
+- Neues Planungsdokument `docs/VERBESSERUNGSPLAN.md` mit Audit-Ergebnis,
+  dokumentierten Fehlalarmen und priorisierter Korrektur-/Erweiterungsliste.
+
 ### Breaking — `better-sqlite3` durch `node:sqlite` ersetzt
 
 - **Native Modul-Abhaengigkeit entfernt**: `better-sqlite3` wurde durch
