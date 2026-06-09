@@ -1,6 +1,6 @@
 'use strict';
 
-const { differenceInHours, differenceInDays, format } = require('date-fns');
+const { differenceInHours, differenceInDays } = require('date-fns');
 
 function calculateFreshness(articles) {
   const now = new Date();

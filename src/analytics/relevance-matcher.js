@@ -229,8 +229,6 @@ class RelevanceMatcher {
     const text = normalize(
       `${article.title || ''} ${article.fullText || ''}`
     );
-    const normalizedEntity = normalize(entity);
-
     const exactCount = this.matchExact(text, entity);
     const inTitle = this.matchExact(article.title || '', entity);
 

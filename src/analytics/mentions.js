@@ -1,7 +1,7 @@
 'use strict';
 
 const ner = require('./ner');
-const { subDays, format } = require('date-fns');
+const { format } = require('date-fns');
 
 function analyzeMentionTrends(articles) {
   const byDate = new Map();

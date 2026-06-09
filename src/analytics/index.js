@@ -111,7 +111,7 @@ async function analyzeArticle(articleId, articleData) {
 }
 
 // Batch analytics: run after articles are collected
-async function analyzeCollection(articles, database) {
+async function analyzeCollection(articles, _database) {
   try {
     const analysis = {};
 

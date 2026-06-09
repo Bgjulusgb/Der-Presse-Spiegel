@@ -136,7 +136,7 @@ class ExtendedSentimentAnalyzer {
       if (polarity === 0) continue;
 
       // Apply modifiers
-      let multiplier = this.analyzeModifiers(tokens, i);
+      const multiplier = this.analyzeModifiers(tokens, i);
       const weight = this.getPositionalWeight(i, tokens.length);
       const contribution = polarity * multiplier * weight;
 

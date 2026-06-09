@@ -1,6 +1,5 @@
 'use strict';
 
-const { keywords, settings } = require('../config');
 const { normalize } = require('../analyzer');
 
 // Advanced Scoring Engine with Multiple Dimensions and Profiles
@@ -75,11 +74,7 @@ class ScoringEngine {
   assessAuthorCredibility(author, article) {
     if (!author || author.length < 2) return 0;
 
-    let score = 0;
     const authorLower = normalize(author);
-
-    // Author mentions byline consistently
-    if (article.author && article.author === author) score += 3;
 
     // Known theater critics/journalists
     const knownCritics = ['rezensentin', 'kritiker', 'korrespondent', 'redakteur', 'redakteurin'];
@@ -90,6 +85,11 @@ class ScoringEngine {
     // Has published multiple articles
     if (article.authorArticleCount && article.authorArticleCount > 5) {
       return this.weights.authorCredibility.credible;
+    }
+
+    // Consistent byline (named author present on the article itself)
+    if (article.author && article.author === author) {
+      return this.weights.authorCredibility.moderate;
     }
 
     return this.weights.authorCredibility.unknown;

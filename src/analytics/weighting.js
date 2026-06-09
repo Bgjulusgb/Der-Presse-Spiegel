@@ -1,8 +1,7 @@
 'use strict';
 
-const { ScoringEngine, createScoringEngine } = require('./scoring');
+const { createScoringEngine } = require('./scoring');
 const { ExtendedSentimentAnalyzer } = require('./sentiment-extended');
-const { keywords } = require('../config');
 
 // Comprehensive Weighting and Rating System
 class ArticleWeightingSystem {
@@ -67,11 +66,13 @@ class ArticleWeightingSystem {
     let score = 0;
     const text = (article.fullText || article.summary || '').toLowerCase();
     const title = (article.title || '').toLowerCase();
-    const combined = `${title} ${text}`;
 
     // Title scoring
     if (title.includes('kammerspiele')) score += 40;
     if (title.includes('premiere')) score += 20;
+
+    // Content scoring (Erwaehnung im Text, falls nicht schon im Titel)
+    if (!title.includes('kammerspiele') && text.includes('kammerspiele')) score += 20;
 
     // Content depth scoring
     const wordCount = (article.fullText || '').split(/\s+/).length;

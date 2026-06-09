@@ -80,16 +80,21 @@ class ResponseCache {
   }
 
   middleware(method = 'GET') {
+    const self = this;
     return (req, res, next) => {
       if (req.method !== method) return next();
-      const cached = this.get(req);
+      const cached = self.get(req);
       if (cached) {
         res.setHeader('X-Cache', 'HIT');
         return res.json(cached);
       }
       const originalJson = res.json;
       res.json = function (data) {
-        cache.set(req, data);
+        try {
+          self.set(req, data);
+        } catch (err) {
+          logger.debug('Cache-Write fehlgeschlagen', { error: err.message });
+        }
         res.setHeader('X-Cache', 'MISS');
         res.setHeader('Cache-Control', 'private, max-age=60');
         return originalJson.call(this, data);
@@ -208,19 +213,6 @@ function buildApp() {
 
   // Rate limiting for API endpoints
   app.use('/api/', limiter.middleware());
-
-  // Input validation middleware
-  const validateInput = (fn) => (req, res, next) => {
-    try {
-      if (req.body && typeof req.body === 'object') {
-        const s = JSON.stringify(req.body);
-        if (s.length > 50000) return res.status(413).json({ error: 'Payload too large' });
-      }
-      fn(req, res, next);
-    } catch (err) {
-      next(err);
-    }
-  };
 
   // Cache middleware für GET /api endpoints (außer /health)
   app.get('/api/articles', cache.middleware('GET'));
@@ -398,7 +390,7 @@ function buildApp() {
       if (q && q.trim()) {
         scored = hybridSearch(articles, q, { limit: 1000 });
       }
-      const max = parseInt(limit, 10) || 500;
+      const max = Math.min(parseInt(limit, 10) || 500, 2000);
       const results = scored.slice(0, max).map((s) => ({
         ...s.article,
         _searchScore: s.score,
@@ -534,7 +526,7 @@ function buildApp() {
   app.get('/api/trends', (req, res) => {
     try {
       const period = req.query.period || '30d';
-      const days = parseInt(period.replace(/[^\d]/g, ''), 10) || 30;
+      const days = Math.min(parseInt(period.replace(/[^\d]/g, ''), 10) || 30, 730);
       const now = new Date();
       const recent = database.getArticlesByRange(subDays(now, days), now);
       const previous = database.getArticlesByRange(subDays(now, days * 2), subDays(now, days));
@@ -1100,6 +1092,9 @@ function buildApp() {
 
   app.get('/api/reports/:filename', (req, res) => {
     const filename = path.basename(req.params.filename);
+    if (!/\.(html|pdf)$/i.test(filename)) {
+      return res.status(400).send('Ungueltiger Report-Dateiname');
+    }
     const filepath = path.join(REPORTS_DIR, filename);
     if (!fs.existsSync(filepath)) return res.status(404).send('Report nicht gefunden');
     res.sendFile(filepath);
@@ -1107,6 +1102,9 @@ function buildApp() {
 
   app.delete('/api/reports/:filename', (req, res) => {
     const filename = path.basename(req.params.filename);
+    if (!/\.(html|pdf)$/i.test(filename)) {
+      return res.status(400).json({ error: 'Ungueltiger Report-Dateiname' });
+    }
     const filepath = path.join(REPORTS_DIR, filename);
     if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'nicht gefunden' });
     fs.unlinkSync(filepath);
@@ -1114,7 +1112,7 @@ function buildApp() {
   });
 
   app.get('/api/logs', (req, res) => {
-    const limit = parseInt(req.query.limit, 10) || 200;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 200, 2000);
     const logFile = path.join(__dirname, '..', 'logs', 'pressespiegel.log');
     if (!fs.existsSync(logFile)) return res.json({ logs: [] });
     const content = fs.readFileSync(logFile, 'utf8');
@@ -1164,8 +1162,8 @@ function buildApp() {
     res.sendFile(path.join(WEB_DIR, 'index.html'));
   });
 
-  // Global error handler (muss nach allen routes sein)
-  app.use((err, req, res, next) => {
+  // Global error handler (muss nach allen routes sein; 4-arg-Signatur ist Pflicht)
+  app.use((err, req, res, _next) => {
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
