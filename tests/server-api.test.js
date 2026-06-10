@@ -241,3 +241,18 @@ test('GET /api/analytics/quotes liefert quotes + coverage', async () => {
   assert.ok(Array.isArray(json.quotes));
   assert.ok(json.coverage && typeof json.coverage === 'object');
 });
+
+test('GET /api/export?format=md liefert Markdown-Linkliste', async () => {
+  const res = await fetch(baseUrl() + '/api/export?format=md&last=7d');
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/markdown/);
+  const body = await res.text();
+  assert.match(body, /^# Pressespiegel Muenchner Kammerspiele/);
+  assert.match(body, /Zeitraum: /);
+});
+
+test('GET /api/export mit unbekanntem Format -> 400', async () => {
+  const { status, json } = await get('/api/export?format=xlsx&last=7d');
+  assert.equal(status, 400);
+  assert.ok(json.error);
+});

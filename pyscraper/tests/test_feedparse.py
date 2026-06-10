@@ -87,3 +87,45 @@ class TestParse(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+NEWS_SITEMAP = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+  <url>
+    <loc>https://example.com/kultur/kammerspiele-premiere</loc>
+    <news:news>
+      <news:publication>
+        <news:name>Beispiel-Zeitung</news:name>
+        <news:language>de</news:language>
+      </news:publication>
+      <news:publication_date>2026-06-01T10:00:00+02:00</news:publication_date>
+      <news:title>Premiere an den Kammerspielen</news:title>
+    </news:news>
+  </url>
+  <url>
+    <loc>https://example.com/sport/irrelevant</loc>
+    <lastmod>2026-06-02</lastmod>
+  </url>
+</urlset>"""
+
+
+class TestNewsSitemap(unittest.TestCase):
+    def test_parse_news_sitemap(self):
+        from pyscraper.feedparse import parse_news_sitemap
+
+        parsed = parse_news_sitemap(NEWS_SITEMAP)
+        self.assertEqual(parsed.feed_type, "news-sitemap")
+        self.assertEqual(len(parsed.items), 2)
+        first = parsed.items[0]
+        self.assertEqual(first.url, "https://example.com/kultur/kammerspiele-premiere")
+        self.assertEqual(first.title, "Premiere an den Kammerspielen")
+        self.assertEqual(first.published.strftime("%Y-%m-%d"), "2026-06-01")
+        # Eintrag ohne news:news nutzt lastmod
+        self.assertEqual(parsed.items[1].published.strftime("%Y-%m-%d"), "2026-06-02")
+
+    def test_rejects_non_sitemap(self):
+        from pyscraper.feedparse import parse_news_sitemap
+
+        with self.assertRaises(ValueError):
+            parse_news_sitemap('<rss version="2.0"><channel/></rss>')

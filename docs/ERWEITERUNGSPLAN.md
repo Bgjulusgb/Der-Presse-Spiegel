@@ -33,7 +33,9 @@ Aufwandsangaben: S = Stunden, M = 1–3 Tage, L = ~1 Woche.
 
 ### 1.1 Neue Feed-Quellen (S–M, nur `config/sources.json`)
 
-Direkt als RSS/Atom verfuegbar, beim Einbau mit `test-feed` verifizieren:
+Direkt als RSS/Atom verfuegbar, beim Einbau mit `test-feed` verifizieren.
+✓ Bereits aufgenommen (verifiziert, 2026-06-09): Muenchner Feuilleton,
+concerti, crescendo. Restliche Kandidaten siehe `docs/VERBESSERUNG.md` §3:
 
 | Kategorie          | Quelle                                           | Bemerkung                                                  |
 | ------------------ | ------------------------------------------------ | ---------------------------------------------------------- |
@@ -54,11 +56,9 @@ Die Aggregatoren finden Artikel aus Hunderten Medien, die kein eigener
 Feed abdeckt — fuer die Vollstaendigkeit des Spiegels wichtiger als jede
 Einzelquelle:
 
-- **Queries aus `keywords.json` generieren statt statisch pflegen**:
-  pro Produktion, pro Ensemble-Mitglied, plus Intendanz/„Muenchner
-  Kammerspiele" kombiniert mit Kritik/Premiere/Interview. Neue Stuecke
-  aus dem Spielplan landen damit automatisch im Backbone (heute: Queries
-  haendisch in `sources.json`).
+- ✓ **Queries aus `keywords.json` generieren statt statisch pflegen**
+  (umgesetzt 2026-06-09, siehe `docs/VERBESSERUNG.md`): `queries_from`-Feld
+  pro Aggregator-Feed, Expansion in Node + Python, `max_queries`-Limit.
 - **GDELT DOC 2.0 API** als dritter Backbone: kostenlose JSON-API ohne
   Key, rollierendes 3-Monats-Fenster der Weltpresse inkl. deutscher
   Medien (`sourcecountry:GM`, `sourcelang:ger`). Liefert URL, Titel,
@@ -74,20 +74,19 @@ Einzelquelle:
 
 ## 2. Abdeckung & Praezision: besseres Scraping und Datenabfrage
 
-1. **News-Sitemaps als Fallback-Kanal (M):** Fast alle Verlage pflegen
-   `sitemap_news.xml` (Google-News-Standard) mit Titel, Datum, Sprache —
-   oft vollstaendiger als der RSS-Feed (manche Feeds liefern nur
-   10 Items). Neuer Parser in `feed-fetcher.js`/`feedparse.py`; pro
-   Quelle optionales Feld `sitemap_url`.
-2. **JSON-LD-First-Extraktion (S–M):** `NewsArticle`-JSON-LD liefert
-   Headline, Autor, Datum, `articleBody` strukturiert — vor Readability/
-   trafilatura pruefen und bevorzugen (Node + Python). Verbessert direkt
-   die Metadaten-Qualitaet der Spiegel-Eintraege.
-3. **AMP-Fallback (S):** Bei Cookie-Wall/Consent-Bloat zuerst
-   `<link rel="amphtml">` versuchen — schlankes HTML, oft ohne Wall;
-   billiger als der Puppeteer-Fallback. Wichtig: auch wenn der Volltext
-   nicht zu holen ist, **bleibt der Link mit Feed-Snippet im Spiegel**
-   (Paywall-Flag statt Verwerfen — heutiges Verhalten beibehalten).
+1. ✓ **News-Sitemaps als Fallback-Kanal (M)** (umgesetzt 2026-06-09):
+   Parser in `feed-fetcher.js`/`feedparse.py`, optionales Feld
+   `sitemap_url` pro Quelle; ergaenzt den Feed und springt bei
+   Feed-Ausfall ein. Offen: konkrete Sitemap-URLs der Verlage lokal
+   verifizieren und eintragen.
+2. ✓ **JSON-LD-First-Extraktion (S–M)** (umgesetzt 2026-06-09, Node):
+   `NewsArticle`-JSON-LD (inkl. `@graph`) liefert Headline, Autor,
+   `articleBody`; substanzieller Body gewinnt gegen die Heuristiken.
+   Python deckt das bereits via trafilatura ab.
+3. ✓ **AMP-Fallback (S)** (umgesetzt 2026-06-09): bei duennem Text oder
+   Paywall-Signal wird `<link rel="amphtml">` aufgeloest und die
+   AMP-Version extrahiert (Node + Python); der laengere Text gewinnt.
+   Der Link mit Feed-Snippet bleibt in jedem Fall im Spiegel.
 4. **RSSHub-Integration (M, optional):** Open-Source-RSS-Generator
    (AGPL, selbst hostbar via Docker, 900+ Routen) fuer Sites ohne Feed.
    Als optionale `rsshub_base_url` in den Settings; Feeds laufen durch
@@ -124,10 +123,10 @@ Einzelquelle:
 1. **Inkrementelle Scans (M):** Wasserzeichen pro Quelle
    (`source_health.last_seen_item_date`); Standard-Scan holt nur Neues,
    `--full` als Override. Macht den taeglichen Spiegel-Lauf schnell.
-2. **Re-Analyse-Kommando (S):** `pressespiegel reanalyze --last 90d`
-   wendet aktuelles Scoring/Tagging auf den Bestand an (heute nur
-   `retag-all`) — Pflicht nach jeder Spielplan-/Keyword-Pflege, sonst
-   ist der Alt-Bestand inkonsistent analysiert.
+2. ✓ **Re-Analyse-Kommando (S)** (umgesetzt 2026-06-09):
+   `pressespiegel reanalyze --last 90d` wendet aktuelles Scoring/
+   Sentiment/Tagging auf den Bestand an — nach jeder Spielplan-/
+   Keyword-Pflege ausfuehren.
 3. **Job-Queue statt Ad-hoc-Scan (M):** Scan-Job-Objekt (queued →
    running → done, Fortschritt in %) statt boolescher Sperre; Basis fuer
    UI-Fortschritt und geplante Backfills.
@@ -146,8 +145,8 @@ UI-Feinschliff:
    redaktionellen Pressespiegels: gruppiert nach Produktion/Story-Cluster
    (§3.1), je Eintrag Quelle · Datum · Autor · Link · Score/Sentiment-
    Badge · 2-Zeilen-Snippet · „auch erschienen in"-Links.
-2. **Teilbare Ausgaben (S–M):** „Linkliste kopieren" (Markdown/Plaintext
-   in die Zwischenablage, z. B. fuer E-Mail/Slack), Druck-Stylesheet fuer
+2. **Teilbare Ausgaben (S–M):** ✓ „Linkliste kopieren" + `format=md`
+   im Export (umgesetzt 2026-06-09). Offen: Druck-Stylesheet fuer
    sauberen S/W-Ausdruck; PDF bleibt fuer das formale Dokument.
 3. **Zeitungs-Typografie (S–M):** Serifen-Display fuer Schlagzeilen
    (lokal gebundelt), klare Typo-Skala, mehr Weissraum — Pressespiegel-

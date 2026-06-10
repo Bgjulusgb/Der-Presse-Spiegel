@@ -3,7 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { extractArticleDate, extractArticleContent, tryRelativeDate } = require('../src/scraper');
+const {
+  extractArticleDate,
+  extractArticleContent,
+  tryRelativeDate,
+  findAmpUrl,
+} = require('../src/scraper');
 
 test('tryRelativeDate: "vor 2 Stunden"', () => {
   const now = new Date('2026-05-24T12:00:00Z');
@@ -154,4 +159,39 @@ test('extractArticleContent entfernt Script-Tags', () => {
   const content = extractArticleContent(html, 'https://example.com/x');
   assert.ok(!content.text.includes('alert'));
   assert.ok(content.text.includes('Echter Inhalt'));
+});
+
+test('findAmpUrl findet AMP-Link und loest relative URLs auf', () => {
+  const html = '<html><head><link rel="amphtml" href="/amp/artikel-1"></head></html>';
+  assert.equal(
+    findAmpUrl(html, 'https://example.com/artikel-1'),
+    'https://example.com/amp/artikel-1'
+  );
+  assert.equal(findAmpUrl('<html></html>', 'https://example.com/'), null);
+  assert.equal(findAmpUrl(null, 'https://example.com/'), null);
+});
+
+test('extractArticleContent bevorzugt JSON-LD articleBody wenn laenger', () => {
+  const body = 'Die Premiere an den Muenchner Kammerspielen begeisterte das Publikum. '.repeat(8);
+  const html = `<html><head>
+    <script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'NewsArticle',
+      headline: 'Kammerspiele-Premiere gefeiert',
+      author: { '@type': 'Person', name: 'Eva Beispiel' },
+      articleBody: body,
+    })}</script>
+    </head><body><article><p>Nur ein kurzer Teaser-Absatz, der Rest steckt im JSON-LD-Markup der Seite.</p></article></body></html>`;
+  const content = extractArticleContent(html, 'https://example.com/a');
+  assert.ok(content.text.length >= body.trim().length);
+  assert.ok(content.text.includes('begeisterte das Publikum'));
+  assert.equal(content.author, 'Eva Beispiel');
+});
+
+test('extractArticleContent ignoriert kurzes JSON-LD articleBody', () => {
+  const html = `<html><head>
+    <script type="application/ld+json">{"@type":"NewsArticle","articleBody":"kurz"}</script>
+    </head><body><article>${'<p>Ein langer richtiger Artikelabsatz mit ausreichend vielen Woertern fuer die Heuristik.</p>'.repeat(10)}</article></body></html>`;
+  const content = extractArticleContent(html, 'https://example.com/b');
+  assert.ok(content.text.includes('richtiger Artikelabsatz'));
 });

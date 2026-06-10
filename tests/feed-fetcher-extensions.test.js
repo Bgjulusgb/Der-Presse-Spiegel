@@ -153,3 +153,41 @@ test('buildHeaders: etag und if-modified-since werden gesetzt', () => {
   assert.equal(h['if-none-match'], 'abc');
   assert.equal(h['if-modified-since'], 'Sun, 19 May 2026 00:00:00 GMT');
 });
+
+const { parseNewsSitemap } = require('../src/feed-fetcher');
+
+const NEWS_SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+  <url>
+    <loc>https://example.com/kultur/kammerspiele-premiere</loc>
+    <news:news>
+      <news:publication>
+        <news:name>Beispiel-Zeitung</news:name>
+        <news:language>de</news:language>
+      </news:publication>
+      <news:publication_date>2026-06-01T10:00:00+02:00</news:publication_date>
+      <news:title>Premiere an den Kammerspielen</news:title>
+    </news:news>
+  </url>
+  <url>
+    <loc>https://example.com/sport/irrelevant</loc>
+    <lastmod>2026-06-02</lastmod>
+  </url>
+</urlset>`;
+
+test('parseNewsSitemap liest loc, news:title und publication_date', async () => {
+  const parsed = await parseNewsSitemap(NEWS_SITEMAP);
+  assert.equal(parsed.items.length, 2);
+  const first = parsed.items[0];
+  assert.equal(first.url, 'https://example.com/kultur/kammerspiele-premiere');
+  assert.equal(first.title, 'Premiere an den Kammerspielen');
+  assert.equal(first.publishedDate.toISOString().slice(0, 10), '2026-06-01');
+  assert.equal(first.language, 'de');
+  // Eintrag ohne news:news nutzt lastmod
+  assert.equal(parsed.items[1].publishedDate.toISOString().slice(0, 10), '2026-06-02');
+});
+
+test('parseNewsSitemap wirft bei Nicht-Sitemap', async () => {
+  await assert.rejects(() => parseNewsSitemap('<rss version="2.0"><channel/></rss>'));
+});

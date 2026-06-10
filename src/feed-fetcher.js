@@ -472,6 +472,48 @@ async function parseFeedXml(text) {
   throw new Error('Unbekanntes Feed-Format');
 }
 
+// Google-News-Sitemap (sitemap_news.xml): <urlset><url><loc> + <news:news>
+// mit Titel/Datum/Sprache. Oft vollstaendiger als der RSS-Feed der Quelle.
+async function parseNewsSitemap(text) {
+  const parser = new xml2js.Parser({
+    explicitArray: false,
+    mergeAttrs: true,
+    explicitCharkey: false,
+    trim: true,
+    normalize: true,
+    emptyTag: () => null,
+    valueProcessors: [(val) => he.decode(val || '')],
+  });
+  const parsed = await parser.parseStringPromise(text);
+  if (!parsed || !parsed.urlset) throw new Error('Keine News-Sitemap (urlset fehlt)');
+
+  const items = [];
+  for (const entry of arr(parsed.urlset.url)) {
+    if (!entry) continue;
+    const loc = textOf(entry.loc);
+    if (!loc) continue;
+    const news = entry['news:news'] || entry.news || {};
+    const title = textOf(news['news:title'] || news.title);
+    const pubDate =
+      textOf(news['news:publication_date'] || news.publication_date) ||
+      textOf(entry.lastmod) ||
+      null;
+    const publication = news['news:publication'] || news.publication || {};
+    const language = textOf(publication['news:language'] || publication.language) || null;
+    items.push({
+      url: loc,
+      title,
+      publishedDate: parseDateSafe(pubDate),
+      language,
+      summary: '',
+      content: '',
+      author: null,
+      guid: loc,
+    });
+  }
+  return { title: null, items };
+}
+
 function arr(x) {
   if (x == null) return [];
   return Array.isArray(x) ? x : [x];
@@ -779,6 +821,7 @@ module.exports = {
   fetchFeed,
   testFeed,
   parseFeedXml,
+  parseNewsSitemap,
   parseJsonFeed,
   detectEncoding,
   decode,

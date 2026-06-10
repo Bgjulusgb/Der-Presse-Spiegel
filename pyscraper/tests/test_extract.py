@@ -53,3 +53,16 @@ class TestExtract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFindAmpUrl(unittest.TestCase):
+    def test_finds_and_resolves_relative(self):
+        from pyscraper.extract import find_amp_url
+
+        html = '<html><head><link rel="amphtml" href="/amp/artikel-1"></head></html>'
+        self.assertEqual(
+            find_amp_url(html, "https://example.com/artikel-1"),
+            "https://example.com/amp/artikel-1",
+        )
+        self.assertIsNone(find_amp_url("<html></html>", "https://example.com/"))
+        self.assertIsNone(find_amp_url("", "https://example.com/"))

@@ -1016,6 +1016,8 @@ function initArticleFilters() {
   $('#export-articles').addEventListener('click', exportCurrentArticles);
   $('#export-csv').addEventListener('click', () => downloadExport('csv'));
   $('#export-json').addEventListener('click', () => downloadExport('json'));
+  const copyBtn = $('#copy-linklist');
+  if (copyBtn) copyBtn.addEventListener('click', copyLinkList);
 
   const saveBtn = $('#filter-save');
   if (saveBtn) {
@@ -1085,6 +1087,35 @@ async function handleSuggestInput(q) {
     });
   } catch {
     /* ignore */
+  }
+}
+
+// Kopiert die aktuell gefilterte Trefferliste als Markdown-Linkliste —
+// der Spiegel in weitergebbarer Form (E-Mail, Chat), inkl. Suchfilter
+async function copyLinkList() {
+  const articles = state.articles || [];
+  if (articles.length === 0) {
+    toast('Keine Artikel in der aktuellen Ansicht', 'error');
+    return;
+  }
+  const fmtDate = (d) => (d ? String(d).slice(0, 10) : 'ohne Datum');
+  // eckige Klammern wuerden das [Titel](URL)-Linkformat brechen
+  const mdLabel = (s) => String(s || '').replace(/[[\]]/g, ' ').trim();
+  const lines = [`Pressespiegel Muenchner Kammerspiele — ${articles.length} Artikel`, ''];
+  for (const a of articles) {
+    const badges = [a.category, a.sentiment, a.article_type].filter(Boolean).join(' · ');
+    lines.push(`- **[${mdLabel(a.title) || a.url}](${a.url})**`);
+    lines.push(
+      `  ${a.source || 'Unbekannt'} · ${fmtDate(a.published_date)}${a.author ? ` · ${a.author}` : ''}${badges ? ` · ${badges}` : ''}`
+    );
+    const alsoOn = Array.isArray(a.also_on) ? a.also_on : [];
+    if (alsoOn.length > 0) lines.push(`  auch erschienen in: ${alsoOn.join(', ')}`);
+  }
+  try {
+    await navigator.clipboard.writeText(lines.join('\n') + '\n');
+    toast(`Linkliste mit ${articles.length} Artikeln kopiert`, 'success');
+  } catch {
+    toast('Kopieren fehlgeschlagen — Browser-Berechtigung pruefen', 'error');
   }
 }
 

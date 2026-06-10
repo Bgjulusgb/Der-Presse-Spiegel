@@ -11,7 +11,7 @@ const { format } = require('date-fns');
 
 const logger = require('../src/logger');
 const { parseDateRange } = require('../src/utils');
-const { runScan } = require('../src/pipeline');
+const { runScan, reanalyzeArticles } = require('../src/pipeline');
 const database = require('../src/database');
 const { generateReport, findLatestReport, REPORTS_DIR } = require('../src/reporter');
 const scheduler = require('../src/scheduler');
@@ -80,6 +80,34 @@ program
       }
     } catch (err) {
       logger.error('Scan fehlgeschlagen', { error: err.message, stack: err.stack });
+      console.error(chalk.red(`Fehler: ${err.message}`));
+      process.exit(1);
+    } finally {
+      database.close();
+    }
+  });
+
+program
+  .command('reanalyze')
+  .description('Wendet aktuelles Scoring/Sentiment/Tagging auf Bestandsartikel an')
+  .option('--from <date>', 'Startdatum YYYY-MM-DD')
+  .option('--to <date>', 'Enddatum YYYY-MM-DD')
+  .option('--last <range>', 'Zeitraum z.B. 90d, 6m', '90d')
+  .action(async (opts) => {
+    try {
+      const { from, to } = parseDateRange(opts);
+      section(
+        `Re-Analyse: ${format(from, 'yyyy-MM-dd')} bis ${format(to, 'yyyy-MM-dd')}`
+      );
+      const result = reanalyzeArticles({ from, to });
+      console.log(chalk.green('\nRe-Analyse abgeschlossen'));
+      console.log(`  ${chalk.bold('Artikel:')}  ${chalk.green.bold(result.updated)}`);
+      console.log(`  ${chalk.bold('Tags neu:')} ${result.tagsAdded}`);
+      if (result.errors.length > 0) {
+        console.log(`  ${chalk.bold('Fehler:')}   ${chalk.red(result.errors.length)}`);
+      }
+    } catch (err) {
+      logger.error('Re-Analyse fehlgeschlagen', { error: err.message });
       console.error(chalk.red(`Fehler: ${err.message}`));
       process.exit(1);
     } finally {
