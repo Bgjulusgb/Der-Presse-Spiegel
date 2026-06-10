@@ -97,6 +97,37 @@ def parse_feed(text: str) -> ParsedFeed:
     raise ValueError("Unbekanntes Feed-Format")
 
 
+def parse_news_sitemap(text: str) -> ParsedFeed:
+    """Google-News-Sitemap (sitemap_news.xml): <urlset><url><loc> plus
+    <news:news> mit Titel/Datum. Oft vollstaendiger als der RSS-Feed —
+    identisches Verhalten wie parseNewsSitemap in src/feed-fetcher.js."""
+    root = ET.fromstring(text)
+    if _local(root.tag).lower() != "urlset":
+        raise ValueError("Keine News-Sitemap (urlset fehlt)")
+    items: list[FeedItem] = []
+    for entry in root:
+        if _local(entry.tag) != "url":
+            continue
+        m = _children_map(entry)
+        loc = _text(m.get("loc"))
+        if not loc:
+            continue
+        title = ""
+        pub_date = _text(m.get("lastmod"))
+        news = m.get("news")
+        if news:
+            nm = _children_map(news[0])
+            title = _text(nm.get("title"))
+            pub_date = _text(nm.get("publication_date")) or pub_date
+        items.append(FeedItem(
+            title=title,
+            url=loc,
+            guid=loc,
+            published=parse_date(pub_date),
+        ))
+    return ParsedFeed(title="", items=items, feed_type="news-sitemap")
+
+
 def _parse_rss(root: ET.Element) -> ParsedFeed:
     channel = None
     for child in root:

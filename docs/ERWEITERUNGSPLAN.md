@@ -74,15 +74,15 @@ Einzelquelle:
 
 ## 2. Abdeckung & Praezision: besseres Scraping und Datenabfrage
 
-1. **News-Sitemaps als Fallback-Kanal (M):** Fast alle Verlage pflegen
-   `sitemap_news.xml` (Google-News-Standard) mit Titel, Datum, Sprache —
-   oft vollstaendiger als der RSS-Feed (manche Feeds liefern nur
-   10 Items). Neuer Parser in `feed-fetcher.js`/`feedparse.py`; pro
-   Quelle optionales Feld `sitemap_url`.
-2. **JSON-LD-First-Extraktion (S–M):** `NewsArticle`-JSON-LD liefert
-   Headline, Autor, Datum, `articleBody` strukturiert — vor Readability/
-   trafilatura pruefen und bevorzugen (Node + Python). Verbessert direkt
-   die Metadaten-Qualitaet der Spiegel-Eintraege.
+1. ✓ **News-Sitemaps als Fallback-Kanal (M)** (umgesetzt 2026-06-09):
+   Parser in `feed-fetcher.js`/`feedparse.py`, optionales Feld
+   `sitemap_url` pro Quelle; ergaenzt den Feed und springt bei
+   Feed-Ausfall ein. Offen: konkrete Sitemap-URLs der Verlage lokal
+   verifizieren und eintragen.
+2. ✓ **JSON-LD-First-Extraktion (S–M)** (umgesetzt 2026-06-09, Node):
+   `NewsArticle`-JSON-LD (inkl. `@graph`) liefert Headline, Autor,
+   `articleBody`; substanzieller Body gewinnt gegen die Heuristiken.
+   Python deckt das bereits via trafilatura ab.
 3. ✓ **AMP-Fallback (S)** (umgesetzt 2026-06-09): bei duennem Text oder
    Paywall-Signal wird `<link rel="amphtml">` aufgeloest und die
    AMP-Version extrahiert (Node + Python); der laengere Text gewinnt.

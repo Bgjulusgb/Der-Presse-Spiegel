@@ -170,3 +170,28 @@ test('findAmpUrl findet AMP-Link und loest relative URLs auf', () => {
   assert.equal(findAmpUrl('<html></html>', 'https://example.com/'), null);
   assert.equal(findAmpUrl(null, 'https://example.com/'), null);
 });
+
+test('extractArticleContent bevorzugt JSON-LD articleBody wenn laenger', () => {
+  const body = 'Die Premiere an den Muenchner Kammerspielen begeisterte das Publikum. '.repeat(8);
+  const html = `<html><head>
+    <script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'NewsArticle',
+      headline: 'Kammerspiele-Premiere gefeiert',
+      author: { '@type': 'Person', name: 'Eva Beispiel' },
+      articleBody: body,
+    })}</script>
+    </head><body><article><p>Nur ein kurzer Teaser-Absatz, der Rest steckt im JSON-LD-Markup der Seite.</p></article></body></html>`;
+  const content = extractArticleContent(html, 'https://example.com/a');
+  assert.ok(content.text.length >= body.trim().length);
+  assert.ok(content.text.includes('begeisterte das Publikum'));
+  assert.equal(content.author, 'Eva Beispiel');
+});
+
+test('extractArticleContent ignoriert kurzes JSON-LD articleBody', () => {
+  const html = `<html><head>
+    <script type="application/ld+json">{"@type":"NewsArticle","articleBody":"kurz"}</script>
+    </head><body><article>${'<p>Ein langer richtiger Artikelabsatz mit ausreichend vielen Woertern fuer die Heuristik.</p>'.repeat(10)}</article></body></html>`;
+  const content = extractArticleContent(html, 'https://example.com/b');
+  assert.ok(content.text.includes('richtiger Artikelabsatz'));
+});

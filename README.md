@@ -38,56 +38,16 @@ JSON-Configs und native Module:
 npm run doctor
 ```
 
-### Troubleshooting: `Could not locate the bindings file` / better-sqlite3
+### Hinweis zur Datenbank
 
-Tritt der Fehler _"Could not locate the bindings file"_ oder
-_"better_sqlite3.node"_ auf (haeufig nach Download als ZIP oder bei
-Versions-Wechsel), gibt es drei Loesungen:
-
-**Loesung 1 — Neuinstallation (am schnellsten):**
-
-```
-npm run fix-sqlite:clean
-```
-
-Dieser Befehl loescht `node_modules` + `package-lock.json` und installiert
-alles frisch. Funktioniert, sobald die Node-Version stimmt und Netzwerk-
-Zugriff fuer den Prebuild-Download da ist.
-
-Manuell:
+Die App nutzt das in Node eingebaute `node:sqlite` (stabil ab Node 24) —
+es gibt **keine nativen Build-Abhaengigkeiten** mehr (kein better-sqlite3,
+kein Python/MSVC/gcc noetig). Der fruehere Fehler _"Could not locate the
+bindings file"_ kann nicht mehr auftreten. Bei Problemen genuegt:
 
 ```
-# Windows (cmd):
-rmdir /s /q node_modules
-del package-lock.json
-npm install
-
-# macOS / Linux:
-rm -rf node_modules package-lock.json
-npm install
+npm run doctor
 ```
-
-**Loesung 2 — Build aus Quellcode:**
-
-```
-npm run fix-sqlite
-```
-
-Voraussetzungen:
-
-- **Windows:** [Visual Studio Build Tools 2022](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-  mit Workload _"Desktop development with C++"_ und [Python 3.x](https://www.python.org/downloads/).
-  Danach: `npm config set msvs_version 2022`
-- **macOS:** `xcode-select --install`
-- **Linux:** `sudo apt install build-essential python3` (oder Aequivalent)
-
-**Loesung 3 — Node-Version pruefen:**
-
-`better-sqlite3` liefert vorgebaute Binaries fuer Node 20, 22 und 24 (x64).
-Sehr neue Node-Versionen (26+) oder ARM-Windows haben evtl. keine Prebuilds.
-Empfehlung: **Node 22 LTS** von https://nodejs.org/de/download/.
-
-Nach Behebung: `npm run doctor` sollte alle Pruefungen gruen anzeigen.
 
 Desktop-App:
 
@@ -143,7 +103,7 @@ Eigenschaften:
   Ausschluesse (Hamburger/Berliner/Wiener Kammerspiele ohne Muenchen-Bezug)
   greifen weiterhin.
 - **Relevanz-gestufte Anreicherung**: klare Treffer werden beim
-  Anreicherungs-Budget *zuerst* bedient — neue, aber irrelevante Kurzmeldungen
+  Anreicherungs-Budget _zuerst_ bedient — neue, aber irrelevante Kurzmeldungen
   verdraengen so nicht mehr die eigentlich relevanten Artikel.
 - **Deterministische Analyse**: Relevanz-Scoring, Sentiment (mit Negations- und
   Verstaerker-Fenster sowie staerker gewichteter Schlagzeilen-Wertung),
@@ -307,18 +267,24 @@ Robuste Multi-Layer-Pipeline:
 - Vollstaendige Browser-Header inkl. Sec-Fetch-\*, Accept-Encoding
 - **Auto-Encoding** via Content-Type, BOM, XML-Decl, Meta-Charset
 - **Conditional GET** mit ETag und Last-Modified pro Feed
-- **Multi-Format-Parser**: RSS 2.0, Atom, RDF (RSS 1.0), JSON Feed
+- **Multi-Format-Parser**: RSS 2.0, Atom, RDF (RSS 1.0), JSON Feed,
+  Google-News-Sitemaps (`sitemap_news.xml`)
+- **News-Sitemap als Zusatzkanal**: optionales Feld `sitemap_url` pro
+  Quelle in `sources.json` — ergaenzt Feeds, die nur ~10 Items liefern,
+  und springt ein, wenn der Feed selbst down ist
 - **HTML-Entity-Decoding** und HTML-Strip aller Feed-Items
+- **AMP-Fallback** bei Consent-/Paywall-Seiten (`<link rel="amphtml">`)
 - **Puppeteer-Fallback** fuer Cloudflare-geschuetzte Sites
 - **Retry mit exponentiellem Backoff** (3 Versuche, 2s/4s/8s)
 - **Rate-Limit pro Domain** (Default 1 Request/Sekunde)
 - **Brotli/Gzip/Deflate** Dekompression
 - **Auto-Disable** von Quellen nach acht Fehlern in Folge
 
-Pro Artikel: `@mozilla/readability` (gleiche Engine wie Firefox-Lesemodus)
-fuer saubere Volltext-Extraktion, Score-basierte Article-Body-Erkennung
-als Fallback. Datum aus Meta-Tags, JSON-LD inkl. `@graph`, time-Element,
-URL-Pattern, Text-Heuristik.
+Pro Artikel: **JSON-LD-First** (`NewsArticle.articleBody`, Headline und
+Autor direkt aus dem strukturierten Verlags-Markup, inkl. `@graph`),
+dann `@mozilla/readability` (gleiche Engine wie Firefox-Lesemodus),
+Score-basierte Article-Body-Erkennung als letzter Fallback. Datum aus
+Meta-Tags, JSON-LD, time-Element, URL-Pattern, Text-Heuristik.
 
 ## Auto-Tagging
 
@@ -391,37 +357,37 @@ pressespiegel schedule                          Cron-Modus
 
 ## REST-API
 
-| Endpoint                  | Methode         | Beschreibung                   |
-| ------------------------- | --------------- | ------------------------------ |
-| /api/health               | GET             | Status                         |
-| /api/articles             | GET             | gefilterte/durchsuchte Artikel |
-| /api/article/:id          | GET             | Detail-Daten eines Artikels    |
-| /api/article/:id/tags     | GET/POST/DELETE | Tags pro Artikel               |
-| /api/article/:id/bookmark | POST/DELETE     | Lesezeichen                    |
-| /api/stats                | GET             | Statistiken                    |
-| /api/scan                 | POST            | Scan starten                   |
-| /api/scan/status          | GET             | aktueller Scan-Status          |
-| /api/report               | POST            | Report generieren              |
-| /api/reports              | GET             | Liste aller Reports            |
-| /api/reports/:filename    | GET/DELETE      | Report oeffnen/loeschen        |
-| /api/sources              | GET/PUT         | Quellen-Verwaltung             |
-| /api/sources/test         | POST            | einzelnen Feed live testen     |
-| /api/sources/toggle       | POST            | Quelle aktivieren/deaktivieren |
-| /api/sources/opml         | GET             | OPML-Export aller Feeds        |
-| /api/sources/opml-import  | POST            | OPML-Import                    |
-| /api/keywords             | GET/PUT         | Suchbegriffe                   |
-| /api/settings             | GET/PUT         | Einstellungen                  |
-| /api/tags                 | GET             | alle Tags mit Counts           |
-| /api/tags/retag-all       | POST            | gesamte DB neu taggen          |
-| /api/bookmarks            | GET             | Lesezeichen-Liste              |
-| /api/saved-searches       | GET/POST/DELETE | gespeicherte Suchen            |
-| /api/mentions             | GET             | Top-Begriffe                   |
-| /api/trends               | GET             | Vergleich zweier Zeitraeume    |
-| /api/did-you-mean         | GET             | Tippfehler-Korrektur           |
-| /api/suggest              | GET             | Autocomplete-Vorschlaege       |
-| /api/duplicates/check     | GET             | Duplikat-Pruefung              |
+| Endpoint                  | Methode         | Beschreibung                          |
+| ------------------------- | --------------- | ------------------------------------- |
+| /api/health               | GET             | Status                                |
+| /api/articles             | GET             | gefilterte/durchsuchte Artikel        |
+| /api/article/:id          | GET             | Detail-Daten eines Artikels           |
+| /api/article/:id/tags     | GET/POST/DELETE | Tags pro Artikel                      |
+| /api/article/:id/bookmark | POST/DELETE     | Lesezeichen                           |
+| /api/stats                | GET             | Statistiken                           |
+| /api/scan                 | POST            | Scan starten                          |
+| /api/scan/status          | GET             | aktueller Scan-Status                 |
+| /api/report               | POST            | Report generieren                     |
+| /api/reports              | GET             | Liste aller Reports                   |
+| /api/reports/:filename    | GET/DELETE      | Report oeffnen/loeschen               |
+| /api/sources              | GET/PUT         | Quellen-Verwaltung                    |
+| /api/sources/test         | POST            | einzelnen Feed live testen            |
+| /api/sources/toggle       | POST            | Quelle aktivieren/deaktivieren        |
+| /api/sources/opml         | GET             | OPML-Export aller Feeds               |
+| /api/sources/opml-import  | POST            | OPML-Import                           |
+| /api/keywords             | GET/PUT         | Suchbegriffe                          |
+| /api/settings             | GET/PUT         | Einstellungen                         |
+| /api/tags                 | GET             | alle Tags mit Counts                  |
+| /api/tags/retag-all       | POST            | gesamte DB neu taggen                 |
+| /api/bookmarks            | GET             | Lesezeichen-Liste                     |
+| /api/saved-searches       | GET/POST/DELETE | gespeicherte Suchen                   |
+| /api/mentions             | GET             | Top-Begriffe                          |
+| /api/trends               | GET             | Vergleich zweier Zeitraeume           |
+| /api/did-you-mean         | GET             | Tippfehler-Korrektur                  |
+| /api/suggest              | GET             | Autocomplete-Vorschlaege              |
+| /api/duplicates/check     | GET             | Duplikat-Pruefung                     |
 | /api/export               | GET             | CSV, JSON oder Markdown (`format=md`) |
-| /api/logs                 | GET             | letzte Log-Eintraege           |
+| /api/logs                 | GET             | letzte Log-Eintraege                  |
 
 ## Tech-Stack
 
@@ -431,7 +397,7 @@ Encoding          iconv-lite 0.7
 XML/HTML          xml2js 0.6, cheerio 1.2, he 1.2
 Browser           puppeteer 25.x (Fallback)
 Readability       @mozilla/readability 0.6
-Datenbank         better-sqlite3 12.x (WAL)
+Datenbank         node:sqlite (eingebaut, WAL)
 Suche             fuse.js 7.x, natural 8.x (Porter-Stemmer-DE),
                   js-levenshtein 1.x
 Datum             date-fns 4.x

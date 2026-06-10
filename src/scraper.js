@@ -10,7 +10,7 @@ const { normalizeUrl } = require('./utils');
 const { extractFirstParagraph } = require('./deduplicator');
 const { rssLikelyRelevant } = require('./analyzer');
 const database = require('./database');
-const { fetchFeed, fetchText, testFeed } = require('./feed-fetcher');
+const { fetchFeed, fetchText, testFeed, parseNewsSitemap } = require('./feed-fetcher');
 
 function extractArticleDate(html, url) {
   if (!html) return tryUrlDate(url) || null;
@@ -340,10 +340,60 @@ function tryReadability(html, url) {
   }
 }
 
+const ARTICLE_LD_TYPES = new Set([
+  'Article',
+  'NewsArticle',
+  'ReportageNewsArticle',
+  'AnalysisNewsArticle',
+  'BackgroundNewsArticle',
+  'OpinionNewsArticle',
+  'ReviewNewsArticle',
+  'BlogPosting',
+  'Review',
+]);
+
+// JSON-LD NewsArticle liefert Headline/Autor/articleBody strukturiert und
+// vom Verlag selbst gepflegt — praeziser als jede Container-Heuristik.
+// Muss vor REMOVE_SELECTORS laufen (entfernt script-Tags).
+function tryJsonLdArticle($) {
+  const nodes = $('script[type="application/ld+json"]');
+  for (let i = 0; i < nodes.length; i++) {
+    try {
+      const raw = $(nodes[i]).html();
+      if (!raw) continue;
+      const data = JSON.parse(raw);
+      const items = Array.isArray(data) ? data : data['@graph'] ? data['@graph'] : [data];
+      for (const item of items) {
+        if (!item) continue;
+        const types = Array.isArray(item['@type']) ? item['@type'] : [item['@type']];
+        if (!types.some((t) => ARTICLE_LD_TYPES.has(t))) continue;
+        const authorNode = Array.isArray(item.author) ? item.author[0] : item.author;
+        let author =
+          typeof authorNode === 'string' ? authorNode : (authorNode && authorNode.name) || null;
+        if (author) author = String(author).replace(/\s+/g, ' ').trim();
+        if (author && author.length > 80) author = null;
+        return {
+          headline: typeof item.headline === 'string' ? item.headline.trim() : '',
+          author,
+          description: typeof item.description === 'string' ? item.description.trim() : '',
+          articleBody:
+            typeof item.articleBody === 'string'
+              ? item.articleBody.replace(/\s+/g, ' ').trim()
+              : '',
+        };
+      }
+    } catch {
+      /* skip invalid json-ld */
+    }
+  }
+  return null;
+}
+
 function extractArticleContent(html, url) {
   if (!html) return { title: '', text: '', firstParagraph: '', paywall: false };
 
   const $ = cheerio.load(html);
+  const ldArticle = tryJsonLdArticle($);
 
   REMOVE_SELECTORS.forEach((sel) => {
     try {
@@ -496,6 +546,16 @@ function extractArticleContent(html, url) {
       finalTitle = readabilityResult.title;
     if (readabilityResult.author && !finalAuthor) finalAuthor = readabilityResult.author;
   }
+  // JSON-LD-First: ein gepflegter articleBody schlaegt die Heuristiken,
+  // sobald er mindestens gleichwertig ist; Headline/Autor ergaenzen Luecken
+  if (ldArticle) {
+    if (ldArticle.articleBody.length >= 200 && ldArticle.articleBody.length > finalText.length) {
+      finalText = ldArticle.articleBody;
+    }
+    if (!finalTitle && ldArticle.headline) finalTitle = ldArticle.headline;
+    if (!finalAuthor && ldArticle.author) finalAuthor = ldArticle.author;
+    if (!description && ldArticle.description) description = ldArticle.description;
+  }
   const finalFirstParagraph = extractFirstParagraph(finalText);
 
   return {
@@ -558,7 +618,8 @@ async function fetchRssFeed(feed) {
     logger.error(
       `RSS fehlgeschlagen: ${feed.name} (${result.errorClass || 'unknown'}): ${result.error}`
     );
-    return [];
+    // Feed tot, aber die News-Sitemap liefert evtl. trotzdem
+    return fetchSitemapItems(feed);
   }
 
   database.recordSourceSuccess(feed.name, {
@@ -580,7 +641,7 @@ async function fetchRssFeed(feed) {
     `RSS: ${feed.name} -> ${result.items.length} Eintraege (${result.responseTimeMs}ms)${viaTag}`
   );
 
-  return result.items
+  const items = result.items
     .map((item) => ({
       title: item.title,
       url: item.url,
@@ -592,6 +653,44 @@ async function fetchRssFeed(feed) {
       sourcePriority: feed.priority || 50,
     }))
     .filter((it) => it.url);
+
+  // News-Sitemap als Ergaenzung: viele Verlags-Feeds liefern nur die
+  // letzten ~10 Artikel, die Sitemap die letzten 48h vollstaendig
+  const sitemapItems = await fetchSitemapItems(feed);
+  if (sitemapItems.length > 0) {
+    const seen = new Set(items.map((i) => i.url));
+    for (const it of sitemapItems) {
+      if (!seen.has(it.url)) items.push(it);
+    }
+  }
+  return items;
+}
+
+// Holt Eintraege aus der News-Sitemap einer Quelle (sitemap_news.xml,
+// Feld "sitemap_url" in sources.json). Fehler sind nicht fatal — die
+// Sitemap ist ein Zusatzkanal, kein Ersatz fuer den Feed.
+async function fetchSitemapItems(feed) {
+  if (!feed.sitemap_url) return [];
+  try {
+    const res = await fetchText(feed.sitemap_url, { timeout: 20000 });
+    const parsed = await parseNewsSitemap(res.text);
+    logger.info(`Sitemap: ${feed.name} -> ${parsed.items.length} Eintraege`);
+    return parsed.items
+      .map((item) => ({
+        title: item.title,
+        url: item.url,
+        publishedDate: item.publishedDate,
+        summary: '',
+        content: '',
+        author: null,
+        source: feed.name,
+        sourcePriority: feed.priority || 50,
+      }))
+      .filter((it) => it.url);
+  } catch (err) {
+    logger.debug(`Sitemap fehlgeschlagen: ${feed.name} (${err.message})`);
+    return [];
+  }
 }
 
 // Findet die AMP-Version einer Seite (<link rel="amphtml">) — schlankes

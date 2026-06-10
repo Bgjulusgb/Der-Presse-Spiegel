@@ -16,7 +16,7 @@ from .analyzer import Analyzer
 from .database import Database
 from .dedup import Deduplicator
 from .extract import extract_article_content, extract_article_date, find_amp_url
-from .feedparse import looks_like_feed, parse_feed
+from .feedparse import looks_like_feed, parse_feed, parse_news_sitemap
 from .fetcher import AsyncFetcher
 from .newssearch import fetch_bing_news, fetch_google_news, resolve_google_news_url
 from .textutils import collapse_ws, first_paragraph, normalize_url, parse_date
@@ -106,7 +106,8 @@ class ScanPipeline:
                 "status_code": result.status or None,
             })
             log.warning("RSS fehlgeschlagen: %s (%s)", name, result.error_class)
-            return []
+            # Feed tot, aber die News-Sitemap liefert evtl. trotzdem
+            return await self._fetch_sitemap_items(fetcher, feed)
         if not looks_like_feed(result.text):
             self.db.record_source_failure(name, "kein Feed-Inhalt", {
                 "response_ms": result.elapsed_ms, "error_class": "parse",
@@ -138,7 +139,36 @@ class ScanPipeline:
                 "summary": it.summary, "content": it.content, "author": it.author,
                 "source": name, "source_priority": feed.get("priority", 50),
             })
+
+        # News-Sitemap als Ergaenzung: viele Verlags-Feeds liefern nur die
+        # letzten ~10 Artikel, die Sitemap die letzten 48h vollstaendig
+        sitemap_items = await self._fetch_sitemap_items(fetcher, feed)
+        if sitemap_items:
+            seen_urls = {i["url"] for i in items}
+            items.extend(i for i in sitemap_items if i["url"] not in seen_urls)
         return items
+
+    async def _fetch_sitemap_items(self, fetcher: AsyncFetcher, feed: dict) -> list[dict]:
+        """Eintraege aus der News-Sitemap (Feld "sitemap_url" in sources.json).
+        Fehler sind nicht fatal — die Sitemap ist ein Zusatzkanal."""
+        sitemap_url = feed.get("sitemap_url")
+        if not sitemap_url:
+            return []
+        try:
+            res = await fetcher.fetch(sitemap_url, timeout_ms=20000)
+            if not res.ok or not res.text:
+                return []
+            parsed = parse_news_sitemap(res.text)
+            log.info("Sitemap: %s -> %d Einträge", feed["name"], len(parsed.items))
+            return [{
+                "title": it.title, "url": it.url, "published": it.published,
+                "summary": "", "content": "", "author": "",
+                "source": feed["name"],
+                "source_priority": feed.get("priority", 50),
+            } for it in parsed.items if it.url]
+        except Exception as exc:  # noqa: BLE001
+            log.debug("Sitemap fehlgeschlagen: %s (%s)", feed.get("name"), exc)
+            return []
 
     def _record_aggregator(self, name: str, res: dict, feed_type: str):
         if res["status"] == "ok":

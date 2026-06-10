@@ -39,21 +39,37 @@ Erfolg in `config/sources.json` aufnehmen:
 - In Muenchen Magazin, kulturvollzug.de
 - muenchen.de / Rathaus-Umschau (RSS-Pfad recherchieren)
 
-## 4. Naechste Runde (Backlog aus dem Erweiterungsplan)
+## 4. Runde 2 — umgesetzt ✓ (2026-06-09)
 
-In Prioritaetsreihenfolge, jeweils unabhaengig shipbar:
+1. ✓ **News-Sitemaps** (§2.1): `parseNewsSitemap()` (Node) +
+   `parse_news_sitemap()` (Python) fuer Google-News-Sitemaps; optionales
+   Feld `sitemap_url` pro Quelle in `sources.json`. Die Sitemap ergaenzt
+   den Feed (Dedup per URL) und springt ein, wenn der Feed down ist.
+   Hinweis: konkrete Sitemap-URLs der grossen Verlage waren aus der
+   Sandbox nicht verifizierbar (Egress-Policy) — lokal pruefen, Muster:
+   `https://<verlag>/sitemap-news.xml`.
+2. ✓ **JSON-LD-First-Extraktion** (§2.2, Node): `tryJsonLdArticle()`
+   liest `NewsArticle`/`Article`-JSON-LD (inkl. `@graph`); ein
+   substanzieller `articleBody` (≥200 Zeichen, laenger als die Heuristik)
+   gewinnt, Headline/Autor/Description fuellen Luecken. Python nutzt
+   JSON-LD bereits via trafilatura.
+3. ✓ **Veraltete README-Doku korrigiert**: Troubleshooting-Abschnitt und
+   Tech-Stack verwiesen noch auf `better-sqlite3`/`npm run fix-sqlite` —
+   beides existiert seit der Migration auf `node:sqlite` nicht mehr.
 
-1. **News-Sitemaps** (§2.1) — `sitemap_news.xml`-Parser als Fallback-Kanal,
-   Feld `sitemap_url` pro Quelle (Node + Python).
-2. **JSON-LD-First-Extraktion** (§2.2) — `NewsArticle`-JSON-LD vor
-   Readability bevorzugen (Node; trafilatura nutzt JSON-LD bereits).
-3. **Story-Cluster in UI/Report** (§3.1) + **Kritikerspiegel** (§3.2) —
+## 5. Naechste Runde (Backlog aus dem Erweiterungsplan)
+
+1. **Story-Cluster in UI/Report** (§3.1) + **Kritikerspiegel** (§3.2) —
    Clipping-Struktur statt flacher Liste.
-4. **Inkrementelle Scans** (§4.1) — Wasserzeichen pro Quelle.
-5. **FTS5-Index** (§7.1) und **HTML-Snapshots** (§7.2) — sobald der
+2. **Inkrementelle Scans** (§4.1) — Wasserzeichen pro Quelle.
+3. **FTS5-Index** (§7.1) und **HTML-Snapshots** (§7.2) — sobald der
    Backfill-Bestand waechst.
+4. **Sitemap-URLs nachtragen**: fuer Merkur/tz/AZ/SZ lokal die
+   `sitemap-news.xml`-Pfade verifizieren und in `sources.json` eintragen.
 
-## 5. Verifikation dieser Runde
+## 6. Verifikation
+
+Runde 1:
 
 - ESLint: 0 Fehler, 0 Warnungen
 - Node: 370 Tests gruen (5 neue: Query-Expansion, AMP)
@@ -61,3 +77,9 @@ In Prioritaetsreihenfolge, jeweils unabhaengig shipbar:
 - `python3 -m pyscraper selftest`: ok
 - Live-Check: `test-feed` gegen Muenchner Feuilleton ok; Query-Expansion
   gegen reale `keywords.json`/`sources.json` geprueft
+
+Runde 2:
+
+- Node: 376 Tests gruen (4 neue: Sitemap-Parser, JSON-LD-Extraktion)
+- Python: 51 Tests gruen (2 neue: Sitemap-Parser)
+- ESLint sauber, `pyscraper selftest` ok
